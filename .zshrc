@@ -89,7 +89,6 @@ bindkey -M viins ‘jj’ vi-cmd-mode
 source ~/perl5/perlbrew/etc/bashrc
 export PELRBREW_CPAN_MIRROR=http://mirror.transip.net/CPAN/
 alias upgrade_nuke='docker rm -f $(docker ps -a | grep -v mysql)'
-# alias envsubst='/Users/athomas/homebrew/Cellar/gettext/0.19.7/bin/envsubst'
 alias clean_pycache="find . -type f -name '*.pyc' -delete"
 alias kill_all_vagrants="vagrant global-status | grep virtualbox | awk '{print $1}' | xargs -n1 vagrant destroy -f"
 alias eval_docker='eval "$(docker-machine env default)"'
