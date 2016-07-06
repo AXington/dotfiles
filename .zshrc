@@ -82,7 +82,6 @@ source $ZSH/oh-my-zsh.sh
 # Example aliases
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
-export IMAGEORG=narsil.ad.pdrop.net:5000
 alias nukeit='docker rm --force $(docker ps -a -q)'
 alias nuke_cleaner="docker rm -f cleaner mysqlcleaner s3"
 bindkey -M viins ‘jj’ vi-cmd-mode
