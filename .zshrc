@@ -1,10 +1,12 @@
-# Path to your oh-my-zsh installation.
-export ZSH=/Users/athomas/.oh-my-zsh
+# If you come from bash you might have to change your $PATH.
+# export PATH=$HOME/bin:/usr/local/bin:$PATH
 
-# Set name of the theme to load.
-# Look in ~/.oh-my-zsh/themes/
-# Optionally, if you set this to "random", it'll load a random theme each
-# time that oh-my-zsh is loaded.
+# Path to your oh-my-zsh installation.
+  export ZSH=/home/andrew/.oh-my-zsh
+
+# Set name of the theme to load. Optionally, if you set this to "random"
+# it'll load a random theme each time that oh-my-zsh is loaded.
+# See https://github.com/robbyrussell/oh-my-zsh/wiki/Themes
 ZSH_THEME="robbyrussell"
 
 # Uncomment the following line to use case-sensitive completion.
@@ -49,14 +51,13 @@ ZSH_THEME="robbyrussell"
 # Custom plugins may be added to ~/.oh-my-zsh/custom/plugins/
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
-plugins=(git zsh-syntax-highlighting pass fuck task ssh-agent vi-mode virtualenvwrapper osx )
+plugins=(zsh-syntax-highlighting pass fuck task ssh-agent virtualenvwrapper)
+
+source $ZSH/oh-my-zsh.sh
 
 # User configuration
 
-export PATH="/Users/athomas/homebrew/bin:/Users/athomas/tools/jmeter/apache-jmeter-2.13/bin:/Users/athomas/homebrew/bin:/Users/athomas/tools/jmeter/apache-jmeter-2.13/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/X11/bin:/usr/local/munki:/Users/athomas:/Users/athomas:/Users/athomas/homebrew/Cellar/gettext/0.19.7/bin/"
 # export MANPATH="/usr/local/man:$MANPATH"
-
-source $ZSH/oh-my-zsh.sh
 
 # You may need to manually set your language environment
 # export LANG=en_US.UTF-8
@@ -82,12 +83,3 @@ source $ZSH/oh-my-zsh.sh
 # Example aliases
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
-alias nukeit='docker rm --force $(docker ps -a -q)'
-alias nuke_cleaner="docker rm -f cleaner mysqlcleaner s3"
-bindkey -M viins ‘jj’ vi-cmd-mode
-source ~/perl5/perlbrew/etc/bashrc
-export PELRBREW_CPAN_MIRROR=http://mirror.transip.net/CPAN/
-alias upgrade_nuke='docker rm -f $(docker ps -a | grep -v mysql)'
-alias clean_pycache="find . -type f -name '*.pyc' -delete"
-alias kill_all_vagrants="vagrant global-status | grep virtualbox | awk '{print $1}' | xargs -n1 vagrant destroy -f"
-alias eval_docker='eval "$(docker-machine env default)"'
