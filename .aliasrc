@@ -1,0 +1,22 @@
+#!/bin/bash
+
+if [ -f contexts ] ;then
+source contexts;
+fi
+
+$MINIKUBE=${MINIKUBE:-"none"}
+$DEV=${DEV:-"none"}
+$STAGING=${STAGING:-"none"}
+$PROD=${PROD:-"none"}
+$NAMESPACE=${NAMESPACE:-"none"}
+
+alias kmk='kubectl config use-context $MINIKUBE'
+alias kdev='kubectl config use-context $DEV'
+alias kstaging='kubectl config use-context $STAGING'
+alias kprod='kubectl config use-context $PROD'
+alias kdo='kubectl -n $NAMESPACE'
+alias clean_pycache="find . -type f -name '*.pyc' -delete"
+alias nuke_docker='docker rm --force $(docker ps -a -q)'
+alias kill_all_vagrants="vagrant global-status | grep virtualbox | awk '{print $1}' | xargs -n1 vagrant destroy -f"
+alias clean_docker_images="docker rmi -f $(docker images | grep none | awk '{print $3}')"
+
