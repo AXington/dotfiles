@@ -1,12 +1,10 @@
-# If you come from bash you might have to change your $PATH.
-# export PATH=$HOME/bin:/usr/local/bin:$PATH
-
 # Path to your oh-my-zsh installation.
-  export ZSH=/home/andrew/.oh-my-zsh
+export ZSH=/Users/athomas/.oh-my-zsh
 
-# Set name of the theme to load. Optionally, if you set this to "random"
-# it'll load a random theme each time that oh-my-zsh is loaded.
-# See https://github.com/robbyrussell/oh-my-zsh/wiki/Themes
+# Set name of the theme to load.
+# Look in ~/.oh-my-zsh/themes/
+# Optionally, if you set this to "random", it'll load a random theme each
+# time that oh-my-zsh is loaded.
 ZSH_THEME="robbyrussell"
 
 # Uncomment the following line to use case-sensitive completion.
@@ -26,7 +24,7 @@ ZSH_THEME="robbyrussell"
 # DISABLE_LS_COLORS="true"
 
 # Uncomment the following line to disable auto-setting terminal title.
-# DISABLE_AUTO_TITLE="true"
+DISABLE_AUTO_TITLE="true"
 
 # Uncomment the following line to enable command auto-correction.
 # ENABLE_CORRECTION="true"
@@ -51,23 +49,20 @@ ZSH_THEME="robbyrussell"
 # Custom plugins may be added to ~/.oh-my-zsh/custom/plugins/
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
-plugins=(zsh-syntax-highlighting pass fuck task ssh-agent virtualenvwrapper)
-
-source $ZSH/oh-my-zsh.sh
+plugins=(zsh-syntax-highlighting python sudo ssh-agent virtualenvwrapper urltools)
 
 # User configuration
 
+export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/local/bin:/opt/X11/bin"
+[ -f ~/.pathfile ] && source ~/.pathfile
 # export MANPATH="/usr/local/man:$MANPATH"
 
-# You may need to manually set your language environment
-# export LANG=en_US.UTF-8
+source $ZSH/oh-my-zsh.sh
 
-# Preferred editor for local and remote sessions
-if [[ -n $SSH_CONNECTION ]]; then
-	export EDITOR='vim'
-else
-	export EDITOR='mvim'
-fi
+# You may need to manually set your language environment
+export LANG=en_US.UTF-8
+
+export EDITOR='vim'
 
 # Compilation flags
 # export ARCHFLAGS="-arch x86_64"
@@ -83,13 +78,20 @@ fi
 # Example aliases
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
-tmux
-setxkbmap -option ctrl:nocaps
-source ~/perl5/perlbrew/etc/bashrc
 
-if [ -f ~/.aliasrc ]; then
-	source ~/.aliasrc;
+ZSH_TMUX_AUTOQUIT=false
+
+alias nuke_docker='docker rm --force $(docker ps -a -q)'
+alias kill_all_vagrants='vagrant global-status | grep virtualbox | awk '\''{print }'\'' | xargs -n1 vagrant destroy -f'
+alias clean_pycache='find . -type f -name '\''*.pyc'\'' -delete'
+alias clean_docker_images="docker rmi -f $(docker images | grep none | awk '{print $3}')"
+
+if [ -f ~/.local_settings ]; then
+	source ~/.local_settings;
 else
-	echo 'No alias file found'
+	echo 'No local settings file found'
 fi
+
+
+eval $(thefuck --alias)
 
