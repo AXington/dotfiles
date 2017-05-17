@@ -18,7 +18,9 @@ To set it up first you must set up the following:
 
 ###Experimental (WIP, untested, use at your own risk)
 
-After these prereqs are installed, run setup.sh
+After these prereqs are installed, run:
+
+`setup.sh`
 
 To add to your path add a .pathfile to your home directory and export your new path.
 
