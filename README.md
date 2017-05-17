@@ -5,6 +5,8 @@ It uses ZSH, OH-MY-ZSH, and tmux for most of it's configurations.
 
 The tmux settings here are from https://github.com/gpakosz/.tmux
 
+![My Terminal](https://github.com/AXington/linuxsetup/blob/master/img/screenshot.png)
+
 ## Setup
 To set it up first you must set up the following:
 
