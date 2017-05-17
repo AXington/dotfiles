@@ -1,12 +1,12 @@
 #! /bin/bash
 
+
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 git submodule update --init --recursive
 
 ln -s -f $DIR/gpakosz-tmux/.tmux.conf $HOME/.tmux.conf
 ln -s -f $DIR/tmux.conf.local $HOME/.tmux.conf.local
-ln -s -f $DIR/gitconfig $HOME/.gitconfig
 ln -s -f $DIR/vim $HOME/.vim
 ln -s -f $DIR/vimrc $HOME/.vimrc
 ln -s -f $DIR/zshrc $HOME/.zshrc
@@ -21,4 +21,10 @@ select yn in "Yes" "No"; do
 		No ) echo "not disabling capslock"; break;;
 	esac
 done
+
+[ -z '$GIT_EMAIL' ] || git config --global user.email "$GIT_EMAIL"
+[ -z '$GIT_NAME' ] || git config --global user.name "$GIT_NAME"
+[ -z '$EDITOR' ] || git config --global core.editor "$EDITOR"
+
+
 

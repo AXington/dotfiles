@@ -18,7 +18,13 @@ To set it up first you must set up the following:
 
 ###Experimental (WIP, untested, use at your own risk)
 
-After these prereqs are installed, run:
+After the prerequs are installed, if you wish to setup git eport the following variables:
+
+```
+export GIT_EMAIL=you@yourdomain.extension
+export GIT_NAME="Firstname Lastname"
+export EDITOR="vim"
+```
 
 `setup.sh`
 
@@ -37,7 +43,6 @@ git submodule update --init --recursive
 
 ln -s -f gpakosz-tmux/.tmux.conf $HOME/.tmux.conf
 ln -s -f tmux.conf.local $HOME/.tmux.conf.local
-ln -s -f gitconfig $HOME/.gitconfig
 ln -s -f vim $HOME/.vim
 ln -s -f vimrc $HOME/.vimrc
 ln -s -f zshrc $HOME/.zshrc
