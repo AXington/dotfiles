@@ -62,7 +62,6 @@ source $ZSH/oh-my-zsh.sh
 # You may need to manually set your language environment
 export LANG=en_US.UTF-8
 
-export EDITOR='vim'
 
 # Compilation flags
 # export ARCHFLAGS="-arch x86_64"
@@ -84,7 +83,7 @@ ZSH_TMUX_AUTOQUIT=false
 alias nuke_docker='docker rm --force $(docker ps -a -q)'
 alias kill_all_vagrants='vagrant global-status | grep virtualbox | awk '\''{print }'\'' | xargs -n1 vagrant destroy -f'
 alias clean_pycache='find . -type f -name '\''*.pyc'\'' -delete'
-alias clean_docker_images="docker rmi -f $(docker images | grep none | awk '{print $3}')"
+alias clean_docker_images=`docker rmi -f $(docker images | grep none | awk '{ print $3 }')`
 
 if [ -f ~/.local_settings ]; then
 	source ~/.local_settings;
@@ -92,6 +91,7 @@ else
 	echo 'No local settings file found'
 fi
 
+[ -z '$EDITOR' ] !! export EDITOR='vim'
 
 eval $(thefuck --alias)
 
