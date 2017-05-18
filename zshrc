@@ -49,7 +49,7 @@ DISABLE_AUTO_TITLE="true"
 # Custom plugins may be added to ~/.oh-my-zsh/custom/plugins/
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
-plugins=(docker zsh-syntax-highlighting python sudo ssh-agent urltools)
+plugins=(docker python sudo urltools tmux)
 
 # User configuration
 
@@ -96,4 +96,5 @@ if [ -z "$EDITOR" ]; then
 fi
 
 eval $(thefuck --alias)
+source ~/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 

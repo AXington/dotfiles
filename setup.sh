@@ -5,11 +5,12 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 git submodule update --init --recursive
 
-ln -s -f $DIR/gpakosz-tmux/.tmux.conf $HOME/.tmux.conf
-ln -s -f $DIR/tmux.conf.local $HOME/.tmux.conf.local
-ln -s -f $DIR/vim $HOME/.vim
-ln -s -f $DIR/vimrc $HOME/.vimrc
-ln -s -f $DIR/zshrc $HOME/.zshrc
+ln -s $DIR/gpakosz-tmux/.tmux.conf $HOME/.tmux.conf
+ln -s $DIR/tmux.conf.local $HOME/.tmux.conf.local
+cp -r $DIR/vim $HOME/.vim
+ln -s $DIR/vimrc $HOME/.vimrc
+ln -s $DIR/zshrc $HOME/.zshrc
+cp -r $DIR/zsh-syntax-highlighting $HOME/zsh-syntax-highlighting
 
 nocaps="setxkbmap -option ctrl:nocaps\n
 xcape -e 'Caps_Lock=Escape;Control_L=Escape;Control_R=Escape'"
