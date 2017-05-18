@@ -45,9 +45,11 @@ git submodule update --init --recursive
 
 ln -s -f gpakosz-tmux/.tmux.conf $HOME/.tmux.conf
 ln -s -f tmux.conf.local $HOME/.tmux.conf.local
-ln -s -f vim $HOME/.vim
-ln -s -f vimrc $HOME/.vimrc
-ln -s -f zshrc $HOME/.zshrc
+mkdir -p ~/.vim
+cp -r vim/. ~/.vim/.
+ln -s -f vimrc ~/.vimrc
+ln -s -f zshrc ~/.zshrc
+cp -r zsh-syntax-highlighting ~/.
 
 # if you want to set your caps_lock button to control (highly recommended)
 echo "setxkbmap -option ctrl:nocaps" >> $HOME/.local_settings
