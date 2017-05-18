@@ -7,6 +7,12 @@ The tmux settings here are from https://github.com/gpakosz/.tmux
 
 ![My Terminal](https://github.com/AXington/linuxsetup/blob/master/img/screenshot.png)
 
+## Future notes
+I'm currently looking into replacing oh-my-zsh with https://github.com/myzsh/myzsh
+Currently what I need from it that makes me hesitant is docker tab completion and
+python tab completion. However, it seems to be lighter weight than oh-my-zsh and plugins
+for it are not as coupled to the themes as OMZ are.
+
 ## Setup
 To set it up first you must set up the following:
 
