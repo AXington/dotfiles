@@ -24,6 +24,8 @@ To set it up first you must set up the following:
 * xcape (linux only, if you want to override caps lock, see install instructions in submodule)
 * Powerline fonts (see https://github.com/gpakosz/.tmux) for more information
 
+### Optional:
+
 ###Experimental (WIP, untested, use at your own risk)
 
 After the prerequs are installed, if you wish to setup git eport the following variables:
@@ -60,5 +62,10 @@ cp -r zsh-syntax-highlighting ~/.
 # if you want to set your caps_lock button to control (highly recommended)
 echo "setxkbmap -option ctrl:nocaps" >> $HOME/.local_settings
 echo "xcape -e 'Caps_Lock=Control'" >> $HOME/.local_settings
+
+# optional, script to clean docker cache
+mkdir -p ~/bin
+cp clean_docker_cache ~/bin
+echo "export PATH=$HOME/bin:$PATH" >> ~/.pathfile
 ```
 

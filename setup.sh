@@ -11,6 +11,9 @@ cp -r $DIR/vim $HOME/.vim
 ln -s $DIR/vimrc $HOME/.vimrc
 ln -s $DIR/zshrc $HOME/.zshrc
 cp -r $DIR/zsh-syntax-highlighting $HOME/zsh-syntax-highlighting
+mkdir -p $HOME/bin
+cp clean_docker_images $HOME/bin/
+echo "export PATH=/$HOME/bin/:$PATH" >> $HOME/.pathfile
 
 nocaps="setxkbmap -option ctrl:nocaps\n
 xcape -e 'Caps_Lock=Escape;Control_L=Escape;Control_R=Escape'"
