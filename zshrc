@@ -83,7 +83,6 @@ ZSH_TMUX_AUTOQUIT=false
 alias nuke_docker='docker rm --force $(docker ps -a -q)'
 alias kill_all_vagrants='vagrant global-status | grep virtualbox | awk '\''{print }'\'' | xargs -n1 vagrant destroy -f'
 alias clean_pycache='find . -type f -name '\''*.pyc'\'' -delete'
-alias clean_docker_images="docker rmi -f $(docker images | grep none | awk '{ print $3 }')"
 
 if [ -f ~/.local_settings ]; then
 	source ~/.local_settings;
