@@ -1,0 +1,14 @@
+// Personal VS Code setup
+// installed plugins = vim, seti monokai, python
+
+{
+    "workbench.colorTheme": "Seti Monokai",
+    "vim.disableAnnoyingNeovimMessage": true,
+    "workbench.colorCustomizations": {
+        "editor.background": "#000000",
+        "editor.foreground": "#ffffff"
+    },
+    "editor.renderWhitespace": "all",
+    "editor.renderControlCharacters": true,
+    "editor.renderIndentGuides": true
+}
