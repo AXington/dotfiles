@@ -81,7 +81,6 @@ export LANG=en_US.UTF-8
 alias nuke_docker='docker rm --force $(docker ps -a -q)'
 alias kill_all_vagrants='vagrant global-status | grep virtualbox | awk '\''{print }'\'' | xargs -n1 vagrant destroy -f'
 alias clean_pycache='find . -type f -name '\''*.pyc'\'' -delete'
-alias tm='tmux attach || tmux new'
 
 if [ -f ~/.local_settings ]; then
 	source ~/.local_settings;
@@ -94,6 +93,6 @@ if [ -z "$EDITOR" ]; then
 fi
 
 eval $(thefuck --alias)
-tm
+tmux attach
 source ~/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 
