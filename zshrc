@@ -90,6 +90,8 @@ fi
 
 if [ -z "$EDITOR" ]; then
 	export EDITOR='vim'
+elif [ "$EDITOR" != 'vim' ]; then
+	export EDITOR='vim'
 fi
 
 eval $(thefuck --alias)

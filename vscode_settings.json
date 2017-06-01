@@ -1,5 +1,5 @@
 // Personal VS Code setup
-// installed plugins = vim, seti monokai, python
+// installed plugins = vim, seti monokai, python, Docker, MagicPython, markdownlint
 
 {
     "workbench.colorTheme": "Seti Monokai",

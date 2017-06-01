@@ -1,0 +1,7 @@
+#! /bin/bash
+
+# Setup GPG Agent
+export GPG_TTY=$(TTY)
+GPG_PATH="/path/to/gpg/agent"
+export PATH="$GPG_PATH:$PATH"
+
