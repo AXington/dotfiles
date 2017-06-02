@@ -79,18 +79,9 @@ export LANG=en_US.UTF-8
 # alias ohmyzsh="mate ~/.oh-my-zsh"
 
 alias nuke_docker='docker rm --force $(docker ps -a -q)'
-alias kill_all_vagrants='vagrant global-status | grep virtualbox | awk '\''{print }'\'' | xargs -n1 vagrant destroy -f'
 
 if [ -f ~/.local_settings ]; then
 	source ~/.local_settings;
-else
-	echo 'No local settings file found'
-fi
-
-if [ -z "$EDITOR" ]; then
-	export EDITOR='vim'
-elif [ "$EDITOR" != 'vim' ]; then
-	export EDITOR='vim'
 fi
 
 eval $(thefuck --alias)
