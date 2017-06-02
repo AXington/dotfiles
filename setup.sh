@@ -13,6 +13,7 @@ ln -s $DIR/zshrc $HOME/.zshrc
 cp -r $DIR/zsh-syntax-highlighting $HOME/zsh-syntax-highlighting
 mkdir -p $HOME/bin
 cp clean_docker_images $HOME/bin/
+cp clean_python_cache $HOME/bin/
 echo "export PATH=/$HOME/bin/:$PATH" >> $HOME/.pathfile
 
 nocaps="setxkbmap -option ctrl:nocaps\n

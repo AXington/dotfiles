@@ -63,9 +63,10 @@ cp -r zsh-syntax-highlighting ~/.
 echo "setxkbmap -option ctrl:nocaps" >> $HOME/.local_settings
 echo "xcape -e 'Caps_Lock=Control'" >> $HOME/.local_settings
 
-# optional, script to clean docker cache
+# optional scripts to clean docker cache (orphaned images), and python cache
 mkdir -p ~/bin
 cp clean_docker_cache ~/bin
+cp clean_python_cache ~/bin
 echo "export PATH=$HOME/bin:$PATH" >> ~/.pathfile
 ```
 
