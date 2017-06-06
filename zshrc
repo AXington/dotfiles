@@ -93,6 +93,8 @@ elif [ "$EDITOR" != 'vim' ]; then
 	export EDITOR='vim'
 fi
 
+DEFAULT_USERNAME=athomas
+prompt_context(){}
 eval $(thefuck --alias)
 tmux attach
 source ~/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
