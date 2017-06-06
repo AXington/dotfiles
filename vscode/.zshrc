@@ -84,6 +84,8 @@ if [ -f ~/.local_settings ]; then
 	source ~/.local_settings;
 fi
 
+DEFAULT_USERNAME=athomas
+prompt_context(){}
 eval $(thefuck --alias)
 source ~/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 
