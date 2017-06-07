@@ -49,7 +49,7 @@ DISABLE_AUTO_TITLE="true"
 # Custom plugins may be added to ~/.oh-my-zsh/custom/plugins/
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
-plugins=(docker python sudo urltools)
+plugins=(docker python virtualenvwrapper virtualenv zsh_reload)
 
 # User configuration
 
@@ -96,7 +96,7 @@ fi
 DEFAULT_USERNAME=athomas
 prompt_context(){}
 eval $(thefuck --alias)
-tmux attach
+tmux attach || tmux new -s main
 source ~/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 
 
