@@ -2,4 +2,4 @@
 *.local_settings
 *.pathfile
 *.DS_Store
-*.zcoredump*
+*.zcompdump*
