@@ -1,4 +1,5 @@
 *.swp
-.local_settings
-.pathfile
-.DS_Store
+*.local_settings
+*.pathfile
+*.DS_Store
+*.zcoredump*
