@@ -87,11 +87,7 @@ else
 	echo 'No local settings file found'
 fi
 
-if [ -z "$EDITOR" ]; then
-	export EDITOR='vim'
-elif [ "$EDITOR" != 'vim' ]; then
-	export EDITOR='vim'
-fi
+export EDITOR='vim'
 
 DEFAULT_USERNAME=athomas
 prompt_context(){}

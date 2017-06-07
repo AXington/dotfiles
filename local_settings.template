@@ -1,8 +1,0 @@
-#! /bin/bash
-
-export MINIKUBE=localhost
-
-alias kmk='kubectl config use-context ${MINIKUBE}'
-alias kgetns='kubectl get ns'
-alias kdo='kubectl --namespace=$NAMESPACE'
-
