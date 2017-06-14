@@ -89,6 +89,8 @@ fi
 
 export EDITOR='vim'
 
+bindkey -v
+
 DEFAULT_USERNAME=athomas
 prompt_context(){}
 eval $(thefuck --alias)
