@@ -9,6 +9,7 @@ autocmd BufNewFile,BufRead *.json set ft=javascript
 set term=screen-256color
 set listchars=tab:>-,trail:~,extends:>,precedes:<
 set list
+set shiftwidth=4
 autocmd FileType yaml setlocal ts=2 sts=2 sw=2 expandtab
 autocmd BufNewFile,BufRead *.yaml.tmpl set ft=yaml~
 
