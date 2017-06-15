@@ -1,5 +1,5 @@
 # Path to your oh-my-zsh installation.
-export ZSH=/Users/athomas/.oh-my-zsh
+export ZSH=/home/athomas/.oh-my-zsh
 
 # Set name of the theme to load.
 # Look in ~/.oh-my-zsh/themes/
@@ -83,8 +83,6 @@ alias kill_all_vagrants='vagrant global-status | grep virtualbox | awk '\''{prin
 
 if [ -f ~/.local_settings ]; then
 	source ~/.local_settings;
-else
-	echo 'No local settings file found'
 fi
 
 export EDITOR='vim'
