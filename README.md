@@ -1,17 +1,12 @@
 # linuxsetup
-this is my linux setup that I keep at all times so I never lose my setup
+this is my dev and work setup that I keep at all times so I can quickly
+set up new environments to my preferences and have a consistent workflow.
+I also keep this with the readme as a reminder and to help friends who like my setup
+to easily get set up with something like it.
 
 It uses ZSH, OH-MY-ZSH, and tmux for most of it's configurations.
 
-The tmux settings here are from https://github.com/gpakosz/.tmux
-
-![My Terminal](https://github.com/AXington/linuxsetup/blob/master/img/screenshot.png)
-
-## Future notes
-I'm currently looking into replacing oh-my-zsh with https://github.com/myzsh/myzsh
-Currently what I need from it that makes me hesitant is docker tab completion and
-python tab completion. However, it seems to be lighter weight than oh-my-zsh and plugins
-for it are not as coupled to the themes as OMZ are.
+I also use VIM as my editor and vim mode in my terminal.
 
 ## Setup
 To set it up first you must set up the following:
@@ -20,53 +15,33 @@ To set it up first you must set up the following:
 * OH-MY-ZSH
 * vim
 * tmux
+* .tmux
 * thefuck
-* xcape (linux only, if you want to override caps lock, see install instructions in submodule)
-* Powerline fonts (see https://github.com/gpakosz/.tmux) for more information
+* Powerline fonts https://github.com/powerline/fonts
+* zsh-syntax-highlighting https://github.com/zsh-users/zsh-syntax-highlighting
 
-### Optional:
-
-###Experimental (WIP, untested, use at your own risk)
-
-After the prerequs are installed, if you wish to setup git eport the following variables:
+### Examples of some of the setup.
 
 ```
-export GIT_EMAIL=you@yourdomain.extension
-export GIT_NAME="Firstname Lastname"
-export EDITOR="vim"
-```
-
-`setup.sh`
-
-To add to your path add a .pathfile to your home directory and export your new path.
-
-`export PATH='/path/to/your/stuff:$PATH'`
-
-To add other settings, aliases, etc, add these to a `.local_settings` file in your home directory
-
-###Known good
-
-```
-git clone git@github.com:AXington/linuxsetup.git
-cd linuxsetup
-git submodule update --init --recursive
-
-ln -s -f gpakosz-tmux/.tmux.conf $HOME/.tmux.conf
+# tmux and .tmux
+git clone git@github.com:gpakosz/.tmux.git
+ln -s -f .tmux/.tmux.conf
 ln -s -f tmux.conf.local $HOME/.tmux.conf.local
-mkdir -p ~/.vim
-cp -r vim/. ~/.vim/.
-ln -s -f vimrc ~/.vimrc
-ln -s -f zshrc ~/.zshrc
-cp -r zsh-syntax-highlighting ~/.
 
-# if you want to set your caps_lock button to control (highly recommended)
-echo "setxkbmap -option ctrl:nocaps" >> $HOME/.local_settings
-echo "xcape -e 'Caps_Lock=Control'" >> $HOME/.local_settings
+# vim
+mkdir -p ~/.vim
+cp -r /path/to/my/repo/vim/. ~/.vim/.
+ln -s -f vimrc ~/.vimrc
+
+# I put the following into a dot directory so I don't have to look at it when I do ls on ~
+git clone git@github.com:zsh-users/zsh-syntax-highlighting.git ~/.zsh-syntax-highlighting
 
 # optional scripts to clean docker cache (orphaned images), and python cache
-mkdir -p ~/bin
-cp clean_docker_cache ~/bin
-cp clean_python_cache ~/bin
-echo "export PATH=$HOME/bin:$PATH" >> ~/.pathfile
+cp scripts/clean_docker_cache /some/dir/in/$PATH
+cp scropts/clean_python_cache /some/dir/in/$PATH
+
+# Finally, put zshrc in place:
+ln -s -f zshrc ~/.zshrc
+source ~/.zshrc
 ```
 
