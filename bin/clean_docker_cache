@@ -1,8 +1,0 @@
-#! /usr/bin/env bash
-
-IMAGES=$(docker images | grep none | awk '{ print $3 }')
-
-for i in $IMAGES; do
-	docker rmi $i
-done
-

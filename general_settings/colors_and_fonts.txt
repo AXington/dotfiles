@@ -1,3 +1,6 @@
+Fonts:
+Meslo with Powerline
+
 Terminal ANSI Colors
 
 Black     #000000
@@ -17,3 +20,4 @@ B Magenta #FF2FFF
 B Cyan    #2FFFFF
 Dark Gray #6E6E6E
 Gray      #848484
+
