@@ -49,11 +49,10 @@ DISABLE_AUTO_TITLE="true"
 # Custom plugins may be added to ~/.oh-my-zsh/custom/plugins/
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
-plugins=(docker python virtualenvwrapper virtualenv zsh_reload)
+plugins=(docker python virtualenvwrapper virtualenv zsh_reload kubectl)
 
 # User configuration
 
-export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/local/bin:/opt/X11/bin"
 [ -f ~/.pathfile ] && source ~/.pathfile
 # export MANPATH="/usr/local/man:$MANPATH"
 
@@ -92,7 +91,5 @@ bindkey -v
 DEFAULT_USERNAME=athomas
 prompt_context(){}
 eval $(thefuck --alias)
-tmux attach || tmux new -s main
-source ~/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
-
+source ~/.zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 

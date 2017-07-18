@@ -1,0 +1,19 @@
+Terminal ANSI Colors
+
+Black     #000000
+Red       #CD1919
+Green     #19CD19
+Yellow    #CDCD00
+Blue      #1919CD
+Magenta   #CD00CD
+Cyan      #00CDCD
+White     #FFFFFF
+Grey      #4C4C4C
+B Red     #FF2F2F
+B Green   #2FFF2F
+B Yellow  #FFFF2F
+B Blue    #2F2FFF
+B Magenta #FF2FFF
+B Cyan    #2FFFFF
+Dark Gray #6E6E6E
+Gray      #848484
