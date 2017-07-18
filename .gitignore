@@ -3,3 +3,4 @@
 *.pathfile
 *.DS_Store
 *.zcompdump*
+virtualenvwrapper
