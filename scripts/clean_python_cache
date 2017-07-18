@@ -1,0 +1,19 @@
+#! /usr/bin/env python
+
+import os
+import fnmatch
+from shutil import rmtree
+
+cdir = os.getcwd()
+
+for root, dirnames, filenames in os.walk(cdir):
+    for filename in fnmatch.filter(filenames, '*.pyc'):
+        file = os.path.join(root, filename)
+        if '.git' not in file:
+            os.remove(file)
+
+dirs = [x[0] for x in os.walk(cdir)]
+for dir in dirs:
+    if '.git' not in dir and '__pycache__' in dir:
+        rmtree(dir)
+
