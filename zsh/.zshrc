@@ -1,5 +1,6 @@
 # Path to your oh-my-zsh installation.
-export ZSH=/home/athomas/.oh-my-zsh
+export ZSH=/home/andrew/.oh-my-zsh
+PATH="/usr/local/bin:/usr/bin:$PATH"
 
 # Set name of the theme to load.
 # Look in ~/.oh-my-zsh/themes/
@@ -88,7 +89,7 @@ export EDITOR='vim'
 
 bindkey -v
 
-DEFAULT_USERNAME=athomas
+DEFAULT_USERNAME=andrew
 prompt_context(){}
 eval $(thefuck --alias)
 source ~/.zsh-syntax-highlighting/zsh-syntax-highlighting.zsh

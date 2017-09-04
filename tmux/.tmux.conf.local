@@ -246,4 +246,5 @@ tmux_conf_theme_clock_style='24'
 # move status line to top
 #set -g status-position top
 set -g mouse on
+set-option -g default-shell /bin/zsh
 
