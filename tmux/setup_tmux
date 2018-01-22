@@ -1,0 +1,11 @@
+#! /usr/bin/env bash
+
+if [ "$(uname)" == "Darwin" ]; then
+	brew install reattach-to-user-namespace
+fi
+
+git clone https://github.com/gpakosz/.tmux.git $HOME/.tmux
+ln -s -f $HOME/.tmux/.tmux.conf $HOME/.
+
+ln -sf $(PWD)/.tmux.conf.local $HOME/.
+
