@@ -1,11 +1,12 @@
-# Path to your oh-my-zsh installation.
-export ZSH=/home/andrew/.oh-my-zsh
-PATH="/usr/local/bin:/usr/bin:$PATH"
+# If you come from bash you might have to change your $PATH.
+export PATH=$HOME/bin:/usr/local/bin:$PATH
 
-# Set name of the theme to load.
-# Look in ~/.oh-my-zsh/themes/
-# Optionally, if you set this to "random", it'll load a random theme each
-# time that oh-my-zsh is loaded.
+# Path to your oh-my-zsh installation.
+export ZSH=/Users/h272584/.oh-my-zsh
+
+# Set name of the theme to load. Optionally, if you set this to "random"
+# it'll load a random theme each time that oh-my-zsh is loaded.
+# See https://github.com/robbyrussell/oh-my-zsh/wiki/Themes
 ZSH_THEME="agnoster"
 
 # Uncomment the following line to use case-sensitive completion.
@@ -25,7 +26,7 @@ ZSH_THEME="agnoster"
 # DISABLE_LS_COLORS="true"
 
 # Uncomment the following line to disable auto-setting terminal title.
-DISABLE_AUTO_TITLE="true"
+# DISABLE_AUTO_TITLE="true"
 
 # Uncomment the following line to enable command auto-correction.
 # ENABLE_CORRECTION="true"
@@ -46,29 +47,32 @@ DISABLE_AUTO_TITLE="true"
 # Would you like to use another custom folder than $ZSH/custom?
 # ZSH_CUSTOM=/path/to/new-custom-folder
 
+export VIRTUALENVWRAPPER_PYTHON="/usr/local/bin/python3"
 # Which plugins would you like to load? (plugins can be found in ~/.oh-my-zsh/plugins/*)
 # Custom plugins may be added to ~/.oh-my-zsh/custom/plugins/
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
-plugins=(docker python virtualenvwrapper virtualenv zsh_reload kubectl)
-
-# User configuration
-
-[ -f ~/.pathfile ] && source ~/.pathfile
-# export MANPATH="/usr/local/man:$MANPATH"
+plugins=(fly docker python brew npm virtualenvwrapper)
 
 source $ZSH/oh-my-zsh.sh
 
-# You may need to manually set your language environment
-export LANG=en_US.UTF-8
+# User configuration
 
+# export MANPATH="/usr/local/man:$MANPATH"
+
+# You may need to manually set your language environment
+# export LANG=en_US.UTF-8
+
+# Preferred editor for local and remote sessions
+export EDITOR='vim'
 
 # Compilation flags
 # export ARCHFLAGS="-arch x86_64"
 
 # ssh
-# export SSH_KEY_PATH="~/.ssh/dsa_id"
+export SSH_KEY_PATH="~/.ssh/id_rsa"
 
+bindkey -v
 # Set personal aliases, overriding those provided by oh-my-zsh libs,
 # plugins, and themes. Aliases can be placed here, though oh-my-zsh
 # users are encouraged to define aliases within the ZSH_CUSTOM folder.
@@ -77,20 +81,21 @@ export LANG=en_US.UTF-8
 # Example aliases
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
-
+#
 alias nuke_docker='docker rm --force $(docker ps -a -q)'
-alias kill_all_vagrants='vagrant global-status | grep virtualbox | awk '\''{print }'\'' | xargs -n1 vagrant destroy -f'
-
-if [ -f ~/.local_settings ]; then
-	source ~/.local_settings;
-fi
-
-export EDITOR='vim'
-
-bindkey -v
-
-DEFAULT_USERNAME=andrew
 prompt_context(){}
+export JAVA_HOME="$(/usr/libexec/java_home -v 9.0)"
+export HOMEBREW_CELLAR="/usr/local/Cellar"
+alias setJdk6='export JAVA_HOME=$(/usr/libexec/java_home -v 1.6)'
+alias setJdk7='export JAVA_HOME=$(/usr/libexec/java_home -v 1.7)'
+alias setJdk8='export JAVA_HOME=$(/usr/libexec/java_home -v 1.8)'
+alias setJdk9='export JAVA_HOME=$(/usr/libexec/java_home -v 9.0)'
 eval $(thefuck --alias)
+export GPG_TTY=`tty`
+bindkey -M viins 'jj' vi-cmd-mode
+bindkey '^R' history-incremental-search-backward
+source ~/.vault_auth || true
 source ~/.zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+tmux attach || tmux new
+
 
