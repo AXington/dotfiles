@@ -1,0 +1,20 @@
+# Set Editor to vim
+export EDITOR='vim'
+
+# Enable and configure vim mode on cmd prompt
+bindkey -v
+bindkey '^R' history-incremental-search-backward
+bindkey -M viins 'jj' vi-cmd-mode
+
+# Aliases
+alias nuke_docker='docker rm --force $(docker ps -a -q)'
+
+# Remove comp and user name from prompt
+prompt_context(){}
+
+# Set up fuck command
+eval $(thefuck --alias)
+
+# attach tmux if available, if not start new
+tmux attach || tmux new
+
