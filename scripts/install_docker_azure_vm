@@ -1,0 +1,14 @@
+#! /usr/bin/env bash
+
+HOST=$1
+USER=$2
+
+
+ssh $USER@$HOST "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -"
+ssh $USER@$HOST 'sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"'
+ssh $USER@$HOST "sudo apt-get update"
+ssh $USER@$HOST "sudo apt-get install -y docker-ce"
+ssh $USER@$HOST "sudo usermod -aG docker ${USER}"
+ssh $USER@$HOST "sudo apt-get install -y docker-compose"
+
+
