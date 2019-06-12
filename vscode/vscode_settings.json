@@ -3,13 +3,15 @@
 
 {
     "workbench.colorTheme": "Seti Monokai",
-    "vim.disableAnnoyingNeovimMessage": true,
+    // "vim.disableAnnoyingNeovimMessage": true,
     "workbench.colorCustomizations": {
         "editor.background": "#000000",
-        "editor.foreground": "#ffffff"
+        "editor.foreground": "#ffffff",
+        "editorCursor.foreground": "#c7c7c7"
     },
-    "editor.renderWhitespace": "all",
+    "editor.renderWhitespace": "bouondary",
     "editor.renderControlCharacters": true,
-    "editor.renderIndentGuides": true
+    "editor.renderIndentGuides": true,
+    "editor.fontFamily": "Meslo LG M Regular for Powerline, monospace"
 }
 

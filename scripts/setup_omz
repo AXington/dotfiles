@@ -1,0 +1,12 @@
+#! /usr/bin/env bash
+
+curl -O https://github.com/robbyrussell/oh-my-zsh/raw/master/tools/install.sh
+sed -i.tmp 's:env zsh::g' install.sh
+sed -i.tmp 's:chsh -s .*$::g' install.sh
+sh install.sh
+git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting
+awk '/plugins=\($/ { print; print "zsh-syntax-highlighting"; next }1' .zshrc > .zshr_tmp
+mv .zshrc .zshrc.bak
+mv .zshrc_tmp .zshrc
+sudo chsh -s $(which zsh) $USER
+
