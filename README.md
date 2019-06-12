@@ -16,32 +16,39 @@ To set it up first you must set up the following:
 * vim
 * tmux
 * .tmux
-* thefuck
 * Powerline fonts https://github.com/powerline/fonts
 * zsh-syntax-highlighting https://github.com/zsh-users/zsh-syntax-highlighting
 
 ### Examples of some of the setup.
 
 ```
-# tmux and .tmux
+# Install oh-my-zsh
+# zsh should already be installed
+# if mac: brew install zsh
+# ubuntu: apt-get install -y zsh
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/robbyrussell/oh-my-zsh/master/tools/install.sh)"
+
+# Setup zsh syntax highlighting
+git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting
+# add zsh-syntax-highlighting to plugins in ~/.zshrc
+
+# Setup tmux and .tmux
 git clone git@github.com:gpakosz/.tmux.git
 ln -s -f .tmux/.tmux.conf
-ln -s -f tmux.conf.local $HOME/.tmux.conf.local
+cp .tmux/.tmux.conf.local ~/.tmux.conf.local
+# I add several options, see setup_zsh_tmux_env.sh
 
 # vim
-mkdir -p ~/.vim
-cp -r /path/to/my/repo/vim/. ~/.vim/.
-ln -s -f vimrc ~/.vimrc
+git clone git@github.com:AXington/.vim.git
+cd .vim && git checkout heavenly
 
-# I put the following into a dot directory so I don't have to look at it when I do ls on ~
-git clone git@github.com:zsh-users/zsh-syntax-highlighting.git ~/.zsh-syntax-highlighting
 
 # optional scripts to clean docker cache (orphaned images), and python cache
-cp scripts/clean_docker_cache /some/dir/in/$PATH
-cp scropts/clean_python_cache /some/dir/in/$PATH
+cp scripts/clean_docker_cache /usr/local/bin/$PATH
+cp scripts/clean_python_cache /usr/local/bin/$PATH
 
-# Finally, put zshrc in place:
-ln -s -f zshrc ~/.zshrc
-source ~/.zshrc
+
+Some/most of this should be already done as part of setup_zsh_tmux_env.sh
+
 ```
 
