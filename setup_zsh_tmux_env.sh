@@ -12,6 +12,41 @@
 # install omz
 #sh -c "$(curl -fsSL https://raw.githubusercontent.com/robbyrussell/oh-my-zsh/master/tools/install.sh)"
 
+
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    # install tmux and pre-reqs
+    /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+
+    brew update && brew install tmux \
+        reattach-to-user-namespace \
+        python3 \
+        vim \
+        jq \
+        dtrx \
+        git \
+        coreutils \
+        findutils \
+        gnu-tar \
+        gnu-sed \
+        gawk \
+        gnutls \
+        gnu-indent \
+        gnu-getopt \
+        grep
+    brew install macvim -- --with-override-system-vim --with-lua --with-luajit
+
+elif [[ "$OSTYPE" == "linux-gnu" ]]; then
+    # TODO: add command -b switch to add yum and pacman support
+    apt-get install -y tmux \
+        git \
+        xclip \
+        python3 \
+        vim \
+        jq \
+        dtrx \
+        zsh
+fi
+
 # install tmux fonts
 git clone https://github.com/powerline/fonts.git --depth=1
 cd fonts
@@ -19,28 +54,12 @@ cd fonts
 cd ..
 rm -rf fonts
 
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    # install tmux and pre-reqs
-    brew update && brew install tmux \
-        reattach-to-user-namespace \
-        python3 \
-        vim \
-        jq \
-        dtrx
-elif [[ "$OSTYPE" == "linux-gnu" ]]; then
-    # TODO: add command -b switch to add yum and pacman support
-    apt-get install -y tmux \
-        xclip \
-        python3 \
-        vim \
-        jq \
-        dtrx
-fi
 git clone https://github.com/gpakosz/.tmux.git $HOME/.tmux
 ln -s -f $HOME/.tmux/.tmux.conf $HOME/.
 cp $HOME/.tmux/.tmux.conf.local $HOME/.
 
-sed -i .bak -e 's/tmux_conf_theme_left_separator/#tmux_conf_theme_left_separator/g' \
+# Customize tmux
+sed -i.bak -e 's/tmux_conf_theme_left_separator/#tmux_conf_theme_left_separator/g' \
     -e 's/tmux_conf_theme_right_separator/#tmux_conf_theme_right_separator/g' \
     -e "s/#tmux_conf_theme_left_separator_main=''/tmux_conf_theme_left_separator_main=''/" \
     -e "s/#tmux_conf_theme_left_separator_sub=''/tmux_conf_theme_left_separator_sub=''/" \
@@ -60,13 +79,23 @@ bind a last-window
 bind n next-window
 EOF
 
+# install oh-my-zsh
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/robbyrussell/oh-my-zsh/master/tools/install.sh) --unattended"
 
+# Set up zshrc options
+sed -i.bak -e 's/ZSH_THEME="robbyrussell"/ZSH_THEME="agnoster"/'
+
+# add mac specific options
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    cat << 'EOF' >> ~/.zshrc
+export HOMEBREW_CELLAR="/usr/local/Cellar"
+EOF
+fi
 
 cat << 'EOF' >> ~/.zshrc
 export LANG=en_US.UTF-8
 alias nuke_docker='docker rm --force $(docker ps -a -q)'
-#export HOMEBREW_CELLAR="/usr/local/Cellar"
-#autoload -U +X bashcompinit && bashcompinit
+autoload -U +X bashcompinit && bashcompinit
 export EDITOR='vim'
 export SSH_KEY_PATH="~/.ssh/rsa_id"
 prompt_context(){}
@@ -94,4 +123,5 @@ git clone https://github.com/AXington/.vim.git $HOME/.vim
 current_dir=$(pwd)
 cd $HOME/.vim && git checkout heavenly && cd $current_dir
 
-source ~/.zshrc
+sudo chsh $USER -s $(which zsh)
+exec zsh -l
