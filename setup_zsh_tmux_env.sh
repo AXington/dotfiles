@@ -69,11 +69,14 @@ alias nuke_docker='docker rm --force $(docker ps -a -q)'
 #autoload -U +X bashcompinit && bashcompinit
 export EDITOR='vim'
 export SSH_KEY_PATH="~/.ssh/rsa_id"
+prompt_context(){}
 export GPG_TTY=`tty`
 bindkey '^R' history-incremental-search-backward
 #source <(helm completion zsh)
 #source <(kubectl completion zsh)
 #source /usr/local/etc/bash_completion.d/az
+fpath+=${ZDOTDIR:-~}/.zsh_functions
+tmux attach || tmux new
 EOF
 
 # add zsh-syntax-highlighting plugin to omz plugins
