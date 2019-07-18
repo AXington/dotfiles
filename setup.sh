@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # install Homebrew (if mac)
 # /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
@@ -17,34 +17,30 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
     # install tmux and pre-reqs
     /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
 
-    brew update && brew install tmux \
-        reattach-to-user-namespace \
-        python3 \
-        vim \
-        jq \
-        dtrx \
-        git \
-        coreutils \
-        findutils \
-        gnu-tar \
-        gnu-sed \
-        gawk \
-        gnutls \
-        gnu-indent \
-        gnu-getopt \
-        grep
-    brew install macvim -- --with-override-system-vim --with-lua --with-luajit
+    brew update
+
+    cat brew_packages.txt | xargs -I{} brew install {}
+
+    # symlink all the gnu binaries to ~/.gnubin
+    mkdir $HOME/.gnubin
+    for dir in $(ls /usr/local/opt); do
+        gbin="/usr/local/opt/$dir/libexec/gnubin"
+        if [[ -d "$gbin" ]]; then
+            ls -1 $gbin | gxargs -ri ln -s -f $gbin/{} $HOME/.gnubin
+        fi
+    done
 
 elif [[ "$OSTYPE" == "linux-gnu" ]]; then
-    # TODO: add command -b switch to add yum and pacman support
-    apt-get install -y tmux \
-        git \
-        xclip \
-        python3 \
-        vim \
-        jq \
-        dtrx \
-        zsh
+    if [[ hash apt-get ]];then
+        sudo apt-get install -y $(cat apt-packages.txt | xargs)
+    elif [[ hash pacman ]]; then
+        sudo pacman -S $(cat pacman-packages.txt | xargs)
+    else
+        echo "only deb/ubuntu and arch flavors of linux are currently supported"
+    fi
+else
+    echo "only linux and mac are supported"
+    exit 1
 fi
 
 # install tmux fonts
@@ -85,16 +81,23 @@ sh -c "$(curl -fsSL https://raw.githubusercontent.com/robbyrussell/oh-my-zsh/mas
 # Set up zshrc options
 sed -i.bak -e 's/ZSH_THEME="robbyrussell"/ZSH_THEME="agnoster"/'
 
-# add mac specific options
+# add mac specific options and gnu bins to path
 if [[ "$OSTYPE" == "darwin"* ]]; then
     cat << 'EOF' >> ~/.zshrc
 export HOMEBREW_CELLAR="/usr/local/Cellar"
 EOF
+    # make all the gnu binaries default
+    echo "export PATH=$HOME/.gnubin:$PATH" >> ~/.zshrc
+fi
+
+# if on ubuntu set default editor to vim
+if [[ hash update-alternatives ]]; then
+    sudo update-alternatives --set editor /usr/bin/vim.basic
 fi
 
 cat << 'EOF' >> ~/.zshrc
 export LANG=en_US.UTF-8
-alias nuke_docker='docker rm --force $(docker ps -a -q)'
+#alias nuke_docker='docker rm --force $(docker ps -a -q)'
 autoload -U +X bashcompinit && bashcompinit
 export EDITOR='vim'
 export SSH_KEY_PATH="~/.ssh/rsa_id"
@@ -123,5 +126,6 @@ git clone https://github.com/AXington/.vim.git $HOME/.vim
 current_dir=$(pwd)
 cd $HOME/.vim && git checkout heavenly && cd $current_dir
 
+# set zsh as default shell and start zsh
 sudo chsh $USER -s $(which zsh)
 exec zsh -l

@@ -1,0 +1,17 @@
+curl
+git
+gitflow-avh
+gcc
+gettext
+htop
+jq
+libffi
+make
+openssh
+python
+tmux
+unzip
+tree
+vim
+xclip
+zsh
