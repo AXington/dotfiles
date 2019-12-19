@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+
+aws eks list-clusters | jq -r '.clusters[]' | \
+  xargs -I {} aws eks update-kubeconfig --name {} --alias {}
+
+
