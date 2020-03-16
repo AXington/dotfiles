@@ -31,9 +31,9 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
     done
 
 elif [[ "$OSTYPE" == "linux-gnu" ]]; then
-    if [[ hash apt-get ]];then
+    if hash apt-get ;then
         sudo apt-get install -y $(cat apt-packages.txt | xargs)
-    elif [[ hash pacman ]]; then
+    elif hash pacman ; then
         sudo pacman -S $(cat pacman-packages.txt | xargs)
     else
         echo "only deb/ubuntu and arch flavors of linux are currently supported"
