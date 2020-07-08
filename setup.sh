@@ -124,7 +124,9 @@ ln -s -f scripts/clean_python_cache /usr/local/bin/.
 
 git clone https://github.com/AXington/.vim.git $HOME/.vim
 current_dir=$(pwd)
-cd $HOME/.vim && git checkout heavenly && cd $current_dir
+cd $HOME/.vim && git checkout heavenly && git submodule init && git submodule update && cd $current_dir
+ln -s -f $HOME/.vim/.vimrc $HOME/.vimrc
+ln -s -f $HOME/.vim/.vimrc.local $HOME/.vimrc.local
 
 # set zsh as default shell and start zsh
 sudo chsh $USER -s $(which zsh)
