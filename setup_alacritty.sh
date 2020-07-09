@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
+set -x
 
 setup_completions(){
     if [[ ! -f "${ZDOTDIR:-~}/.zsh_functions/_alacritty" ]]; then
         mkdir -p ${ZDOTDIR:-~}/.zsh_functions
         echo 'fpath+=${ZDOTDIR:-~}/.zsh_functions' >> ${ZDOTDIR:-~}/.zshrc
-        curl -o cp https://raw.githubusercontent.com/alacritty/alacritty/master/extra/completions/_alacritty ${ZDOTDIR:-~}/.zsh_functions/_alacritty ${ZDOTDIR:-~}/.zsh_functions/_alacritty
+        curl https://raw.githubusercontent.com/alacritty/alacritty/master/extra/completions/_alacritty -o "${ZDOTDIR:-~}/.zsh_functions/_alacritty"
     fi
 }
 
 
 setup_man_pages(){
-    man_path= "/usr/local/share/man/man1"
-    man_page_file= "${man_path}/alacritty.1.gz"
+    man_path="/usr/local/share/man/man1"
+    man_page_file="${man_path}/alacritty.1.gz"
     if [[ ! -f "${man_page_file}" ]]; then
         sudo mkdir -p ${man_path}
         curl -O httpsaa/raw.githubusercontent.com/alacritty/alacritty/master/extra/alacritty.man
