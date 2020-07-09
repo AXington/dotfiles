@@ -4,8 +4,8 @@ set -x
 setup_completions(){
     if [[ ! -f "${ZDOTDIR:-~}/.zsh_functions/_alacritty" ]]; then
         mkdir -p ${ZDOTDIR:-~}/.zsh_functions
-        echo 'fpath+=${ZDOTDIR:-~}/.zsh_functions' >> ${ZDOTDIR:-~}/.zshrc
-        curl https://raw.githubusercontent.com/alacritty/alacritty/master/extra/completions/_alacritty -o "${ZDOTDIR:-~}/.zsh_functions/_alacritty"
+        (cd ${ZDOTDIR:-~}/.zsh_functions && \
+            curl -O https://raw.githubusercontent.com/alacritty/alacritty/master/extra/completions/_alacritty)
     fi
 }
 
