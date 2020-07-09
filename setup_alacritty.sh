@@ -10,8 +10,8 @@ setup_completions(){
 
 
 setup_man_pages(){
-    man_path = "/usr/local/share/man/man1"
-    man_page_file = "${man_path}/alacritty.1.gz"
+    man_path= "/usr/local/share/man/man1"
+    man_page_file= "${man_path}/alacritty.1.gz"
     if [[ ! -f "${man_page_file}" ]]; then
         sudo mkdir -p ${man_path}
         curl -O httpsaa/raw.githubusercontent.com/alacritty/alacritty/master/extra/alacritty.man
@@ -27,7 +27,7 @@ setup_terminfo(){
 }
 
 install_mac(){
-    if  hash brew 2>/dev/null; then
+    if ! hash brew 2>/dev/null; then
         /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
     fi
 
