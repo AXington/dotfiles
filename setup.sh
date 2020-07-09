@@ -31,9 +31,9 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
     done
 
 elif [[ "$OSTYPE" == "linux-gnu" ]]; then
-    if hash apt-get ;then
+    if hash apt-get 2>/dev/null;then
         sudo apt-get install -y $(cat apt-packages.txt | xargs)
-    elif hash pacman ; then
+    elif hash pacman 2>/dev/null; then
         sudo pacman -S $(cat pacman-packages.txt | xargs)
     else
         echo "only deb/ubuntu and arch flavors of linux are currently supported"
@@ -91,7 +91,7 @@ EOF
 fi
 
 # if on ubuntu set default editor to vim
-if [[ hash update-alternatives ]]; then
+if  hash update-alternatives 2>/dev/null; then
     sudo update-alternatives --set editor /usr/bin/vim.basic
 fi
 
