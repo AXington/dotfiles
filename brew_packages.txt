@@ -2,10 +2,8 @@ bash
 coreutils
 findutils
 gawk
-git
 gcc
 gettext
-git-flow-avh
 gnu-getopt
 gnu-indent
 gnu-sed
@@ -16,29 +14,8 @@ grep
 gzip
 htop
 jq
-libarchive
-libassuan
-libevent
-libffi
-libgcrypt
-libgpg-error
-libidn2
-libksba
-libmagic
-libmpc
-libpng
-libtasn1
-libunistring
-libusb
-libyaml
 macvim -- --with-override-system-vim --with-lua --with-luajit
-ncurses
-openssl
-pinentry
-pinentry-mac
 pkg-config
-pyenv
-python
 readline
 reattach-to-user-namespace
 tmux
@@ -49,4 +26,3 @@ vim --override-system-vi
 watch
 wget
 xz
-zsh
