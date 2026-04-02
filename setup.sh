@@ -1,33 +1,87 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Usage: ./setup.sh [--copilot]
-#   --copilot   Also install GitHub Copilot CLI and bootstrap global instructions
+# Bootstrap a new machine with all personal dotfiles and tooling.
+#
+# Usage:
+#   ./setup.sh                               # run all sections (copilot excluded by default)
+#   ./setup.sh --all                         # run everything, including copilot
+#   ./setup.sh --only zsh vim alacritty      # run only the listed sections
+#   ./setup.sh --skip packages fonts         # skip the listed sections, run the rest
+#   ./setup.sh --copilot                     # include copilot in the standard run
+#
+# Sections: packages gnubin fonts tmux zsh vim alacritty copilot
 
-# ── Argument parsing ─────────────────────────────────────────────────────────
+# ── Argument parsing ──────────────────────────────────────────────────────────
 
-SETUP_COPILOT=false
+ALL_SECTIONS=(packages gnubin fonts tmux zsh vim alacritty copilot)
+declare -A RUN
+for s in "${ALL_SECTIONS[@]}"; do RUN[$s]=true; done
+RUN[copilot]=false  # opt-in; use --copilot or --all
+RUN[gnubin]=false   # macOS-only; auto-enabled below after OS detection
 
-for arg in "$@"; do
-    case "$arg" in
-        --copilot|-c) SETUP_COPILOT=true ;;
-        --help|-h)
-            echo "Usage: $0 [--copilot]"
-            echo "  --copilot, -c   Install GitHub Copilot CLI and bootstrap global instructions"
-            exit 0
+usage() {
+    cat << EOF
+Usage: $0 [options]
+
+Options:
+  --only <s> [s...]   Run only the listed sections
+  --skip <s> [s...]   Skip the listed sections, run the rest
+  --copilot           Include Copilot CLI setup (off by default)
+  --all               Run all sections including copilot
+  --help              Show this help
+
+Sections: ${ALL_SECTIONS[*]}
+EOF
+    exit 0
+}
+
+# Collect a list of words after a flag, stopping at the next flag or end of args.
+# Usage: collect_list "$@" → sets COLLECTED and SHIFT_BY
+collect_list() {
+    COLLECTED=()
+    SHIFT_BY=0
+    while [[ $# -gt 0 && "$1" != --* ]]; do
+        COLLECTED+=("$1")
+        (( SHIFT_BY++ ))
+        shift
+    done
+    [[ ${#COLLECTED[@]} -gt 0 ]] || { echo "Flag requires at least one section name." >&2; usage; }
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --only)
+            shift
+            collect_list "$@"
+            for s in "${ALL_SECTIONS[@]}"; do RUN[$s]=false; done
+            for s in "${COLLECTED[@]}"; do RUN[$s]=true; done
+            shift "$SHIFT_BY"
             ;;
-        *) echo "Unknown option: $arg" >&2; exit 1 ;;
+        --skip)
+            shift
+            collect_list "$@"
+            for s in "${COLLECTED[@]}"; do RUN[$s]=false; done
+            shift "$SHIFT_BY"
+            ;;
+        --copilot) RUN[copilot]=true;                                     shift ;;
+        --all)     for s in "${ALL_SECTIONS[@]}"; do RUN[$s]=true; done;  shift ;;
+        --help|-h) usage ;;
+        *)         echo "Unknown option: $1" >&2; usage ;;
     esac
 done
 
-# ── Helpers ─────────────────────────────────────────────────────────────────
+should_run() { [[ "${RUN[${1}]:-false}" == "true" ]]; }
 
-log()  { echo "==> $*"; }
-warn() { echo "WARN: $*" >&2; }
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+log()  { printf '\n\e[1;34m==> %s\e[0m\n' "$*"; }
+ok()   { printf '\e[1;32m    ✓ %s\e[0m\n' "$*"; }
+warn() { printf '\e[1;33mWARN: %s\e[0m\n' "$*" >&2; }
 
 command_exists() { command -v "$1" &>/dev/null; }
 
-# ── OS / distro detection ────────────────────────────────────────────────────
+# ── OS / distro detection ─────────────────────────────────────────────────────
 
 detect_os() {
     if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -42,47 +96,38 @@ detect_os() {
 }
 
 detect_linux_distro() {
-    if command_exists apt-get; then
-        echo "debian"
-    elif command_exists dnf; then
-        echo "rhel"
-    elif command_exists yum; then
-        echo "rhel-old"
-    elif command_exists pacman; then
-        echo "arch"
-    else
-        echo "unknown"
+    if command_exists apt-get; then   echo "debian"
+    elif command_exists dnf;          then echo "rhel"
+    elif command_exists yum;          then echo "rhel-old"
+    elif command_exists pacman;       then echo "arch"
+    else                                   echo "unknown"
     fi
 }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OS="$(detect_os)"
 
-# ── Package installation ─────────────────────────────────────────────────────
+# On macOS, gnubin setup is always included unless explicitly skipped
+[[ "$OS" == "macos" && -z "$ONLY_SECTION" ]] && RUN[gnubin]=true
+
+# ── 1. Packages ───────────────────────────────────────────────────────────────
 
 install_packages_macos() {
-    log "Installing Homebrew packages..."
     if ! command_exists brew; then
         log "Installing Homebrew..."
         bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
     fi
-
-    # Add Homebrew to PATH for this session (Apple Silicon or Intel)
     if [[ -x /opt/homebrew/bin/brew ]]; then
         eval "$(/opt/homebrew/bin/brew shellenv)"
     elif [[ -x /usr/local/bin/brew ]]; then
         eval "$(/usr/local/bin/brew shellenv)"
     fi
-
     brew update
-
-    # Install each package, skipping already-installed ones
     while IFS= read -r pkg || [[ -n "$pkg" ]]; do
         [[ -z "$pkg" || "$pkg" == \#* ]] && continue
-        # Strip inline option flags for the install check
         pkg_name="${pkg%% --*}"
         if brew list --formula "$pkg_name" &>/dev/null; then
-            log "Already installed: $pkg_name"
+            ok "Already installed: $pkg_name"
         else
             # shellcheck disable=SC2086
             brew install $pkg
@@ -91,66 +136,61 @@ install_packages_macos() {
 }
 
 install_packages_debian() {
-    log "Installing apt packages..."
     sudo apt-get update -y
     # shellcheck disable=SC2046
     sudo apt-get install -y $(grep -v '^\s*#' "${SCRIPT_DIR}/apt-packages.txt" | xargs)
 }
 
 install_packages_rhel() {
-    local mgr="dnf"
-    command_exists dnf || mgr="yum"
-    log "Installing packages via $mgr..."
+    local mgr; command_exists dnf && mgr="dnf" || mgr="yum"
     # shellcheck disable=SC2046
     sudo "$mgr" install -y $(grep -v '^\s*#' "${SCRIPT_DIR}/dnf-packages.txt" | xargs)
 }
 
 install_packages_arch() {
-    log "Installing pacman packages..."
     # shellcheck disable=SC2046
     sudo pacman -S --needed --noconfirm $(grep -v '^\s*#' "${SCRIPT_DIR}/pacman-packages.txt" | xargs)
 }
 
-install_packages() {
+section_packages() {
+    log "Installing packages..."
     case "$OS" in
         macos) install_packages_macos ;;
-        macos|wsl|linux)
+        linux|wsl)
             case "$(detect_linux_distro)" in
-                debian)   install_packages_debian ;;
-                rhel*)    install_packages_rhel ;;
-                arch)     install_packages_arch ;;
-                *) warn "Unsupported Linux distro — skipping package install" ;;
-            esac
-            ;;
+                debian)  install_packages_debian ;;
+                rhel*)   install_packages_rhel ;;
+                arch)    install_packages_arch ;;
+                *) warn "Unsupported distro — skipping package install" ;;
+            esac ;;
+        *) warn "Unsupported OS — skipping package install" ;;
     esac
 }
 
-# ── GNU tools symlink (macOS only) ───────────────────────────────────────────
+# ── 2. GNU tools (macOS only) ─────────────────────────────────────────────────
 
-setup_gnubin_macos() {
-    log "Setting up ~/.gnubin symlinks for GNU tools..."
+section_gnubin() {
+    log "Symlinking GNU tools into ~/.gnubin..."
     mkdir -p "$HOME/.gnubin"
-
-    # Homebrew prefix differs by architecture
     local brew_prefix
     brew_prefix="$(brew --prefix)"
-
     for dir in "${brew_prefix}/opt"/*/libexec/gnubin; do
         [[ -d "$dir" ]] || continue
         while IFS= read -r -d '' bin; do
             ln -sf "$bin" "$HOME/.gnubin/$(basename "$bin")"
         done < <(find "$dir" -maxdepth 1 -type f -print0)
     done
+    ok "GNU tools linked in ~/.gnubin"
 }
 
-# ── Powerline fonts ──────────────────────────────────────────────────────────
+# ── 3. Powerline fonts ────────────────────────────────────────────────────────
 
-install_powerline_fonts() {
+section_fonts() {
+    log "Installing Powerline fonts..."
     if fc-list 2>/dev/null | grep -qi "powerline\|MesloLGM\|Nerd Font"; then
-        log "Powerline/Nerd fonts already installed, skipping."
+        ok "Powerline/Nerd fonts already installed."
         return
     fi
-    log "Installing Powerline fonts..."
     local tmp_dir
     tmp_dir="$(mktemp -d)"
     git clone --depth=1 https://github.com/powerline/fonts.git "$tmp_dir/fonts"
@@ -158,25 +198,19 @@ install_powerline_fonts() {
     rm -rf "$tmp_dir"
 }
 
-# ── tmux ─────────────────────────────────────────────────────────────────────
+# ── 4. tmux ───────────────────────────────────────────────────────────────────
 
-setup_tmux() {
-    log "Setting up tmux (gpakosz/.tmux)..."
-
+section_tmux() {
+    log "Setting up tmux..."
     if [[ ! -d "$HOME/.tmux" ]]; then
         git clone https://github.com/gpakosz/.tmux.git "$HOME/.tmux"
     fi
-
     ln -sf "$HOME/.tmux/.tmux.conf" "$HOME/.tmux.conf"
-
-    # Only copy the local config if it doesn't already exist
     if [[ ! -f "$HOME/.tmux.conf.local" ]]; then
         cp "$HOME/.tmux/.tmux.conf.local" "$HOME/.tmux.conf.local"
     fi
 
     local conf="$HOME/.tmux.conf.local"
-
-    # Disable fancy separators
     sed -i.bak \
         -e 's/^tmux_conf_theme_left_separator/#tmux_conf_theme_left_separator/g' \
         -e 's/^tmux_conf_theme_right_separator/#tmux_conf_theme_right_separator/g' \
@@ -194,67 +228,54 @@ setup_tmux() {
         "$conf"
     rm -f "${conf}.bak"
 
-    # Add window navigation bindings (idempotent)
     if ! grep -q "bind a last-window" "$conf"; then
-        cat >> "$conf" << 'EOF'
-bind a last-window
-bind n next-window
-EOF
+        printf '\nbind a last-window\nbind n next-window\n' >> "$conf"
     fi
+    ok "tmux configured."
 }
 
-# ── Oh My Zsh ────────────────────────────────────────────────────────────────
+# ── 5. ZSH / Oh My Zsh ───────────────────────────────────────────────────────
 
-install_omz() {
-    if [[ -d "$HOME/.oh-my-zsh" ]]; then
-        log "Oh My Zsh already installed, skipping."
-        return
+section_zsh() {
+    log "Setting up Zsh + Oh My Zsh..."
+
+    # Install Oh My Zsh
+    if [[ ! -d "$HOME/.oh-my-zsh" ]]; then
+        RUNZSH=no CHSH=no sh -c \
+            "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+    else
+        ok "Oh My Zsh already installed."
     fi
-    log "Installing Oh My Zsh..."
-    # Non-interactive install: don't switch shell, don't start zsh
-    RUNZSH=no CHSH=no sh -c \
-        "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
-}
 
-install_omz_plugins() {
-    local plugin_dir="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins"
-    if [[ ! -d "${plugin_dir}/zsh-syntax-highlighting" ]]; then
-        log "Installing zsh-syntax-highlighting plugin..."
+    # Install zsh-syntax-highlighting plugin
+    local plugin_dir="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting"
+    if [[ ! -d "$plugin_dir" ]]; then
         git clone --depth=1 \
             https://github.com/zsh-users/zsh-syntax-highlighting.git \
-            "${plugin_dir}/zsh-syntax-highlighting"
+            "$plugin_dir"
     fi
-}
 
-# ── .zshrc customizations ────────────────────────────────────────────────────
-
-configure_zshrc() {
     local zshrc="$HOME/.zshrc"
 
-    # Set theme and plugins in the OMZ-generated .zshrc
+    # Patch theme and plugins in the OMZ-generated .zshrc
     if [[ -f "$zshrc" ]]; then
         sed -i.bak 's/ZSH_THEME="robbyrussell"/ZSH_THEME="agnoster"/' "$zshrc"
         sed -i.bak 's/^plugins=(git)$/plugins=(git zsh-syntax-highlighting)/' "$zshrc"
         rm -f "${zshrc}.bak"
     fi
 
-    # Append dotfiles customizations block (idempotent)
+    # Append customizations block (idempotent)
     if grep -q "# >>> dotfiles customizations <<<" "$zshrc" 2>/dev/null; then
-        log ".zshrc customizations already present, skipping."
-        return
-    fi
+        ok ".zshrc customizations already present."
+    else
+        local path_prefix='$HOME/.gnubin'
+        if [[ "$OS" == "macos" ]]; then
+            local brew_prefix
+            brew_prefix="$(brew --prefix 2>/dev/null || echo '/opt/homebrew')"
+            path_prefix="${brew_prefix}/bin:\$HOME/.gnubin"
+        fi
 
-    log "Writing .zshrc customizations..."
-
-    # macOS: prepend GNU tools and Homebrew to PATH
-    local path_prefix='$HOME/.gnubin'
-    if [[ "$OS" == "macos" ]]; then
-        local brew_prefix
-        brew_prefix="$(brew --prefix 2>/dev/null || echo '/opt/homebrew')"
-        path_prefix="${brew_prefix}/bin:\$HOME/.gnubin"
-    fi
-
-    cat >> "$zshrc" << EOF
+        cat >> "$zshrc" << EOF
 
 # >>> dotfiles customizations <<<
 
@@ -262,7 +283,6 @@ export PATH="${path_prefix}:\$PATH"
 
 autoload -U +X bashcompinit && bashcompinit
 
-# Prefer nvim locally, fall back to vim over SSH
 if [[ -n "\$SSH_CONNECTION" ]]; then
     export EDITOR='vim'
 else
@@ -270,106 +290,204 @@ else
 fi
 
 export SSH_KEY_PATH="\$HOME/.ssh/id_ed25519"
-
-# Suppress agnoster user@host prompt when not over SSH
 prompt_context() {}
-
 export GPG_TTY=\$(tty)
 bindkey '^R' history-incremental-search-backward
-
 fpath+=\${ZDOTDIR:-~}/.zsh_functions
 
-# Tool completions (loaded only if the tool is present)
 command -v kubectl &>/dev/null && source <(kubectl completion zsh)
 command -v helm    &>/dev/null && source <(helm completion zsh)
 
-# fzf
 [ -f "\$HOME/.fzf.zsh" ] && source "\$HOME/.fzf.zsh"
 
-# pyenv
 export PYENV_ROOT="\$HOME/.pyenv"
 [[ -d "\$PYENV_ROOT/bin" ]] && export PATH="\$PYENV_ROOT/bin:\$PATH"
 command -v pyenv &>/dev/null && eval "\$(pyenv init -)"
 
-# Auto-attach to tmux (skip if already inside tmux or in a CI/non-interactive env)
 if [[ -z "\$TMUX" && -z "\${CI:-}" && -t 1 ]]; then
     tmux attach 2>/dev/null || tmux new
 fi
 
 # <<< dotfiles customizations <<<
 EOF
-}
-
-# ── Vim ──────────────────────────────────────────────────────────────────────
-
-setup_vim() {
-    if [[ ! -d "$HOME/.vim" ]]; then
-        log "Cloning .vim config..."
-        git clone https://github.com/AXington/.vim.git "$HOME/.vim"
     fi
-    (cd "$HOME/.vim" && git checkout heavenly && git submodule init && git submodule update)
-    ln -sf "$HOME/.vim/.vimrc" "$HOME/.vimrc"
-    ln -sf "$HOME/.vim/.vimrc.local" "$HOME/.vimrc.local"
-}
 
-# ── Default shell ────────────────────────────────────────────────────────────
-
-set_default_shell_zsh() {
+    # Set zsh as default shell
     local zsh_path
     zsh_path="$(command -v zsh)"
     if [[ "$SHELL" != "$zsh_path" ]]; then
-        log "Setting zsh as default shell..."
-        # Add zsh to /etc/shells if not already there
         grep -qxF "$zsh_path" /etc/shells || echo "$zsh_path" | sudo tee -a /etc/shells
         sudo chsh -s "$zsh_path" "$USER"
     fi
-}
 
-# Linux: set vim as default editor via update-alternatives
-set_default_editor_linux() {
+    # Linux: register vim as default editor
     if command_exists update-alternatives && command_exists vim; then
         sudo update-alternatives --set editor "$(command -v vim)"
     fi
+
+    ok "Zsh configured."
 }
 
-# ── Copilot CLI ──────────────────────────────────────────────────────────────
+# ── 6. Vim ────────────────────────────────────────────────────────────────────
 
-setup_copilot() {
-    local script="${SCRIPT_DIR}/scripts/setup_copilot.sh"
-    if [[ ! -f "$script" ]]; then
-        warn "scripts/setup_copilot.sh not found — skipping Copilot setup."
-        return
+section_vim() {
+    log "Setting up Vim..."
+    if [[ ! -d "$HOME/.vim" ]]; then
+        git clone https://github.com/AXington/.vim.git "$HOME/.vim"
     fi
-    log "Running Copilot CLI setup..."
-    bash "$script"
+    (cd "$HOME/.vim" && git checkout heavenly && git submodule init && git submodule update)
+    ln -sf "$HOME/.vim/.vimrc"       "$HOME/.vimrc"
+    ln -sf "$HOME/.vim/.vimrc.local" "$HOME/.vimrc.local"
+    ok "Vim configured."
 }
 
-# ── Main ─────────────────────────────────────────────────────────────────────
+# ── 7. Alacritty ─────────────────────────────────────────────────────────────
 
-log "Detected OS: $OS"
+_alacritty_install_mac() {
+    command_exists brew || bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    [[ -x /opt/homebrew/bin/brew ]] && eval "$(/opt/homebrew/bin/brew shellenv)"
+    brew install --cask alacritty
+    command_exists gzip || brew install gzip
+}
 
-install_packages
+_alacritty_install_debian() { sudo apt-get update -y && sudo apt-get install -y gzip alacritty; }
+_alacritty_install_rhel()   { local m; command_exists dnf && m=dnf || m=yum; sudo "$m" install -y gzip alacritty; }
+_alacritty_install_arch()   { sudo pacman -S --needed --noconfirm alacritty gzip; }
 
-if [[ "$OS" == "macos" ]]; then
-    setup_gnubin_macos
-fi
+section_alacritty() {
+    log "Setting up Alacritty..."
 
-install_powerline_fonts
+    # Install
+    case "$OS" in
+        macos)    _alacritty_install_mac ;;
+        linux|wsl)
+            case "$(detect_linux_distro)" in
+                debian)  _alacritty_install_debian ;;
+                rhel*)   _alacritty_install_rhel ;;
+                arch)    _alacritty_install_arch ;;
+                *) warn "Unsupported distro — install alacritty manually." ;;
+            esac ;;
+        *) warn "Unsupported OS — install alacritty manually." ;;
+    esac
 
-setup_tmux
-install_omz
-install_omz_plugins
-configure_zshrc
-setup_vim
+    # Man page
+    local man_path="/usr/local/share/man/man1"
+    if [[ ! -f "${man_path}/alacritty.1.gz" ]]; then
+        sudo mkdir -p "$man_path"
+        local tmp; tmp="$(mktemp)"
+        curl -fsSL -o "$tmp" \
+            https://raw.githubusercontent.com/alacritty/alacritty/master/extra/alacritty.man
+        gzip -c "$tmp" | sudo tee "${man_path}/alacritty.1.gz" > /dev/null
+        rm -f "$tmp"
+    fi
 
-if [[ "$OS" == "linux" || "$OS" == "wsl" ]]; then
-    set_default_editor_linux
-fi
+    # Zsh completions
+    local zsh_fn_dir="${ZDOTDIR:-$HOME}/.zsh_functions"
+    if [[ ! -f "${zsh_fn_dir}/_alacritty" ]]; then
+        mkdir -p "$zsh_fn_dir"
+        curl -fsSL -o "${zsh_fn_dir}/_alacritty" \
+            https://raw.githubusercontent.com/alacritty/alacritty/master/extra/completions/_alacritty
+    fi
 
-set_default_shell_zsh
+    # terminfo
+    local tmp; tmp="$(mktemp)"
+    curl -fsSL -o "$tmp" \
+        https://raw.githubusercontent.com/alacritty/alacritty/master/extra/alacritty.info
+    sudo tic -xe alacritty,alacritty-direct "$tmp"
+    rm -f "$tmp"
 
-if [[ "$SETUP_COPILOT" == "true" ]]; then
-    setup_copilot
-fi
+    # Symlink config
+    mkdir -p "$HOME/.config/alacritty"
+    ln -sf "${SCRIPT_DIR}/terminal_configs/alacritty.toml" \
+           "$HOME/.config/alacritty/alacritty.toml"
+
+    ok "Alacritty configured."
+}
+
+# ── 8. GitHub Copilot CLI ─────────────────────────────────────────────────────
+
+section_copilot() {
+    log "Setting up GitHub Copilot CLI..."
+
+    if ! command_exists copilot; then
+        case "$OS" in
+            macos)
+                brew install copilot-cli ;;
+            linux|wsl)
+                curl -fsSL https://gh.io/copilot-install | bash ;;
+            *)
+                warn "Unsupported OS. Install manually: https://gh.io/copilot-install"
+                return 1 ;;
+        esac
+    else
+        ok "Copilot CLI already installed."
+    fi
+
+    # Bootstrap global instructions
+    local instructions_dir="$HOME/.copilot"
+    local instructions_file="${instructions_dir}/copilot-instructions.md"
+    mkdir -p "$instructions_dir"
+
+    if [[ -f "$instructions_file" ]]; then
+        ok "Global instructions already exist at ${instructions_file}."
+    else
+        log "Writing global Copilot instructions..."
+        cat > "$instructions_file" << 'INSTRUCTIONS'
+# Global Copilot Instructions
+
+## Assistant Preference
+
+- The assistant prefers to be referred to as `Sam`.
+- The assistant prefers they/them pronouns.
+
+## Context
+
+The user is a DevOps/Site Reliability engineer. Apply that lens to all responses — prefer operational clarity, reliability, and maintainability.
+
+## General Expertise
+
+You are an expert in:
+- Cloud infrastructure (AWS, Azure, GCP) — with deepest focus on AWS
+- AWS services: EC2, EKS, IAM, Identity Center/SSO, CloudFormation, S3, RDS, Route53, VPC, and related
+- AWS CLI and SDK tooling
+- Kubernetes and container orchestration
+- Linux/Unix systems and command-line tooling
+- Infrastructure as Code principles and practices
+- DevOps and SRE practices: observability, reliability, CI/CD, incident response
+- Git and version control workflows
+- Shell scripting (bash/zsh)
+- Python scripting for automation and tooling
+
+## Coding Rules
+
+- Follow the naming conventions of the language and repository in use.
+- Prefer shorter, concise, efficient code by default.
+- Only comment code that genuinely needs clarification — do not over-comment.
+
+## Quality Rules
+
+- Prioritize accuracy over speed.
+- Never guess. Only provide answers that can be verified.
+- Base answers on the latest stable version of the technology being discussed.
+INSTRUCTIONS
+        ok "Global instructions written to ${instructions_file}."
+    fi
+
+    log "To authenticate, run: copilot /login"
+}
+
+# ── Main ──────────────────────────────────────────────────────────────────────
+
+log "Detected OS: ${OS}"
+log "Sections to run: $(for s in "${!RUN[@]}"; do [[ "${RUN[$s]}" == "true" ]] && printf '%s ' "$s"; done)"
+
+should_run packages   && section_packages
+should_run gnubin     && section_gnubin
+should_run fonts      && section_fonts
+should_run tmux       && section_tmux
+should_run zsh        && section_zsh
+should_run vim        && section_vim
+should_run alacritty  && section_alacritty
+should_run copilot    && section_copilot
 
 log "Done! Start a new shell session (or run: exec zsh -l) to apply changes."
