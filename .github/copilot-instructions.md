@@ -28,7 +28,6 @@ dotfiles/
 ./setup_alacritty.sh                              # Set up Alacritty + symlink config
 ./scripts/setup_tmux_remote_vm.sh <HOST> <USER>  # Deploy tmux config to remote VM
 ./scripts/update_eks_kube_config                  # Auto-configure all EKS cluster kubeconfigs
-./scripts/install_docker_azure_vm <HOST> <USER>  # Install Docker on Azure VM via SSH
 ./scripts/strip_proofpoint_url                    # Decode Proofpoint URL defense links
 ./scripts/add_disk.sh [DEVICE]                    # Format disk and update /etc/fstab
 ```

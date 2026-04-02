@@ -55,8 +55,7 @@ git clone git@github.com:AXington/.vim.git # use https://github.com/gpakosz/.vim
 cd .vim && git checkout heavenly
 
 
-# optional scripts to clean docker cache (orphaned images), and python cache
-cp scripts/clean_docker_cache /usr/local/bin/$PATH
+# optional script to clean python cache
 cp scripts/clean_python_cache /usr/local/bin/$PATH
 
 # setup Alacritty
