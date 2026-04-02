@@ -1,8 +1,10 @@
-#! /usr/bin/env bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-IMAGES=$(docker images | grep none | awk '{ print $3 }')
-
-for i in $IMAGES; do
-	docker rmi $i
-done
-
+# Remove dangling (untagged) Docker images
+dangling=$(docker images -q --filter dangling=true)
+if [[ -n "$dangling" ]]; then
+    echo "$dangling" | xargs docker rmi
+else
+    echo "No dangling images to remove."
+fi

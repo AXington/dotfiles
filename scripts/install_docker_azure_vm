@@ -1,14 +1,36 @@
-#! /usr/bin/env bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-HOST=$1
-USER=$2
+if [[ $# -lt 2 ]]; then
+    echo "Usage: $0 <host> <user>" >&2
+    exit 1
+fi
 
+HOST="$1"
+REMOTE_USER="$2"
 
-ssh $USER@$HOST "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -"
-ssh $USER@$HOST 'sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"'
-ssh $USER@$HOST "sudo apt-get update"
-ssh $USER@$HOST "sudo apt-get install -y docker-ce"
-ssh $USER@$HOST "sudo usermod -aG docker ${USER}"
-ssh $USER@$HOST "sudo apt-get install -y docker-compose"
+ssh "${REMOTE_USER}@${HOST}" << 'REMOTE'
+    set -euo pipefail
+    # Remove legacy packages
+    for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do
+        sudo apt-get remove -y "$pkg" 2>/dev/null || true
+    done
 
+    # Add Docker's official GPG key and repo
+    sudo apt-get update -y
+    sudo apt-get install -y ca-certificates curl gnupg
+    sudo install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+        | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    sudo chmod a+r /etc/apt/keyrings/docker.gpg
 
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+        https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+        | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+    sudo apt-get update -y
+    sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+    sudo usermod -aG docker "$USER"
+    echo "Docker installed. Log out and back in to use docker without sudo."
+REMOTE

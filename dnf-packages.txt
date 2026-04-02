@@ -1,0 +1,17 @@
+curl
+gcc
+git
+gitflow
+htop
+jq
+libffi-devel
+make
+openssh-server
+python3
+python3-pip
+tmux
+unzip
+tree
+vim-enhanced
+xclip
+zsh
