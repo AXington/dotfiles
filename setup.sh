@@ -1,6 +1,25 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Usage: ./setup.sh [--copilot]
+#   --copilot   Also install GitHub Copilot CLI and bootstrap global instructions
+
+# ── Argument parsing ─────────────────────────────────────────────────────────
+
+SETUP_COPILOT=false
+
+for arg in "$@"; do
+    case "$arg" in
+        --copilot|-c) SETUP_COPILOT=true ;;
+        --help|-h)
+            echo "Usage: $0 [--copilot]"
+            echo "  --copilot, -c   Install GitHub Copilot CLI and bootstrap global instructions"
+            exit 0
+            ;;
+        *) echo "Unknown option: $arg" >&2; exit 1 ;;
+    esac
+done
+
 # ── Helpers ─────────────────────────────────────────────────────────────────
 
 log()  { echo "==> $*"; }
@@ -313,6 +332,18 @@ set_default_editor_linux() {
     fi
 }
 
+# ── Copilot CLI ──────────────────────────────────────────────────────────────
+
+setup_copilot() {
+    local script="${SCRIPT_DIR}/scripts/setup_copilot.sh"
+    if [[ ! -f "$script" ]]; then
+        warn "scripts/setup_copilot.sh not found — skipping Copilot setup."
+        return
+    fi
+    log "Running Copilot CLI setup..."
+    bash "$script"
+}
+
 # ── Main ─────────────────────────────────────────────────────────────────────
 
 log "Detected OS: $OS"
@@ -336,5 +367,9 @@ if [[ "$OS" == "linux" || "$OS" == "wsl" ]]; then
 fi
 
 set_default_shell_zsh
+
+if [[ "$SETUP_COPILOT" == "true" ]]; then
+    setup_copilot
+fi
 
 log "Done! Start a new shell session (or run: exec zsh -l) to apply changes."
