@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
 if [[ $# -lt 2 ]]; then
     echo "Usage: $0 <host> <user>" >&2
     exit 1
@@ -10,10 +8,10 @@ fi
 
 HOST="$1"
 REMOTE_USER="$2"
-LOCAL_CONF="${SCRIPT_DIR}/../.tmux.conf.local"
+LOCAL_CONF="$HOME/.tmux.conf.local"
 
 if [[ ! -f "$LOCAL_CONF" ]]; then
-    echo "Error: .tmux.conf.local not found at ${LOCAL_CONF}" >&2
+    echo "Error: ~/.tmux.conf.local not found. Run setup.sh --only tmux first." >&2
     exit 1
 fi
 

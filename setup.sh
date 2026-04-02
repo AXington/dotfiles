@@ -12,67 +12,6 @@ set -euo pipefail
 #
 # Sections: packages gnubin fonts tmux zsh vim alacritty copilot
 
-# ── Argument parsing ──────────────────────────────────────────────────────────
-
-ALL_SECTIONS=(packages gnubin fonts tmux zsh vim alacritty copilot)
-declare -A RUN
-for s in "${ALL_SECTIONS[@]}"; do RUN[$s]=true; done
-RUN[copilot]=false  # opt-in; use --copilot or --all
-RUN[gnubin]=false   # macOS-only; auto-enabled below after OS detection
-
-usage() {
-    cat << EOF
-Usage: $0 [options]
-
-Options:
-  --only <s> [s...]   Run only the listed sections
-  --skip <s> [s...]   Skip the listed sections, run the rest
-  --copilot           Include Copilot CLI setup (off by default)
-  --all               Run all sections including copilot
-  --help              Show this help
-
-Sections: ${ALL_SECTIONS[*]}
-EOF
-    exit 0
-}
-
-# Collect a list of words after a flag, stopping at the next flag or end of args.
-# Usage: collect_list "$@" → sets COLLECTED and SHIFT_BY
-collect_list() {
-    COLLECTED=()
-    SHIFT_BY=0
-    while [[ $# -gt 0 && "$1" != --* ]]; do
-        COLLECTED+=("$1")
-        (( SHIFT_BY++ ))
-        shift
-    done
-    [[ ${#COLLECTED[@]} -gt 0 ]] || { echo "Flag requires at least one section name." >&2; usage; }
-}
-
-while [[ $# -gt 0 ]]; do
-    case "$1" in
-        --only)
-            shift
-            collect_list "$@"
-            for s in "${ALL_SECTIONS[@]}"; do RUN[$s]=false; done
-            for s in "${COLLECTED[@]}"; do RUN[$s]=true; done
-            shift "$SHIFT_BY"
-            ;;
-        --skip)
-            shift
-            collect_list "$@"
-            for s in "${COLLECTED[@]}"; do RUN[$s]=false; done
-            shift "$SHIFT_BY"
-            ;;
-        --copilot) RUN[copilot]=true;                                     shift ;;
-        --all)     for s in "${ALL_SECTIONS[@]}"; do RUN[$s]=true; done;  shift ;;
-        --help|-h) usage ;;
-        *)         echo "Unknown option: $1" >&2; usage ;;
-    esac
-done
-
-should_run() { [[ "${RUN[${1}]:-false}" == "true" ]]; }
-
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 log()  { printf '\n\e[1;34m==> %s\e[0m\n' "$*"; }
@@ -96,19 +35,79 @@ detect_os() {
 }
 
 detect_linux_distro() {
-    if command_exists apt-get; then   echo "debian"
-    elif command_exists dnf;          then echo "rhel"
-    elif command_exists yum;          then echo "rhel-old"
-    elif command_exists pacman;       then echo "arch"
-    else                                   echo "unknown"
+    if command_exists apt-get;   then echo "debian"
+    elif command_exists dnf;     then echo "rhel"
+    elif command_exists yum;     then echo "rhel-old"
+    elif command_exists pacman;  then echo "arch"
+    else                              echo "unknown"
     fi
 }
 
+# Detect OS and script location before argument parsing so defaults can be
+# set correctly (e.g. gnubin defaults to enabled on macOS).
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OS="$(detect_os)"
 
-# On macOS, gnubin setup is always included unless explicitly skipped
-[[ "$OS" == "macos" && -z "$ONLY_SECTION" ]] && RUN[gnubin]=true
+# ── Argument parsing ──────────────────────────────────────────────────────────
+
+ALL_SECTIONS=(packages gnubin fonts tmux zsh vim alacritty copilot)
+declare -A RUN
+for s in "${ALL_SECTIONS[@]}"; do RUN[$s]=true; done
+RUN[copilot]=false                                   # opt-in; use --copilot or --all
+[[ "$OS" == "macos" ]] && RUN[gnubin]=true || RUN[gnubin]=false  # macOS-only
+
+usage() {
+    cat << EOF
+Usage: $0 [options]
+
+Options:
+  --only <s> [s...]   Run only the listed sections
+  --skip <s> [s...]   Skip the listed sections, run the rest
+  --copilot           Include Copilot CLI setup (off by default)
+  --all               Run all sections including copilot
+  --help              Show this help
+
+Sections: ${ALL_SECTIONS[*]}
+EOF
+    exit 0
+}
+
+# Collect a space-separated list of section names after a flag, stopping at
+# the next flag or end of args.  Sets COLLECTED (array) and SHIFT_BY (count).
+collect_list() {
+    COLLECTED=()
+    SHIFT_BY=0
+    while [[ $# -gt 0 && "$1" != --* ]]; do
+        COLLECTED+=("$1")
+        SHIFT_BY=$(( SHIFT_BY + 1 ))   # avoid (( )) with set -e when value is 0
+        shift
+    done
+    [[ ${#COLLECTED[@]} -gt 0 ]] || { echo "Flag requires at least one section name." >&2; usage; }
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --only)
+            shift
+            collect_list "$@"
+            for s in "${ALL_SECTIONS[@]}"; do RUN[$s]=false; done
+            for s in "${COLLECTED[@]}";    do RUN[$s]=true;  done
+            shift "$SHIFT_BY"
+            ;;
+        --skip)
+            shift
+            collect_list "$@"
+            for s in "${COLLECTED[@]}"; do RUN[$s]=false; done
+            shift "$SHIFT_BY"
+            ;;
+        --copilot) RUN[copilot]=true;                                    shift ;;
+        --all)     for s in "${ALL_SECTIONS[@]}"; do RUN[$s]=true; done; shift ;;
+        --help|-h) usage ;;
+        *)         echo "Unknown option: $1" >&2; usage ;;
+    esac
+done
+
+should_run() { [[ "${RUN[${1}]:-false}" == "true" ]]; }
 
 # ── 1. Packages ───────────────────────────────────────────────────────────────
 
@@ -125,12 +124,12 @@ install_packages_macos() {
     brew update
     while IFS= read -r pkg || [[ -n "$pkg" ]]; do
         [[ -z "$pkg" || "$pkg" == \#* ]] && continue
-        pkg_name="${pkg%% --*}"
-        if brew list --formula "$pkg_name" &>/dev/null; then
+        pkg_name="${pkg%% *}"
+        if brew list --formula "$pkg_name" &>/dev/null 2>&1 \
+           || brew list --cask "$pkg_name" &>/dev/null 2>&1; then
             ok "Already installed: $pkg_name"
         else
-            # shellcheck disable=SC2086
-            brew install $pkg
+            brew install "$pkg_name"
         fi
     done < "${SCRIPT_DIR}/brew_packages.txt"
 }
@@ -170,6 +169,10 @@ section_packages() {
 # ── 2. GNU tools (macOS only) ─────────────────────────────────────────────────
 
 section_gnubin() {
+    if [[ "$OS" != "macos" ]]; then
+        warn "gnubin is macOS-only, skipping on $OS."
+        return
+    fi
     log "Symlinking GNU tools into ~/.gnubin..."
     mkdir -p "$HOME/.gnubin"
     local brew_prefix
@@ -187,15 +190,29 @@ section_gnubin() {
 
 section_fonts() {
     log "Installing Powerline fonts..."
-    if fc-list 2>/dev/null | grep -qi "powerline\|MesloLGM\|Nerd Font"; then
+
+    # fc-list is Linux (fontconfig); on macOS check font dirs directly
+    local has_fonts=false
+    if command_exists fc-list && fc-list 2>/dev/null | grep -qi "powerline\|MesloLGM\|Nerd Font"; then
+        has_fonts=true
+    elif [[ "$OS" == "macos" ]] && find ~/Library/Fonts /Library/Fonts -name "*Powerline*" -o \
+         -name "*MesloLGM*" -o -name "*NerdFont*" 2>/dev/null | grep -q .; then
+        has_fonts=true
+    fi
+
+    if [[ "$has_fonts" == "true" ]]; then
         ok "Powerline/Nerd fonts already installed."
         return
     fi
+
     local tmp_dir
     tmp_dir="$(mktemp -d)"
+    trap 'rm -rf "$tmp_dir"' EXIT
+
     git clone --depth=1 https://github.com/powerline/fonts.git "$tmp_dir/fonts"
     bash "$tmp_dir/fonts/install.sh"
     rm -rf "$tmp_dir"
+    trap - EXIT
 }
 
 # ── 4. tmux ───────────────────────────────────────────────────────────────────
@@ -239,7 +256,6 @@ section_tmux() {
 section_zsh() {
     log "Setting up Zsh + Oh My Zsh..."
 
-    # Install Oh My Zsh
     if [[ ! -d "$HOME/.oh-my-zsh" ]]; then
         RUNZSH=no CHSH=no sh -c \
             "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
@@ -247,7 +263,6 @@ section_zsh() {
         ok "Oh My Zsh already installed."
     fi
 
-    # Install zsh-syntax-highlighting plugin
     local plugin_dir="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting"
     if [[ ! -d "$plugin_dir" ]]; then
         git clone --depth=1 \
@@ -257,14 +272,12 @@ section_zsh() {
 
     local zshrc="$HOME/.zshrc"
 
-    # Patch theme and plugins in the OMZ-generated .zshrc
     if [[ -f "$zshrc" ]]; then
         sed -i.bak 's/ZSH_THEME="robbyrussell"/ZSH_THEME="agnoster"/' "$zshrc"
         sed -i.bak 's/^plugins=(git)$/plugins=(git zsh-syntax-highlighting)/' "$zshrc"
         rm -f "${zshrc}.bak"
     fi
 
-    # Append customizations block (idempotent)
     if grep -q "# >>> dotfiles customizations <<<" "$zshrc" 2>/dev/null; then
         ok ".zshrc customizations already present."
     else
@@ -312,7 +325,6 @@ fi
 EOF
     fi
 
-    # Set zsh as default shell
     local zsh_path
     zsh_path="$(command -v zsh)"
     if [[ "$SHELL" != "$zsh_path" ]]; then
@@ -320,7 +332,6 @@ EOF
         sudo chsh -s "$zsh_path" "$USER"
     fi
 
-    # Linux: register vim as default editor
     if command_exists update-alternatives && command_exists vim; then
         sudo update-alternatives --set editor "$(command -v vim)"
     fi
@@ -350,14 +361,29 @@ _alacritty_install_mac() {
     command_exists gzip || brew install gzip
 }
 
-_alacritty_install_debian() { sudo apt-get update -y && sudo apt-get install -y gzip alacritty; }
-_alacritty_install_rhel()   { local m; command_exists dnf && m=dnf || m=yum; sudo "$m" install -y gzip alacritty; }
-_alacritty_install_arch()   { sudo pacman -S --needed --noconfirm alacritty gzip; }
+_alacritty_install_debian() {
+    sudo apt-get update -y
+    # alacritty is available via snap on Ubuntu; fall back to cargo build on Debian
+    if command_exists snap; then
+        sudo snap install alacritty --classic
+    else
+        warn "alacritty not in default apt repos. Install via cargo or your distro's method."
+    fi
+    command_exists gzip || sudo apt-get install -y gzip
+}
+
+_alacritty_install_rhel() {
+    local m; command_exists dnf && m=dnf || m=yum
+    sudo "$m" install -y gzip alacritty
+}
+
+_alacritty_install_arch() {
+    sudo pacman -S --needed --noconfirm alacritty gzip
+}
 
 section_alacritty() {
     log "Setting up Alacritty..."
 
-    # Install
     case "$OS" in
         macos)    _alacritty_install_mac ;;
         linux|wsl)
@@ -374,11 +400,12 @@ section_alacritty() {
     local man_path="/usr/local/share/man/man1"
     if [[ ! -f "${man_path}/alacritty.1.gz" ]]; then
         sudo mkdir -p "$man_path"
-        local tmp; tmp="$(mktemp)"
-        curl -fsSL -o "$tmp" \
+        local man_tmp
+        man_tmp="$(mktemp)"
+        curl -fsSL -o "$man_tmp" \
             https://raw.githubusercontent.com/alacritty/alacritty/master/extra/alacritty.man
-        gzip -c "$tmp" | sudo tee "${man_path}/alacritty.1.gz" > /dev/null
-        rm -f "$tmp"
+        gzip -c "$man_tmp" | sudo tee "${man_path}/alacritty.1.gz" > /dev/null
+        rm -f "$man_tmp"
     fi
 
     # Zsh completions
@@ -390,11 +417,12 @@ section_alacritty() {
     fi
 
     # terminfo
-    local tmp; tmp="$(mktemp)"
-    curl -fsSL -o "$tmp" \
+    local terminfo_tmp
+    terminfo_tmp="$(mktemp)"
+    curl -fsSL -o "$terminfo_tmp" \
         https://raw.githubusercontent.com/alacritty/alacritty/master/extra/alacritty.info
-    sudo tic -xe alacritty,alacritty-direct "$tmp"
-    rm -f "$tmp"
+    sudo tic -xe alacritty,alacritty-direct "$terminfo_tmp"
+    rm -f "$terminfo_tmp"
 
     # Symlink config
     mkdir -p "$HOME/.config/alacritty"
@@ -423,7 +451,6 @@ section_copilot() {
         ok "Copilot CLI already installed."
     fi
 
-    # Bootstrap global instructions
     local instructions_dir="$HOME/.copilot"
     local instructions_file="${instructions_dir}/copilot-instructions.md"
     mkdir -p "$instructions_dir"
@@ -479,15 +506,15 @@ INSTRUCTIONS
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 log "Detected OS: ${OS}"
-log "Sections to run: $(for s in "${!RUN[@]}"; do [[ "${RUN[$s]}" == "true" ]] && printf '%s ' "$s"; done)"
+log "Sections to run:$(for s in "${ALL_SECTIONS[@]}"; do [[ "${RUN[$s]}" == "true" ]] && printf ' %s' "$s"; done)"
 
-should_run packages   && section_packages
-should_run gnubin     && section_gnubin
-should_run fonts      && section_fonts
-should_run tmux       && section_tmux
-should_run zsh        && section_zsh
-should_run vim        && section_vim
-should_run alacritty  && section_alacritty
-should_run copilot    && section_copilot
+should_run packages  && section_packages
+should_run gnubin    && section_gnubin
+should_run fonts     && section_fonts
+should_run tmux      && section_tmux
+should_run zsh       && section_zsh
+should_run vim       && section_vim
+should_run alacritty && section_alacritty
+should_run copilot   && section_copilot
 
 log "Done! Start a new shell session (or run: exec zsh -l) to apply changes."

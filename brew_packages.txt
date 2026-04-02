@@ -14,7 +14,7 @@ grep
 gzip
 htop
 jq
-macvim -- --with-override-system-vim --with-lua --with-luajit
+macvim
 pkg-config
 readline
 reattach-to-user-namespace
@@ -22,7 +22,7 @@ tmux
 tree
 unrar
 unzip
-vim --override-system-vi
+vim
 watch
 wget
 xz
