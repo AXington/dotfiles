@@ -1,0 +1,31 @@
+# WSL2 global VM settings
+# ─────────────────────────────────────────────────────────────────────────────
+# Copy this file to %USERPROFILE%\.wslconfig on Windows, then run:
+#   wsl --shutdown
+# from PowerShell to apply.
+#
+# Docs: https://learn.microsoft.com/en-us/windows/wsl/wsl-config#wslconfig
+
+[wsl2]
+# Cap memory so WSL2 doesn't consume all available RAM.
+# Set to ~50% of your physical RAM.
+memory=8GB
+
+# Number of logical processors available to WSL2.
+# Default is the number of logical processors on the host.
+processors=4
+
+# Swap file size. 0 to disable.
+swap=2GB
+
+# Uncomment to use a custom swap file location
+# swapFile=%USERPROFILE%\AppData\Local\Temp\swap.vhdx
+
+# Uncomment to disable nested virtualisation (improves performance if unused)
+# nestedVirtualization=false
+
+# Uncomment to enable experimental DNS tunneling (useful on some VPNs)
+# dnsTunneling=true
+
+# Uncomment to enable experimental mirrored networking mode (same IPs as Windows)
+# networkingMode=mirrored

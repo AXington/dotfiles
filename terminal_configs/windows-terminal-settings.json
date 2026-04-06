@@ -1,0 +1,52 @@
+{
+    "_comment": "Windows Terminal settings snippet — matches the Alacritty config in this repo.",
+    "_instructions": [
+        "Open Windows Terminal → Settings (Ctrl+,) → Open JSON file (bottom-left)",
+        "1. Merge the object inside 'schemes' into the top-level 'schemes' array",
+        "2. Merge the object inside 'profiles.defaults' into your existing 'profiles.defaults'",
+        "3. Set 'colorScheme' in your WSL profile to 'AliceThomas'",
+        "4. Make sure MesloLGM Nerd Font is installed on Windows first (see setup.sh wsl section)"
+    ],
+
+    "schemes": [
+        {
+            "name": "AliceThomas",
+            "background": "#000000",
+            "foreground": "#ffffff",
+            "cursorColor": "#ffffff",
+            "selectionBackground": "#444444",
+
+            "black":         "#000000",
+            "brightBlack":   "#848484",
+            "blue":          "#5959d9",
+            "brightBlue":    "#6666ff",
+            "cyan":          "#00cdcd",
+            "brightCyan":    "#2fffff",
+            "green":         "#19cd19",
+            "brightGreen":   "#2fff2f",
+            "purple":        "#cd00cd",
+            "brightPurple":  "#ff2fff",
+            "red":           "#cd1919",
+            "brightRed":     "#ff2f2f",
+            "white":         "#ffffff",
+            "brightWhite":   "#ffffff",
+            "yellow":        "#cdcd00",
+            "brightYellow":  "#ffff2f"
+        }
+    ],
+
+    "profiles": {
+        "defaults": {
+            "colorScheme": "AliceThomas",
+            "font": {
+                "face": "MesloLGM Nerd Font",
+                "size": 13.5,
+                "weight": "bold"
+            },
+            "opacity": 100,
+            "padding": "5, 5",
+            "scrollbarState": "hidden",
+            "useAcrylic": false
+        }
+    }
+}
