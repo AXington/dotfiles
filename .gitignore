@@ -4,3 +4,4 @@
 *.DS_Store
 *.zcompdump*
 virtualenvwrapper
+scripts/__pycache__
