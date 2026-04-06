@@ -348,8 +348,12 @@ section_vim() {
         git clone https://github.com/AXington/.vim.git "$HOME/.vim"
     fi
     (cd "$HOME/.vim" && git checkout heavenly && git submodule init && git submodule update)
-    ln -sf "$HOME/.vim/.vimrc"       "$HOME/.vimrc"
-    ln -sf "$HOME/.vim/.vimrc.local" "$HOME/.vimrc.local"
+    ln -sf "$HOME/.vim/.vimrc" "$HOME/.vimrc"
+    # .vimrc.local is machine-specific (WSL patches it at runtime); copy rather than
+    # symlink so changes don't propagate back into the .vim git repo.
+    if [[ ! -f "$HOME/.vimrc.local" ]]; then
+        cp "$HOME/.vim/.vimrc.local" "$HOME/.vimrc.local" 2>/dev/null || touch "$HOME/.vimrc.local"
+    fi
     ok "Vim configured."
 }
 
@@ -375,7 +379,20 @@ _alacritty_install_debian() {
 
 _alacritty_install_rhel() {
     local m; command_exists dnf && m=dnf || m=yum
-    sudo "$m" install -y gzip alacritty
+    # alacritty is not in standard RHEL/Fedora/CentOS repos; use flatpak if available
+    if command_exists flatpak; then
+        flatpak install -y flathub io.github.alacritty.Alacritty
+    elif command_exists cargo; then
+        warn "alacritty not in dnf repos. Building from source via cargo (slow)..."
+        sudo "$m" install -y cmake freetype-devel fontconfig-devel libxcb-devel \
+            libxkbcommon-devel g++ gzip
+        cargo install alacritty
+    else
+        warn "alacritty not in dnf repos and flatpak/cargo not available."
+        warn "Install flatpak first: sudo $m install -y flatpak && flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo"
+        return 1
+    fi
+    command_exists gzip || sudo "$m" install -y gzip
 }
 
 _alacritty_install_arch() {

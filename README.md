@@ -15,7 +15,7 @@ cd ~/dotfiles
 For WSL2 on Windows, include the WSL-specific setup:
 
 ```bash
-./setup.sh --skip alacritty   # Alacritty is macOS/Linux; use Windows Terminal on WSL
+./setup.sh --skip alacritty   # Windows Terminal is your GUI emulator on WSL2; no need to install Alacritty inside WSL
 ```
 
 ## What `setup.sh` Does
@@ -31,7 +31,7 @@ opt-in).
 | `fonts` | Powerline fonts cloned and installed |
 | `tmux` | [gpakosz/.tmux](https://github.com/gpakosz/.tmux) framework, symlinked config, customisations applied to `~/.tmux.conf.local` |
 | `zsh` | Oh My Zsh (non-interactive install), zsh-syntax-highlighting plugin, agnoster theme, dotfiles customisation block appended to `~/.zshrc` |
-| `vim` | [AXington/.vim](https://github.com/AXington/.vim) on the `heavenly` branch, submodules initialised, `.vimrc` / `.vimrc.local` symlinked |
+| `vim` | [AXington/.vim](https://github.com/AXington/.vim) on the `heavenly` branch, submodules initialised, `.vimrc` symlinked; `.vimrc.local` copied (not symlinked — it's machine-specific and patched by the WSL section) |
 | `alacritty` | Alacritty terminal installed, config symlinked from `terminal_configs/alacritty.toml`, man page, terminfo, and zsh completions set up |
 | `wsl` | *(WSL2 only)* `wslu`, `win32yank.exe`, `/etc/wsl.conf`, clipboard + true-color patches to `~/.tmux.conf.local` and `~/.vimrc.local` |
 | `copilot` | *(opt-in)* GitHub Copilot CLI installed, global instructions bootstrapped to `~/.copilot/copilot-instructions.md` |
