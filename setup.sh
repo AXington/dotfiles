@@ -265,9 +265,16 @@ bind C-a send-prefix
 TMUX_PREFIX
     fi
 
-    # Window navigation bindings
+    # Window navigation bindings + manual focus-events toggle (C-a F)
+    # The toggle is a fallback for tools outside the ssh/aws wrappers.
     if ! grep -q "bind a last-window" "$conf"; then
-        printf '\nbind a last-window\nbind n next-window\n' >> "$conf"
+        cat >> "$conf" << 'TMUX_BINDINGS'
+
+bind a last-window
+bind n next-window
+# Toggle focus-events on/off with <prefix>+F (fallback for non-ssh flows)
+bind F run-shell "tmux set focus-events $(tmux show -gv focus-events | grep -q on && echo off || echo on) && tmux display-message 'focus-events: #{focus-events}'"
+TMUX_BINDINGS
     fi
     ok "tmux configured."
 }
@@ -341,6 +348,35 @@ command -v pyenv &>/dev/null && eval "\$(pyenv init -)"
 if [[ -z "\$TMUX" && -z "\${CI:-}" && -t 1 ]]; then
     tmux attach 2>/dev/null || tmux new
 fi
+
+# Disable tmux focus-events during SSH to prevent garbage characters (e.g. [[;)
+# injected by terminal focus escape sequences when browser windows open for
+# SSO/SSM authentication flows.
+ssh() {
+    if [[ -n "\$TMUX" ]]; then
+        tmux set -g focus-events off
+        command ssh "\$@"
+        local _ret=\$?
+        tmux set -g focus-events on
+        return \$_ret
+    else
+        command ssh "\$@"
+    fi
+}
+
+# Same guard for 'aws sso login' which also opens a browser popup.
+# All other aws subcommands pass through unchanged.
+aws() {
+    if [[ -n "\$TMUX" && "\$1" == "sso" && "\$2" == "login" ]]; then
+        tmux set -g focus-events off
+        command aws "\$@"
+        local _ret=\$?
+        tmux set -g focus-events on
+        return \$_ret
+    else
+        command aws "\$@"
+    fi
+}
 
 # <<< dotfiles customizations <<<
 EOF
