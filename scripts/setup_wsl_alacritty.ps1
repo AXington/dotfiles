@@ -1,4 +1,4 @@
-﻿<#
+﻿﻿<#
 .SYNOPSIS
     Bootstrap WSL2 with the latest Ubuntu LTS, Alacritty, and dotfiles on Windows 11.
 
@@ -152,7 +152,7 @@ if (-not $wslInstalled) {
 }
 
 try {
-    wsl --set-default-version 2 2>&1 | Out-Null
+    wsl --set-default-version 2 | Out-Null
 } catch {
     Write-Warn "Could not set WSL default version: $_ (may need reboot)"
 }
@@ -165,7 +165,7 @@ $installedDistros = (Get-WslOutput { wsl --list --quiet }) -join ' '
 
 if ($installedDistros -notmatch [regex]::Escape($UbuntuDistro)) {
     Write-Warn "Installing $UbuntuDistro -- this may take a few minutes..."
-    wsl --install -d $UbuntuDistro --no-launch 2>&1 | Out-Null
+    wsl --install -d $UbuntuDistro --no-launch | Out-Null
     if ($LASTEXITCODE -eq 0) {
         Write-Ok "$UbuntuDistro installed"
     } else {
@@ -274,7 +274,7 @@ if ($wslReady -eq 'ready') {
     $gitCheck = (Get-WslOutput { wsl -d $UbuntuDistro -- bash -c 'command -v git' }) -join ''
     if ([string]::IsNullOrWhiteSpace($gitCheck)) {
         Write-Warn 'git not found in WSL -- installing...'
-        wsl -d $UbuntuDistro -- bash -c 'sudo apt-get update -qq && sudo apt-get install -y -qq git' 2>&1 | Out-Null
+        wsl -d $UbuntuDistro -- bash -c 'sudo apt-get update -qq && sudo apt-get install -y -qq git' | Out-Null
         if ($LASTEXITCODE -ne 0) {
             Write-Warn 'Failed to install git in WSL -- dotfiles clone skipped. Install git manually and re-run.'
         }
@@ -283,7 +283,7 @@ if ($wslReady -eq 'ready') {
     $present = (Get-WslOutput { wsl -d $UbuntuDistro -- bash -c 'test -d ~/dotfiles && echo yes || echo no' }) -join ''
     $present = $present.Trim() -replace "`0", ''
     if ($present -ne 'yes') {
-        wsl -d $UbuntuDistro -- bash -c "git clone $DOTFILES_REPO ~/dotfiles" 2>&1 | Out-Null
+        wsl -d $UbuntuDistro -- bash -c "git clone $DOTFILES_REPO ~/dotfiles" | Out-Null
         if ($LASTEXITCODE -eq 0) {
             Write-Ok 'Dotfiles cloned to ~/dotfiles in WSL'
         } else {
