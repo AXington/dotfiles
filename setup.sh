@@ -50,7 +50,7 @@ OS="$(detect_os)"
 
 # ── Argument parsing ──────────────────────────────────────────────────────────
 
-ALL_SECTIONS=(packages gnubin fonts tmux zsh vim alacritty wsl copilot)
+ALL_SECTIONS=(packages gnubin fonts tmux zsh vim alacritty wsl python copilot)
 declare -A RUN
 for s in "${ALL_SECTIONS[@]}"; do RUN[$s]=true; done
 RUN[copilot]=false                                    # opt-in; use --copilot or --all
@@ -254,7 +254,7 @@ section_tmux() {
 
     # Use C-a as sole prefix; unbind C-b so it passes through to remote/nested
     # tmux sessions which reliably use C-b.
-    if ! grep -q "set -g prefix C-a" "$conf"; then
+    if ! grep -q "^set -g prefix C-a" "$conf"; then
         cat >> "$conf" << 'TMUX_PREFIX'
 
 # Use C-a as the sole prefix; C-b is freed for remote/nested tmux sessions
@@ -344,6 +344,11 @@ command -v helm    &>/dev/null && source <(helm completion zsh)
 export PYENV_ROOT="\$HOME/.pyenv"
 [[ -d "\$PYENV_ROOT/bin" ]] && export PATH="\$PYENV_ROOT/bin:\$PATH"
 command -v pyenv &>/dev/null && eval "\$(pyenv init -)"
+
+# uv
+[ -f "\$HOME/.local/bin/env" ] && . "\$HOME/.local/bin/env"
+export WORKON_HOME="\$HOME/.venvs"
+[ -f "\$HOME/.local/bin/uv-virtualenvwrapper.sh" ] && source "\$HOME/.local/bin/uv-virtualenvwrapper.sh"
 
 if [[ -z "\$TMUX" && -z "\${CI:-}" && -t 1 ]]; then
     tmux attach 2>/dev/null || tmux new
@@ -647,7 +652,67 @@ VIM_WSL
     printf '  \e[1;33m└──────────────────────────────────────────────────────────────────────────┘\e[0m\n'
 }
 
-# ── 9. GitHub Copilot CLI ─────────────────────────────────────────────────────
+# ── 9. Python (uv + uv-virtualenvwrapper + base virtualenv) ──────────────────
+
+section_python() {
+    log "Setting up Python (uv + uv-virtualenvwrapper + base virtualenv)..."
+
+    # Install uv via the official installer (works on all platforms)
+    if ! command_exists uv; then
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        export PATH="$HOME/.local/bin:$PATH"
+    else
+        ok "uv already installed: $(uv --version)"
+    fi
+
+    # uv-virtualenvwrapper provides a shell script; install as a uv tool
+    if [[ ! -f "$HOME/.local/bin/uv-virtualenvwrapper.sh" ]]; then
+        uv tool install uv-virtualenvwrapper
+    else
+        ok "uv-virtualenvwrapper already installed."
+    fi
+
+    # Create the base virtualenv (acts as a system-level scripting environment)
+    local venv_home="${WORKON_HOME:-$HOME/.venvs}"
+    mkdir -p "$venv_home"
+    local base_venv="$venv_home/base"
+    if [[ ! -d "$base_venv" ]]; then
+        uv venv "$base_venv"
+        ok "Created base virtualenv at $base_venv"
+    else
+        ok "Base virtualenv already exists at $base_venv"
+    fi
+
+    log "Installing packages into base virtualenv..."
+    uv pip install --python "$base_venv/bin/python" \
+        `# REPL / debugging` \
+        ipython ipdb pexpect \
+        `# HTTP / networking` \
+        requests httpx paramiko fabric dnspython \
+        `# CLI / TUI` \
+        click typer rich tqdm tabulate prettytable \
+        `# Data / config parsing` \
+        pydantic python-dotenv PyYAML jinja2 \
+        lxml "beautifulsoup4[lxml]" jsonpath-ng \
+        `# PDF / document generation` \
+        reportlab fpdf2 weasyprint pypdf \
+        `# AWS / cloud` \
+        boto3 \
+        `# Kubernetes` \
+        kubernetes \
+        `# System utilities` \
+        psutil sh watchdog \
+        `# Database clients` \
+        psycopg2-binary pymysql \
+        `# Security / crypto` \
+        cryptography \
+        `# Monitoring / observability` \
+        prometheus-client
+
+    ok "Python base virtualenv configured."
+}
+
+# ── 10. GitHub Copilot CLI ────────────────────────────────────────────────────
 
 section_copilot() {
     log "Setting up GitHub Copilot CLI..."
@@ -747,6 +812,7 @@ should_run zsh       && section_zsh
 should_run vim       && section_vim
 should_run alacritty && section_alacritty
 should_run wsl       && section_wsl
+should_run python    && section_python
 should_run copilot   && section_copilot
 
 log "Done! Start a new shell session (or run: exec zsh -l) to apply changes."
