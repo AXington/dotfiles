@@ -31,7 +31,7 @@ style = "Block"
 unfocused_hollow = true
 
 [font]
-normal = {family = "MesloLGM Nerd Font", style = "Regular"}
+normal = {family = "Menlo", style = "Bold"}
 size = 13.5
 builtin_box_drawing = true
 
