@@ -42,18 +42,3 @@ live_config_reload = true
 padding = {x = 5, y = 5}
 dynamic_padding = true
 opacity = 1
-
-[[keyboard.bindings]]
-key = "C"
-mods = "Control|Shift"
-action = "Copy"
-
-[[keyboard.bindings]]
-key = "V"
-mods = "Control|Shift"
-action = "Paste"
-
-[[keyboard.bindings]]
-key = "Insert"
-mods = "Shift"
-action = "Paste"
