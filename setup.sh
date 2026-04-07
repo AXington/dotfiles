@@ -10,7 +10,7 @@ set -euo pipefail
 #   ./setup.sh --skip packages fonts         # skip the listed sections, run the rest
 #   ./setup.sh --copilot                     # include copilot in the standard run
 #
-# Sections: packages gnubin fonts tmux zsh vim alacritty wsl copilot
+# Sections: packages gnubin fonts tmux zsh vim alacritty wsl python copilot
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -54,8 +54,8 @@ ALL_SECTIONS=(packages gnubin fonts tmux zsh vim alacritty wsl python copilot)
 declare -A RUN
 for s in "${ALL_SECTIONS[@]}"; do RUN[$s]=true; done
 RUN[copilot]=false                                    # opt-in; use --copilot or --all
-[[ "$OS" == "macos" ]] && RUN[gnubin]=true || RUN[gnubin]=false  # macOS-only
-[[ "$OS" == "wsl"   ]] && RUN[wsl]=true    || RUN[wsl]=false     # WSL-only
+if [[ "$OS" == "macos" ]]; then RUN[gnubin]=true; else RUN[gnubin]=false; fi  # macOS-only
+if [[ "$OS" == "wsl"   ]]; then RUN[wsl]=true;   else RUN[wsl]=false;   fi   # WSL-only
 
 usage() {
     cat << EOF
@@ -70,7 +70,7 @@ Options:
 
 Sections: ${ALL_SECTIONS[*]}
 EOF
-    exit 0
+    exit "${1:-0}"
 }
 
 # Collect a space-separated list of section names after a flag, stopping at
@@ -83,7 +83,7 @@ collect_list() {
         SHIFT_BY=$(( SHIFT_BY + 1 ))   # avoid (( )) with set -e when value is 0
         shift
     done
-    [[ ${#COLLECTED[@]} -gt 0 ]] || { echo "Flag requires at least one section name." >&2; usage; }
+    [[ ${#COLLECTED[@]} -gt 0 ]] || { echo "Flag requires at least one section name." >&2; usage 1; }
 }
 
 while [[ $# -gt 0 ]]; do
@@ -104,7 +104,7 @@ while [[ $# -gt 0 ]]; do
         --copilot) RUN[copilot]=true;                                    shift ;;
         --all)     for s in "${ALL_SECTIONS[@]}"; do RUN[$s]=true; done; shift ;;
         --help|-h) usage ;;
-        *)         echo "Unknown option: $1" >&2; usage ;;
+        *)         echo "Unknown option: $1" >&2; usage 1 ;;
     esac
 done
 
@@ -126,8 +126,8 @@ install_packages_macos() {
     while IFS= read -r pkg || [[ -n "$pkg" ]]; do
         [[ -z "$pkg" || "$pkg" == \#* ]] && continue
         pkg_name="${pkg%% *}"
-        if brew list --formula "$pkg_name" &>/dev/null 2>&1 \
-           || brew list --cask "$pkg_name" &>/dev/null 2>&1; then
+        if brew list --formula "$pkg_name" &>/dev/null \
+           || brew list --cask "$pkg_name" &>/dev/null; then
             ok "Already installed: $pkg_name"
         else
             brew install "$pkg_name"
@@ -196,8 +196,10 @@ section_fonts() {
     local has_fonts=false
     if command_exists fc-list && fc-list 2>/dev/null | grep -qi "powerline\|MesloLGM\|Nerd Font"; then
         has_fonts=true
-    elif [[ "$OS" == "macos" ]] && find ~/Library/Fonts /Library/Fonts -name "*Powerline*" -o \
-         -name "*MesloLGM*" -o -name "*NerdFont*" 2>/dev/null | grep -q .; then
+    elif [[ "$OS" == "macos" ]] && \
+         find ~/Library/Fonts /Library/Fonts \
+              \( -name "*Powerline*" -o -name "*MesloLGM*" -o -name "*NerdFont*" \) \
+              -print 2>/dev/null | grep -q .; then
         has_fonts=true
     fi
 
@@ -301,33 +303,42 @@ section_zsh() {
     local zshrc="$HOME/.zshrc"
 
     if [[ -f "$zshrc" ]]; then
-        sed -i.bak 's/ZSH_THEME="robbyrussell"/ZSH_THEME="agnoster"/' "$zshrc"
-        sed -i.bak 's/^plugins=(git)$/plugins=(git zsh-syntax-highlighting)/' "$zshrc"
+        sed -i.bak \
+            -e 's/ZSH_THEME="robbyrussell"/ZSH_THEME="agnoster"/' \
+            -e 's/^plugins=(git)$/plugins=(git zsh-syntax-highlighting)/' \
+            "$zshrc"
         rm -f "${zshrc}.bak"
 
         # Fix bare unguarded 'tmux attach || tmux new' left by older setup runs.
         # Must use Python — sed chokes on || in the match pattern.
-        python3 - "$zshrc" << 'PYFIX'
+        if command_exists python3; then
+            python3 - "$zshrc" << 'PYFIX'
 import sys
 path = sys.argv[1]
 with open(path) as f:
     content = f.read()
 bare = 'tmux attach || tmux new\n'
 guarded = 'if [[ -z "$TMUX" && -z "${CI:-}" && -t 1 ]]; then tmux attach 2>/dev/null || tmux new; fi\n'
+changed = False
 if bare in content and guarded not in content:
     content = content.replace(bare, guarded, 1)
-    with open(path, 'w') as f:
-        f.write(content)
+    changed = True
     print('  fixed: bare tmux attach line guarded')
 
 # Remove legacy literal-\n uv-virtualenvwrapper line written by older setups.
 bad = r'\n# uv-virtualenvwrapper\nsource "$HOME/.local/bin/uv-virtualenvwrapper.sh"'
 if bad in content:
     content = content.replace(bad, '')
+    changed = True
+    print('  fixed: removed literal-\\n uv-virtualenvwrapper line')
+
+if changed:
     with open(path, 'w') as f:
         f.write(content)
-    print('  fixed: removed literal-\\n uv-virtualenvwrapper line')
 PYFIX
+        else
+            warn "python3 not found — skipping legacy zshrc cleanup (check for bare 'tmux attach || tmux new' manually)"
+        fi
     fi
 
     if grep -q "# >>> dotfiles customizations <<<" "$zshrc" 2>/dev/null; then
@@ -351,7 +362,11 @@ autoload -U +X bashcompinit && bashcompinit
 if [[ -n "\$SSH_CONNECTION" ]]; then
     export EDITOR='vim'
 else
-    command -v nvim &>/dev/null && export EDITOR='nvim' || export EDITOR='vim'
+    if command -v nvim &>/dev/null; then
+        export EDITOR='nvim'
+    else
+        export EDITOR='vim'
+    fi
 fi
 
 export SSH_KEY_PATH="\$HOME/.ssh/id_ed25519"
@@ -412,10 +427,13 @@ EOF
     fi
 
     local zsh_path
-    zsh_path="$(command -v zsh)"
-    if [[ "$SHELL" != "$zsh_path" ]]; then
+    zsh_path="$(command -v zsh || true)"
+    if [[ -z "$zsh_path" ]]; then
+        warn "zsh not found in PATH — skipping default shell change"
+    elif [[ "$SHELL" != "$zsh_path" ]]; then
         grep -qxF "$zsh_path" /etc/shells || echo "$zsh_path" | sudo tee -a /etc/shells
-        sudo chsh -s "$zsh_path" "$USER"
+        sudo chsh -s "$zsh_path" "$USER" \
+            || warn "chsh failed — run manually: chsh -s $zsh_path"
     fi
 
     if command_exists update-alternatives && command_exists vim; then
@@ -432,7 +450,9 @@ section_vim() {
     if [[ ! -d "$HOME/.vim" ]]; then
         git clone https://github.com/AXington/.vim.git "$HOME/.vim"
     fi
-    (cd "$HOME/.vim" && git checkout Divine && git submodule init && git submodule update)
+    (cd "$HOME/.vim" \
+        && { git symbolic-ref --short HEAD 2>/dev/null | grep -qx "Divine" || git checkout Divine; } \
+        && git submodule update --init --recursive)
     ln -sf "$HOME/.vim/.vimrc" "$HOME/.vimrc"
     # .vimrc.local is machine-specific (WSL patches it at runtime); copy rather than
     # symlink so changes don't propagate back into the .vim git repo.
@@ -446,7 +466,11 @@ section_vim() {
 
 _alacritty_install_mac() {
     command_exists brew || bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-    [[ -x /opt/homebrew/bin/brew ]] && eval "$(/opt/homebrew/bin/brew shellenv)"
+    if [[ -x /opt/homebrew/bin/brew ]]; then
+        eval "$(/opt/homebrew/bin/brew shellenv)"
+    elif [[ -x /usr/local/bin/brew ]]; then
+        eval "$(/usr/local/bin/brew shellenv)"
+    fi
     brew install --cask alacritty
     command_exists gzip || brew install gzip
 }
@@ -466,7 +490,7 @@ _alacritty_install_rhel() {
     local m; command_exists dnf && m=dnf || m=yum
     # alacritty is not in standard RHEL/Fedora/CentOS repos; use flatpak if available
     if command_exists flatpak; then
-        flatpak install -y flathub io.github.alacritty.Alacritty
+        flatpak install --user -y flathub io.github.alacritty.Alacritty
     elif command_exists cargo; then
         warn "alacritty not in dnf repos. Building from source via cargo (slow)..."
         sudo "$m" install -y cmake freetype-devel fontconfig-devel libxcb-devel \
@@ -499,16 +523,24 @@ section_alacritty() {
         *) warn "Unsupported OS — install alacritty manually." ;;
     esac
 
+    # Bail out early if alacritty still isn't available (install step warned already)
+    if ! command_exists alacritty; then
+        warn "alacritty not found after install attempt — skipping man page, completions, and terminfo"
+        return 1
+    fi
+
     # Man page
     local man_path="/usr/local/share/man/man1"
     if [[ ! -f "${man_path}/alacritty.1.gz" ]]; then
         sudo mkdir -p "$man_path"
         local man_tmp
         man_tmp="$(mktemp)"
+        trap 'rm -f "$man_tmp"' RETURN
         curl -fsSL -o "$man_tmp" \
             https://raw.githubusercontent.com/alacritty/alacritty/master/extra/alacritty.man
         gzip -c "$man_tmp" | sudo tee "${man_path}/alacritty.1.gz" > /dev/null
         rm -f "$man_tmp"
+        trap - RETURN
     fi
 
     # Zsh completions
@@ -519,13 +551,19 @@ section_alacritty() {
             https://raw.githubusercontent.com/alacritty/alacritty/master/extra/completions/_alacritty
     fi
 
-    # terminfo
-    local terminfo_tmp
-    terminfo_tmp="$(mktemp)"
-    curl -fsSL -o "$terminfo_tmp" \
-        https://raw.githubusercontent.com/alacritty/alacritty/master/extra/alacritty.info
-    sudo tic -xe alacritty,alacritty-direct "$terminfo_tmp"
-    rm -f "$terminfo_tmp"
+    # terminfo — requires tic (ncurses); present on macOS and most Linux distros
+    if command_exists tic; then
+        local terminfo_tmp
+        terminfo_tmp="$(mktemp)"
+        trap 'rm -f "$terminfo_tmp"' RETURN
+        curl -fsSL -o "$terminfo_tmp" \
+            https://raw.githubusercontent.com/alacritty/alacritty/master/extra/alacritty.info
+        sudo tic -xe alacritty,alacritty-direct "$terminfo_tmp" >/dev/null
+        rm -f "$terminfo_tmp"
+        trap - RETURN
+    else
+        warn "tic not found — skipping alacritty terminfo install (run: sudo tic -xe alacritty,alacritty-direct alacritty.info)"
+    fi
 
     # Symlink config
     mkdir -p "$HOME/.config/alacritty"
@@ -555,6 +593,7 @@ section_wsl() {
     # Better than clip.exe (write-only) + powershell paste (slow).
     if ! command_exists win32yank.exe; then
         log "Installing win32yank for clipboard integration..."
+        command_exists unzip || sudo apt-get install -y unzip
         local winy_tmp
         winy_tmp="$(mktemp)"
         curl -fsSL -o "$winy_tmp" \
