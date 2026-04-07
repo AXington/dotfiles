@@ -28,6 +28,14 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+# -- Environment validation ---------------------------------------------------
+foreach ($var in @('APPDATA', 'USERPROFILE', 'TEMP')) {
+    if ([string]::IsNullOrEmpty([System.Environment]::GetEnvironmentVariable($var))) {
+        Write-Host "  [xx] Required environment variable `$$var is not set -- cannot continue." -ForegroundColor Red
+        exit 1
+    }
+}
+
 # -- Constants -----------------------------------------------------------------
 $DOTFILES_REPO      = 'https://github.com/AXington/dotfiles.git'
 $DOTFILES_RAW       = 'https://raw.githubusercontent.com/AXington/dotfiles/master'
@@ -55,11 +63,24 @@ function Test-CommandExists {
     $null -ne (Get-Command $Name -ErrorAction SilentlyContinue)
 }
 
+# WSL outputs UTF-16LE which PowerShell captures with embedded NUL bytes.
+# This helper strips NUL characters so string matching works correctly.
+function Get-WslOutput {
+    param([scriptblock]$Cmd)
+    try {
+        $raw = & $Cmd 2>&1
+        return ($raw | ForEach-Object { "$_" -replace "`0", '' } | Where-Object { $_ -ne '' })
+    } catch {
+        return @()
+    }
+}
+
 function Get-LatestUbuntuLTS {
     # Query the WSL store for available distros and return the highest-versioned
     # Ubuntu LTS (even year, .04 release). Falls back to Ubuntu-24.04 on failure.
     try {
-        $versions = (wsl --list --online 2>&1) |
+        $lines    = Get-WslOutput { wsl --list --online }
+        $versions = $lines |
             Where-Object  { $_ -match 'Ubuntu-(\d+)\.(\d+)' } |
             ForEach-Object {
                 if ($_ -match 'Ubuntu-(\d+)\.(\d+)') {
@@ -69,7 +90,6 @@ function Get-LatestUbuntuLTS {
                         [PSCustomObject]@{
                             Name  = "Ubuntu-$($Matches[1]).$($Matches[2])"
                             Year  = $year
-                            Month = $month
                         }
                     }
                 }
@@ -89,35 +109,63 @@ function Get-LatestUbuntuLTS {
     return 'Ubuntu-24.04'
 }
 
+function Invoke-WebRequestSafe {
+    # Wrapper around Invoke-WebRequest with consistent error handling.
+    param(
+        [string]$Uri,
+        [string]$OutFile = $null
+    )
+    try {
+        if ($OutFile) {
+            Invoke-WebRequest -Uri $Uri -OutFile $OutFile -UseBasicParsing
+        } else {
+            return (Invoke-WebRequest -Uri $Uri -UseBasicParsing)
+        }
+    } catch {
+        throw "Failed to download ${Uri}: $_"
+    }
+}
+
 # -- 1. WSL2 -------------------------------------------------------------------
 Write-Step 'Setting up WSL2...'
 
-$wslVersionOutput = (wsl --version 2>&1) -join ' '
-if ($LASTEXITCODE -ne 0 -or $wslVersionOutput -notmatch 'WSL version') {
+$wslInstalled = $false
+try {
+    $wslOut = (wsl --version 2>&1) -join ' '
+    $wslInstalled = ($LASTEXITCODE -eq 0 -and $wslOut -match 'WSL version')
+} catch {
+    $wslInstalled = $false
+}
+
+if (-not $wslInstalled) {
     Write-Warn 'WSL not detected -- installing...'
-    wsl --install --no-launch
-    if ($LASTEXITCODE -ne 0) {
-        Write-Warn 'WSL install returned a non-zero exit code -- a reboot is likely required.'
+    $installOut = (wsl --install --no-launch 2>&1) -join ' '
+    if ($LASTEXITCODE -ne 0 -or $installOut -match 'restart|reboot') {
+        Write-Warn 'WSL install requires a reboot to complete.'
         Write-Host ''
         Write-Host '  Please reboot and re-run this script to continue.' -ForegroundColor Yellow
         exit 0
     }
     Write-Ok 'WSL2 installed'
 } else {
-    Write-Ok "WSL2 already installed ($( ($wslVersionOutput -split '\n')[0].Trim() ))"
+    Write-Ok "WSL2 already installed ($( ($wslOut -split ' ')[0..2] -join ' ' ))"
 }
 
-wsl --set-default-version 2 2>$null
+try {
+    wsl --set-default-version 2 2>&1 | Out-Null
+} catch {
+    Write-Warn "Could not set WSL default version: $_ (may need reboot)"
+}
 
 # -- 2. Latest Ubuntu LTS ------------------------------------------------------
 Write-Step 'Installing latest Ubuntu LTS...'
 
-$UbuntuDistro    = Get-LatestUbuntuLTS
-$installedDistros = (wsl --list --quiet 2>&1) -join ' '
+$UbuntuDistro     = Get-LatestUbuntuLTS
+$installedDistros = (Get-WslOutput { wsl --list --quiet }) -join ' '
 
 if ($installedDistros -notmatch [regex]::Escape($UbuntuDistro)) {
     Write-Warn "Installing $UbuntuDistro -- this may take a few minutes..."
-    wsl --install -d $UbuntuDistro --no-launch
+    wsl --install -d $UbuntuDistro --no-launch 2>&1 | Out-Null
     if ($LASTEXITCODE -eq 0) {
         Write-Ok "$UbuntuDistro installed"
     } else {
@@ -134,7 +182,12 @@ if (-not (Test-CommandExists 'alacritty')) {
     if (Test-CommandExists 'winget') {
         winget install --id Alacritty.Alacritty `
             --accept-package-agreements --accept-source-agreements --silent
-        Write-Ok 'Alacritty installed via winget'
+        if ($LASTEXITCODE -eq 0) {
+            Write-Ok 'Alacritty installed via winget'
+            Write-Warn 'You may need to open a new terminal session before Alacritty is in PATH.'
+        } else {
+            Write-Warn "winget install returned exit code $LASTEXITCODE -- check winget logs or install manually from https://alacritty.org"
+        }
     } else {
         Write-Warn 'winget not available -- download Alacritty manually from https://alacritty.org'
     }
@@ -147,15 +200,23 @@ Write-Step 'Installing Meslo LG M for Powerline fonts...'
 
 foreach ($entry in $MESLO_M_FONTS.GetEnumerator()) {
     $destPath = Join-Path $SYSTEM_FONTS_DIR $entry.Key
-    if (Test-Path $destPath) {
+    $regName  = [System.IO.Path]::GetFileNameWithoutExtension($entry.Key) + ' (TrueType)'
+
+    # Check registry first -- font may be registered even if file is present
+    $regExists = $null -ne (Get-ItemProperty -Path $FONTS_REG_KEY -Name $regName -ErrorAction SilentlyContinue)
+
+    if ((Test-Path $destPath) -and $regExists) {
         Write-Ok "Already installed: $($entry.Key)"
         continue
     }
-    $tmp = Join-Path $env:TEMP ([System.IO.Path]::GetRandomFileName() + '.ttf')
+
+    # Strip random extension from GetRandomFileName before appending .ttf
+    $tmpBase = [System.IO.Path]::GetRandomFileName() -replace '\.[^.]*$', ''
+    $tmp     = Join-Path $env:TEMP ($tmpBase + '.ttf')
+
     try {
-        Invoke-WebRequest -Uri $entry.Value -OutFile $tmp -UseBasicParsing
+        Invoke-WebRequestSafe -Uri $entry.Value -OutFile $tmp
         Copy-Item -Path $tmp -Destination $destPath -Force
-        $regName = [System.IO.Path]::GetFileNameWithoutExtension($entry.Key) + ' (TrueType)'
         Set-ItemProperty -Path $FONTS_REG_KEY -Name $regName -Value $entry.Key
         Write-Ok "Installed: $($entry.Key)"
     } catch {
@@ -170,26 +231,34 @@ Write-Step 'Writing Alacritty config...'
 
 New-Item -ItemType Directory -Force -Path $ALACRITTY_CFG_DIR | Out-Null
 
-# Fetch canonical config from dotfiles repo and append WSL shell block
-$tomlContent = (Invoke-WebRequest -Uri "$DOTFILES_RAW/terminal_configs/alacritty.toml" -UseBasicParsing).Content
-$tomlContent  = $tomlContent.TrimEnd() + @"
+try {
+    $tomlContent = (Invoke-WebRequestSafe -Uri "$DOTFILES_RAW/terminal_configs/alacritty.toml").Content
+    $tomlContent = $tomlContent.TrimEnd() + @"
 
 
 [shell]
 program = "wsl.exe"
 args = ["--distribution", "$UbuntuDistro"]
 "@
-
-Set-Content -Path $ALACRITTY_TOML -Value $tomlContent -Encoding UTF8
-Write-Ok "Config written: $ALACRITTY_TOML"
+    # Write UTF-8 without BOM -- PS 5.1's Set-Content -Encoding UTF8 adds a BOM
+    # which Alacritty's TOML parser does not expect.
+    [System.IO.File]::WriteAllText($ALACRITTY_TOML, $tomlContent, [System.Text.UTF8Encoding]::new($false))
+    Write-Ok "Config written: $ALACRITTY_TOML"
+} catch {
+    Write-Warn "Failed to write Alacritty config: $_"
+}
 
 # -- 6. .wslconfig -------------------------------------------------------------
 Write-Step 'Writing .wslconfig...'
 
 if (-not (Test-Path $WSLCONFIG_PATH)) {
-    Invoke-WebRequest -Uri "$DOTFILES_RAW/wslconfig.template" -OutFile $WSLCONFIG_PATH -UseBasicParsing
-    Write-Ok "Written: $WSLCONFIG_PATH"
-    Write-Warn "Edit $WSLCONFIG_PATH to tune memory/CPU for your machine, then run: wsl --shutdown"
+    try {
+        Invoke-WebRequestSafe -Uri "$DOTFILES_RAW/wslconfig.template" -OutFile $WSLCONFIG_PATH
+        Write-Ok "Written: $WSLCONFIG_PATH"
+        Write-Warn "Edit $WSLCONFIG_PATH to tune memory/CPU for your machine, then run: wsl --shutdown"
+    } catch {
+        Write-Warn "Failed to write .wslconfig: $_"
+    }
 } else {
     Write-Ok '.wslconfig already exists -- not overwriting'
 }
@@ -197,14 +266,29 @@ if (-not (Test-Path $WSLCONFIG_PATH)) {
 # -- 7. Clone dotfiles into WSL ------------------------------------------------
 Write-Step 'Cloning dotfiles into WSL...'
 
-$wslReady = ''
-try { $wslReady = (wsl -d $UbuntuDistro -- bash -c 'echo ready' 2>$null).Trim() } catch { }
+$wslReady = (Get-WslOutput { wsl -d $UbuntuDistro -- bash -c 'echo ready' }) -join ''
+$wslReady = $wslReady.Trim() -replace "`0", ''
 
 if ($wslReady -eq 'ready') {
-    $present = (wsl -d $UbuntuDistro -- bash -c 'test -d ~/dotfiles && echo yes || echo no').Trim()
+    # Ensure git is available in WSL -- not guaranteed on a fresh Ubuntu install
+    $gitCheck = (Get-WslOutput { wsl -d $UbuntuDistro -- bash -c 'command -v git' }) -join ''
+    if ([string]::IsNullOrWhiteSpace($gitCheck)) {
+        Write-Warn 'git not found in WSL -- installing...'
+        wsl -d $UbuntuDistro -- bash -c 'sudo apt-get update -qq && sudo apt-get install -y -qq git' 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warn 'Failed to install git in WSL -- dotfiles clone skipped. Install git manually and re-run.'
+        }
+    }
+
+    $present = (Get-WslOutput { wsl -d $UbuntuDistro -- bash -c 'test -d ~/dotfiles && echo yes || echo no' }) -join ''
+    $present = $present.Trim() -replace "`0", ''
     if ($present -ne 'yes') {
-        wsl -d $UbuntuDistro -- bash -c "git clone $DOTFILES_REPO ~/dotfiles"
-        Write-Ok 'Dotfiles cloned to ~/dotfiles in WSL'
+        wsl -d $UbuntuDistro -- bash -c "git clone $DOTFILES_REPO ~/dotfiles" 2>&1 | Out-Null
+        if ($LASTEXITCODE -eq 0) {
+            Write-Ok 'Dotfiles cloned to ~/dotfiles in WSL'
+        } else {
+            Write-Warn 'git clone failed -- clone manually inside WSL: git clone https://github.com/AXington/dotfiles.git ~/dotfiles'
+        }
     } else {
         Write-Ok 'Dotfiles already present in WSL'
     }
