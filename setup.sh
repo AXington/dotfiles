@@ -304,6 +304,30 @@ section_zsh() {
         sed -i.bak 's/ZSH_THEME="robbyrussell"/ZSH_THEME="agnoster"/' "$zshrc"
         sed -i.bak 's/^plugins=(git)$/plugins=(git zsh-syntax-highlighting)/' "$zshrc"
         rm -f "${zshrc}.bak"
+
+        # Fix bare unguarded 'tmux attach || tmux new' left by older setup runs.
+        # Must use Python — sed chokes on || in the match pattern.
+        python3 - "$zshrc" << 'PYFIX'
+import sys
+path = sys.argv[1]
+with open(path) as f:
+    content = f.read()
+bare = 'tmux attach || tmux new\n'
+guarded = 'if [[ -z "$TMUX" && -z "${CI:-}" && -t 1 ]]; then tmux attach 2>/dev/null || tmux new; fi\n'
+if bare in content and guarded not in content:
+    content = content.replace(bare, guarded, 1)
+    with open(path, 'w') as f:
+        f.write(content)
+    print('  fixed: bare tmux attach line guarded')
+
+# Remove legacy literal-\n uv-virtualenvwrapper line written by older setups.
+bad = r'\n# uv-virtualenvwrapper\nsource "$HOME/.local/bin/uv-virtualenvwrapper.sh"'
+if bad in content:
+    content = content.replace(bad, '')
+    with open(path, 'w') as f:
+        f.write(content)
+    print('  fixed: removed literal-\\n uv-virtualenvwrapper line')
+PYFIX
     fi
 
     if grep -q "# >>> dotfiles customizations <<<" "$zshrc" 2>/dev/null; then
