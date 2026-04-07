@@ -20,6 +20,24 @@ warn() { printf '\e[1;33mWARN: %s\e[0m\n' "$*" >&2; }
 
 command_exists() { command -v "$1" &>/dev/null; }
 
+DRY_RUN=false
+CHECK_ONLY=false
+_check_failed=false
+
+# In --dry-run mode, print command instead of executing it.
+run() {
+    if [[ "$DRY_RUN" == "true" ]]; then
+        printf '\e[2;37m  [dry] %s\e[0m\n' "$*"
+    else
+        "$@"
+    fi
+}
+
+# --verify helpers
+pass()       { printf '\e[1;32m  ✓ %s\e[0m\n' "$*"; }
+fail()       { printf '\e[1;31m  ✗ %s\e[0m\n' "$*"; _check_failed=true; }
+skip_check() { printf '\e[2;37m  – %s\e[0m\n' "$*"; }
+
 # ── OS / distro detection ─────────────────────────────────────────────────────
 
 detect_os() {
@@ -66,6 +84,8 @@ Options:
   --skip <s> [s...]   Skip the listed sections, run the rest
   --copilot           Include Copilot CLI setup (off by default)
   --all               Run all sections including copilot
+  --dry-run           Simulate: print what would be done without making changes
+  --verify            Check post-conditions for each section (acts as test suite)
   --help              Show this help
 
 Sections: ${ALL_SECTIONS[*]}
@@ -103,6 +123,8 @@ while [[ $# -gt 0 ]]; do
             ;;
         --copilot) RUN[copilot]=true;                                    shift ;;
         --all)     for s in "${ALL_SECTIONS[@]}"; do RUN[$s]=true; done; shift ;;
+        --dry-run)  DRY_RUN=true;    shift ;;
+        --verify)   CHECK_ONLY=true; shift ;;
         --help|-h) usage ;;
         *)         echo "Unknown option: $1" >&2; usage 1 ;;
     esac
@@ -114,15 +136,19 @@ should_run() { [[ "${RUN[${1}]:-false}" == "true" ]]; }
 
 install_packages_macos() {
     if ! command_exists brew; then
-        log "Installing Homebrew..."
-        bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        if [[ "$DRY_RUN" == "true" ]]; then
+            printf '\e[2;37m  [dry] install Homebrew\e[0m\n'
+        else
+            log "Installing Homebrew..."
+            bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        fi
     fi
     if [[ -x /opt/homebrew/bin/brew ]]; then
         eval "$(/opt/homebrew/bin/brew shellenv)"
     elif [[ -x /usr/local/bin/brew ]]; then
         eval "$(/usr/local/bin/brew shellenv)"
     fi
-    brew update
+    run brew update
     while IFS= read -r pkg || [[ -n "$pkg" ]]; do
         [[ -z "$pkg" || "$pkg" == \#* ]] && continue
         pkg_name="${pkg%% *}"
@@ -130,7 +156,7 @@ install_packages_macos() {
            || brew list --cask "$pkg_name" &>/dev/null; then
             ok "Already installed: $pkg_name"
         else
-            brew install "$pkg_name"
+            run brew install "$pkg_name"
         fi
     done < "${SCRIPT_DIR}/brew_packages.txt"
 }
@@ -138,18 +164,18 @@ install_packages_macos() {
 install_packages_debian() {
     sudo apt-get update -y
     # shellcheck disable=SC2046
-    sudo apt-get install -y $(grep -v '^\s*#' "${SCRIPT_DIR}/apt-packages.txt" | xargs)
+    run sudo apt-get install -y $(grep -v '^\s*#' "${SCRIPT_DIR}/apt-packages.txt" | xargs)
 }
 
 install_packages_rhel() {
     local mgr; command_exists dnf && mgr="dnf" || mgr="yum"
     # shellcheck disable=SC2046
-    sudo "$mgr" install -y $(grep -v '^\s*#' "${SCRIPT_DIR}/dnf-packages.txt" | xargs)
+    run sudo "$mgr" install -y $(grep -v '^\s*#' "${SCRIPT_DIR}/dnf-packages.txt" | xargs)
 }
 
 install_packages_arch() {
     # shellcheck disable=SC2046
-    sudo pacman -S --needed --noconfirm $(grep -v '^\s*#' "${SCRIPT_DIR}/pacman-packages.txt" | xargs)
+    run sudo pacman -S --needed --noconfirm $(grep -v '^\s*#' "${SCRIPT_DIR}/pacman-packages.txt" | xargs)
 }
 
 section_packages() {
@@ -175,13 +201,13 @@ section_gnubin() {
         return
     fi
     log "Symlinking GNU tools into ~/.gnubin..."
-    mkdir -p "$HOME/.gnubin"
+    run mkdir -p "$HOME/.gnubin"
     local brew_prefix
     brew_prefix="$(brew --prefix)"
     for dir in "${brew_prefix}/opt"/*/libexec/gnubin; do
         [[ -d "$dir" ]] || continue
         while IFS= read -r -d '' bin; do
-            ln -sf "$bin" "$HOME/.gnubin/$(basename "$bin")"
+            run ln -sf "$bin" "$HOME/.gnubin/$(basename "$bin")"
         done < <(find "$dir" -maxdepth 1 -type f -print0)
     done
     ok "GNU tools linked in ~/.gnubin"
@@ -212,8 +238,8 @@ section_fonts() {
     tmp_dir="$(mktemp -d)"
     trap 'rm -rf "$tmp_dir"' EXIT
 
-    git clone --depth=1 https://github.com/powerline/fonts.git "$tmp_dir/fonts"
-    bash "$tmp_dir/fonts/install.sh"
+    run git clone --depth=1 https://github.com/powerline/fonts.git "$tmp_dir/fonts"
+    run bash "$tmp_dir/fonts/install.sh"
     rm -rf "$tmp_dir"
     trap - EXIT
 }
@@ -223,12 +249,12 @@ section_fonts() {
 section_tmux() {
     log "Setting up tmux..."
     if [[ ! -d "$HOME/.tmux" ]]; then
-        git clone https://github.com/gpakosz/.tmux.git "$HOME/.tmux"
+        run git clone https://github.com/gpakosz/.tmux.git "$HOME/.tmux"
     fi
     # Per gpakosz/.tmux instructions: symlink main conf, copy local conf
-    ln -sf "$HOME/.tmux/.tmux.conf" "$HOME/.tmux.conf"
+    run ln -sf "$HOME/.tmux/.tmux.conf" "$HOME/.tmux.conf"
     if [[ ! -f "$HOME/.tmux.conf.local" ]]; then
-        cp "$HOME/.tmux/.tmux.conf.local" "$HOME/.tmux.conf.local"
+        run cp "$HOME/.tmux/.tmux.conf.local" "$HOME/.tmux.conf.local"
     fi
 
     local conf="$HOME/.tmux.conf.local"
@@ -240,13 +266,13 @@ section_tmux() {
     # PATH on macOS because gnu-sed is in brew_packages.txt and gnubin is prepended
     # to PATH before this section runs.
     if ! grep -q "uE0B0" "$conf" || grep -q '^tmux_conf_theme_left_separator_main=""' "$conf"; then
-        sed -i \
+        run sed -i \
             -e 's@^tmux_conf_theme_left_separator_main=""$@#tmux_conf_theme_left_separator_main=""@' \
             -e 's@^tmux_conf_theme_left_separator_sub="|"$@#tmux_conf_theme_left_separator_sub="|"@' \
             -e 's@^tmux_conf_theme_right_separator_main=""$@#tmux_conf_theme_right_separator_main=""@' \
             -e 's@^tmux_conf_theme_right_separator_sub="|"$@#tmux_conf_theme_right_separator_sub="|"@' \
             "$conf"
-        sed -i \
+        run sed -i \
             -e "s@^#\(tmux_conf_theme_left_separator_main='\\\\uE0B0'.*\)@\1@" \
             -e "s@^#\(tmux_conf_theme_left_separator_sub='\\\\uE0B1'.*\)@\1@" \
             -e "s@^#\(tmux_conf_theme_right_separator_main='\\\\uE0B2'.*\)@\1@" \
@@ -257,7 +283,10 @@ section_tmux() {
     # Use C-a as sole prefix; unbind C-b so it passes through to remote/nested
     # tmux sessions which reliably use C-b.
     if ! grep -q "^set -g prefix C-a" "$conf"; then
-        cat >> "$conf" << 'TMUX_PREFIX'
+        if [[ "$DRY_RUN" == "true" ]]; then
+            printf '\e[2;37m  [dry] append prefix config to %s\e[0m\n' "$conf"
+        else
+            cat >> "$conf" << 'TMUX_PREFIX'
 
 # Use C-a as the sole prefix; C-b is freed for remote/nested tmux sessions
 set -gu prefix2
@@ -265,18 +294,23 @@ unbind C-b
 set -g prefix C-a
 bind C-a send-prefix
 TMUX_PREFIX
+        fi
     fi
 
     # Window navigation bindings + manual focus-events toggle (C-a F)
     # The toggle is a fallback for tools outside the ssh/aws wrappers.
     if ! grep -q "bind a last-window" "$conf"; then
-        cat >> "$conf" << 'TMUX_BINDINGS'
+        if [[ "$DRY_RUN" == "true" ]]; then
+            printf '\e[2;37m  [dry] append bindings to %s\e[0m\n' "$conf"
+        else
+            cat >> "$conf" << 'TMUX_BINDINGS'
 
 bind a last-window
 bind n next-window
 # Toggle focus-events on/off with <prefix>+F (fallback for non-ssh flows)
 bind F run-shell "tmux set focus-events $(tmux show -gv focus-events | grep -q on && echo off || echo on) && tmux display-message 'focus-events: #{focus-events}'"
 TMUX_BINDINGS
+        fi
     fi
     ok "tmux configured."
 }
@@ -287,15 +321,19 @@ section_zsh() {
     log "Setting up Zsh + Oh My Zsh..."
 
     if [[ ! -d "$HOME/.oh-my-zsh" ]]; then
-        RUNZSH=no CHSH=no sh -c \
-            "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+        if [[ "$DRY_RUN" != "true" ]]; then
+            RUNZSH=no CHSH=no sh -c \
+                "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+        else
+            printf '\e[2;37m  [dry] install oh-my-zsh\e[0m\n'
+        fi
     else
         ok "Oh My Zsh already installed."
     fi
 
     local plugin_dir="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting"
     if [[ ! -d "$plugin_dir" ]]; then
-        git clone --depth=1 \
+        run git clone --depth=1 \
             https://github.com/zsh-users/zsh-syntax-highlighting.git \
             "$plugin_dir"
     fi
@@ -303,11 +341,11 @@ section_zsh() {
     local zshrc="$HOME/.zshrc"
 
     if [[ -f "$zshrc" ]]; then
-        sed -i.bak \
+        run sed -i.bak \
             -e 's/ZSH_THEME="robbyrussell"/ZSH_THEME="agnoster"/' \
             -e 's/^plugins=(git)$/plugins=(git zsh-syntax-highlighting)/' \
             "$zshrc"
-        rm -f "${zshrc}.bak"
+        run rm -f "${zshrc}.bak"
 
         # Fix bare unguarded 'tmux attach || tmux new' left by older setup runs.
         # Must use Python — sed chokes on || in the match pattern.
@@ -344,14 +382,17 @@ PYFIX
     if grep -q "# >>> dotfiles customizations <<<" "$zshrc" 2>/dev/null; then
         ok ".zshrc customizations already present."
     else
-        local path_prefix='$HOME/.gnubin'
-        if [[ "$OS" == "macos" ]]; then
-            local brew_prefix
-            brew_prefix="$(brew --prefix 2>/dev/null || echo '/opt/homebrew')"
-            path_prefix="${brew_prefix}/bin:\$HOME/.gnubin"
-        fi
+        if [[ "$DRY_RUN" == "true" ]]; then
+            printf '\e[2;37m  [dry] append dotfiles customizations to %s\e[0m\n' "$zshrc"
+        else
+            local path_prefix='$HOME/.gnubin'
+            if [[ "$OS" == "macos" ]]; then
+                local brew_prefix
+                brew_prefix="$(brew --prefix 2>/dev/null || echo '/opt/homebrew')"
+                path_prefix="${brew_prefix}/bin:\$HOME/.gnubin"
+            fi
 
-        cat >> "$zshrc" << EOF
+            cat >> "$zshrc" << EOF
 
 # >>> dotfiles customizations <<<
 
@@ -424,6 +465,7 @@ aws() {
 
 # <<< dotfiles customizations <<<
 EOF
+        fi
     fi
 
     local zsh_path
@@ -431,13 +473,19 @@ EOF
     if [[ -z "$zsh_path" ]]; then
         warn "zsh not found in PATH — skipping default shell change"
     elif [[ "$SHELL" != "$zsh_path" ]]; then
-        grep -qxF "$zsh_path" /etc/shells || echo "$zsh_path" | sudo tee -a /etc/shells
-        sudo chsh -s "$zsh_path" "$USER" \
+        grep -qxF "$zsh_path" /etc/shells || {
+            if [[ "$DRY_RUN" == "true" ]]; then
+                printf '\e[2;37m  [dry] add %s to /etc/shells\e[0m\n' "$zsh_path"
+            else
+                echo "$zsh_path" | sudo tee -a /etc/shells
+            fi
+        }
+        run sudo chsh -s "$zsh_path" "$USER" \
             || warn "chsh failed — run manually: chsh -s $zsh_path"
     fi
 
     if command_exists update-alternatives && command_exists vim; then
-        sudo update-alternatives --set editor "$(command -v vim)"
+        run sudo update-alternatives --set editor "$(command -v vim)"
     fi
 
     ok "Zsh configured."
@@ -448,16 +496,20 @@ EOF
 section_vim() {
     log "Setting up Vim..."
     if [[ ! -d "$HOME/.vim" ]]; then
-        git clone https://github.com/AXington/.vim.git "$HOME/.vim"
+        run git clone https://github.com/AXington/.vim.git "$HOME/.vim"
     fi
-    (cd "$HOME/.vim" \
-        && { git symbolic-ref --short HEAD 2>/dev/null | grep -qx "Divine" || git checkout Divine; } \
-        && git submodule update --init --recursive)
-    ln -sf "$HOME/.vim/.vimrc" "$HOME/.vimrc"
+    if [[ "$DRY_RUN" == "true" ]]; then
+        printf '\e[2;37m  [dry] checkout Divine branch and update submodules in ~/.vim\e[0m\n'
+    else
+        (cd "$HOME/.vim" \
+            && { git symbolic-ref --short HEAD 2>/dev/null | grep -qx "Divine" || git checkout Divine; } \
+            && git submodule update --init --recursive)
+    fi
+    run ln -sf "$HOME/.vim/.vimrc" "$HOME/.vimrc"
     # .vimrc.local is machine-specific (WSL patches it at runtime); copy rather than
     # symlink so changes don't propagate back into the .vim git repo.
     if [[ ! -f "$HOME/.vimrc.local" ]]; then
-        cp "$HOME/.vim/.vimrc.local" "$HOME/.vimrc.local" 2>/dev/null || touch "$HOME/.vimrc.local"
+        run cp "$HOME/.vim/.vimrc.local" "$HOME/.vimrc.local" 2>/dev/null || run touch "$HOME/.vimrc.local"
     fi
     ok "Vim configured."
 }
@@ -471,41 +523,41 @@ _alacritty_install_mac() {
     elif [[ -x /usr/local/bin/brew ]]; then
         eval "$(/usr/local/bin/brew shellenv)"
     fi
-    brew install --cask alacritty
-    command_exists gzip || brew install gzip
+    run brew install --cask alacritty
+    command_exists gzip || run brew install gzip
 }
 
 _alacritty_install_debian() {
     sudo apt-get update -y
     # alacritty is available via snap on Ubuntu; fall back to cargo build on Debian
     if command_exists snap; then
-        sudo snap install alacritty --classic
+        run sudo snap install alacritty --classic
     else
         warn "alacritty not in default apt repos. Install via cargo or your distro's method."
     fi
-    command_exists gzip || sudo apt-get install -y gzip
+    command_exists gzip || run sudo apt-get install -y gzip
 }
 
 _alacritty_install_rhel() {
     local m; command_exists dnf && m=dnf || m=yum
     # alacritty is not in standard RHEL/Fedora/CentOS repos; use flatpak if available
     if command_exists flatpak; then
-        flatpak install --user -y flathub io.github.alacritty.Alacritty
+        run flatpak install --user -y flathub io.github.alacritty.Alacritty
     elif command_exists cargo; then
         warn "alacritty not in dnf repos. Building from source via cargo (slow)..."
-        sudo "$m" install -y cmake freetype-devel fontconfig-devel libxcb-devel \
+        run sudo "$m" install -y cmake freetype-devel fontconfig-devel libxcb-devel \
             libxkbcommon-devel g++ gzip
-        cargo install alacritty
+        run cargo install alacritty
     else
         warn "alacritty not in dnf repos and flatpak/cargo not available."
         warn "Install flatpak first: sudo $m install -y flatpak && flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo"
         return 1
     fi
-    command_exists gzip || sudo "$m" install -y gzip
+    command_exists gzip || run sudo "$m" install -y gzip
 }
 
 _alacritty_install_arch() {
-    sudo pacman -S --needed --noconfirm alacritty gzip
+    run sudo pacman -S --needed --noconfirm alacritty gzip
 }
 
 section_alacritty() {
@@ -532,13 +584,17 @@ section_alacritty() {
     # Man page
     local man_path="/usr/local/share/man/man1"
     if [[ ! -f "${man_path}/alacritty.1.gz" ]]; then
-        sudo mkdir -p "$man_path"
+        run sudo mkdir -p "$man_path"
         local man_tmp
         man_tmp="$(mktemp)"
         trap 'rm -f "$man_tmp"' RETURN
-        curl -fsSL -o "$man_tmp" \
+        run curl -fsSL -o "$man_tmp" \
             https://raw.githubusercontent.com/alacritty/alacritty/master/extra/alacritty.man
-        gzip -c "$man_tmp" | sudo tee "${man_path}/alacritty.1.gz" > /dev/null
+        if [[ "$DRY_RUN" == "true" ]]; then
+            printf '\e[2;37m  [dry] download and install man page to %s\e[0m\n' "${man_path}/alacritty.1.gz"
+        else
+            gzip -c "$man_tmp" | sudo tee "${man_path}/alacritty.1.gz" > /dev/null
+        fi
         rm -f "$man_tmp"
         trap - RETURN
     fi
@@ -546,8 +602,8 @@ section_alacritty() {
     # Zsh completions
     local zsh_fn_dir="${ZDOTDIR:-$HOME}/.zsh_functions"
     if [[ ! -f "${zsh_fn_dir}/_alacritty" ]]; then
-        mkdir -p "$zsh_fn_dir"
-        curl -fsSL -o "${zsh_fn_dir}/_alacritty" \
+        run mkdir -p "$zsh_fn_dir"
+        run curl -fsSL -o "${zsh_fn_dir}/_alacritty" \
             https://raw.githubusercontent.com/alacritty/alacritty/master/extra/completions/_alacritty
     fi
 
@@ -556,9 +612,9 @@ section_alacritty() {
         local terminfo_tmp
         terminfo_tmp="$(mktemp)"
         trap 'rm -f "$terminfo_tmp"' RETURN
-        curl -fsSL -o "$terminfo_tmp" \
+        run curl -fsSL -o "$terminfo_tmp" \
             https://raw.githubusercontent.com/alacritty/alacritty/master/extra/alacritty.info
-        sudo tic -xe alacritty,alacritty-direct "$terminfo_tmp" >/dev/null
+        run sudo tic -xe alacritty,alacritty-direct "$terminfo_tmp"
         rm -f "$terminfo_tmp"
         trap - RETURN
     else
@@ -566,8 +622,8 @@ section_alacritty() {
     fi
 
     # Symlink config
-    mkdir -p "$HOME/.config/alacritty"
-    ln -sf "${SCRIPT_DIR}/terminal_configs/alacritty.toml" \
+    run mkdir -p "$HOME/.config/alacritty"
+    run ln -sf "${SCRIPT_DIR}/terminal_configs/alacritty.toml" \
            "$HOME/.config/alacritty/alacritty.toml"
 
     ok "Alacritty configured."
@@ -584,7 +640,7 @@ section_wsl() {
 
     # wslu provides wslview (open URLs/files in Windows), wslpath, etc.
     if ! command_exists wslview; then
-        sudo apt-get install -y wslu
+        run sudo apt-get install -y wslu
     else
         ok "wslu already installed."
     fi
@@ -593,13 +649,17 @@ section_wsl() {
     # Better than clip.exe (write-only) + powershell paste (slow).
     if ! command_exists win32yank.exe; then
         log "Installing win32yank for clipboard integration..."
-        command_exists unzip || sudo apt-get install -y unzip
+        command_exists unzip || run sudo apt-get install -y unzip
         local winy_tmp
         winy_tmp="$(mktemp)"
-        curl -fsSL -o "$winy_tmp" \
+        run curl -fsSL -o "$winy_tmp" \
             "https://github.com/equalsraf/win32yank/releases/latest/download/win32yank-x64.zip"
-        unzip -p "$winy_tmp" win32yank.exe | sudo tee /usr/local/bin/win32yank.exe > /dev/null
-        sudo chmod +x /usr/local/bin/win32yank.exe
+        if [[ "$DRY_RUN" == "true" ]]; then
+            printf '\e[2;37m  [dry] extract win32yank.exe to /usr/local/bin/win32yank.exe\e[0m\n'
+        else
+            unzip -p "$winy_tmp" win32yank.exe | sudo tee /usr/local/bin/win32yank.exe > /dev/null
+        fi
+        run sudo chmod +x /usr/local/bin/win32yank.exe
         rm -f "$winy_tmp"
         ok "win32yank installed at /usr/local/bin/win32yank.exe"
     else
@@ -610,7 +670,10 @@ section_wsl() {
     # Only written if the file doesn't exist; never overwrites existing config.
     if [[ ! -f /etc/wsl.conf ]]; then
         log "Writing /etc/wsl.conf (systemd + interop settings)..."
-        sudo tee /etc/wsl.conf > /dev/null << EOF
+        if [[ "$DRY_RUN" == "true" ]]; then
+            printf '\e[2;37m  [dry] write /etc/wsl.conf\e[0m\n'
+        else
+            sudo tee /etc/wsl.conf > /dev/null << EOF
 [boot]
 systemd=true
 
@@ -621,6 +684,7 @@ appendWindowsPath=true
 [user]
 default=${USER}
 EOF
+        fi
         ok "/etc/wsl.conf written. Run 'wsl --shutdown' from PowerShell to apply."
     else
         ok "/etc/wsl.conf already exists — not overwriting."
@@ -630,7 +694,10 @@ EOF
     local tmux_conf="$HOME/.tmux.conf.local"
     if [[ -f "$tmux_conf" ]] && ! grep -q "# >>> WSL config <<<" "$tmux_conf"; then
         log "Patching ~/.tmux.conf.local for WSL2 (true color + clipboard)..."
-        cat >> "$tmux_conf" << 'TMUX_WSL'
+        if [[ "$DRY_RUN" == "true" ]]; then
+            printf '\e[2;37m  [dry] append WSL config to %s\e[0m\n' "$tmux_conf"
+        else
+            cat >> "$tmux_conf" << 'TMUX_WSL'
 
 # >>> WSL config <<<
 
@@ -652,6 +719,7 @@ if -b 'command -v win32yank.exe > /dev/null 2>&1' {
 
 # <<< WSL config <<<
 TMUX_WSL
+        fi
         ok "~/.tmux.conf.local patched."
     else
         ok "tmux WSL config already present."
@@ -661,7 +729,10 @@ TMUX_WSL
     local vimrc_local="$HOME/.vimrc.local"
     if ! grep -q "\" >>> WSL config <<<" "$vimrc_local" 2>/dev/null; then
         log "Patching ~/.vimrc.local for WSL2 (true color + clipboard)..."
-        cat >> "$vimrc_local" << 'VIM_WSL'
+        if [[ "$DRY_RUN" == "true" ]]; then
+            printf '\e[2;37m  [dry] append WSL config to %s\e[0m\n' "$vimrc_local"
+        else
+            cat >> "$vimrc_local" << 'VIM_WSL'
 
 " >>> WSL config <<<
 
@@ -688,6 +759,7 @@ endif
 
 " <<< WSL config <<<
 VIM_WSL
+        fi
         ok "~/.vimrc.local patched."
     else
         ok "vim WSL config already present."
@@ -722,15 +794,19 @@ section_python() {
 
     # Install uv via the official installer (works on all platforms)
     if ! command_exists uv; then
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-        export PATH="$HOME/.local/bin:$PATH"
+        if [[ "$DRY_RUN" == "true" ]]; then
+            printf '\e[2;37m  [dry] install uv via curl | sh\e[0m\n'
+        else
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+            export PATH="$HOME/.local/bin:$PATH"
+        fi
     else
         ok "uv already installed: $(uv --version)"
     fi
 
     # uv-virtualenvwrapper provides a shell script; install as a uv tool
     if [[ ! -f "$HOME/.local/bin/uv-virtualenvwrapper.sh" ]]; then
-        uv tool install uv-virtualenvwrapper
+        run uv tool install uv-virtualenvwrapper
     else
         ok "uv-virtualenvwrapper already installed."
     fi
@@ -740,37 +816,41 @@ section_python() {
     mkdir -p "$venv_home"
     local base_venv="$venv_home/base"
     if [[ ! -d "$base_venv" ]]; then
-        uv venv "$base_venv"
+        run uv venv "$base_venv"
         ok "Created base virtualenv at $base_venv"
     else
         ok "Base virtualenv already exists at $base_venv"
     fi
 
     log "Installing packages into base virtualenv..."
-    uv pip install --python "$base_venv/bin/python" \
-        `# REPL / debugging` \
-        ipython ipdb pexpect \
-        `# HTTP / networking` \
-        requests httpx paramiko fabric dnspython \
-        `# CLI / TUI` \
-        click typer rich tqdm tabulate prettytable \
-        `# Data / config parsing` \
-        pydantic python-dotenv PyYAML jinja2 \
-        lxml "beautifulsoup4[lxml]" jsonpath-ng \
-        `# PDF / document generation` \
-        reportlab fpdf2 weasyprint pypdf \
-        `# AWS / cloud` \
-        boto3 \
-        `# Kubernetes` \
-        kubernetes \
-        `# System utilities` \
-        psutil sh watchdog \
-        `# Database clients` \
-        psycopg2-binary pymysql \
-        `# Security / crypto` \
-        cryptography \
-        `# Monitoring / observability` \
-        prometheus-client
+    if [[ "$DRY_RUN" == "true" ]]; then
+        printf '\e[2;37m  [dry] uv pip install packages into %s\e[0m\n' "$base_venv"
+    else
+        uv pip install --python "$base_venv/bin/python" \
+            `# REPL / debugging` \
+            ipython ipdb pexpect \
+            `# HTTP / networking` \
+            requests httpx paramiko fabric dnspython \
+            `# CLI / TUI` \
+            click typer rich tqdm tabulate prettytable \
+            `# Data / config parsing` \
+            pydantic python-dotenv PyYAML jinja2 \
+            lxml "beautifulsoup4[lxml]" jsonpath-ng \
+            `# PDF / document generation` \
+            reportlab fpdf2 weasyprint pypdf \
+            `# AWS / cloud` \
+            boto3 \
+            `# Kubernetes` \
+            kubernetes \
+            `# System utilities` \
+            psutil sh watchdog \
+            `# Database clients` \
+            psycopg2-binary pymysql \
+            `# Security / crypto` \
+            cryptography \
+            `# Monitoring / observability` \
+            prometheus-client
+    fi
 
     ok "Python base virtualenv configured."
 }
@@ -783,9 +863,13 @@ section_copilot() {
     if ! command_exists copilot; then
         case "$OS" in
             macos)
-                brew install copilot-cli ;;
+                run brew install copilot-cli ;;
             linux|wsl)
-                curl -fsSL https://gh.io/copilot-install | bash ;;
+                if [[ "$DRY_RUN" == "true" ]]; then
+                    printf '\e[2;37m  [dry] install Copilot CLI via curl | bash\e[0m\n'
+                else
+                    curl -fsSL https://gh.io/copilot-install | bash
+                fi ;;
             *)
                 warn "Unsupported OS. Install manually: https://gh.io/copilot-install"
                 return 1 ;;
@@ -796,13 +880,16 @@ section_copilot() {
 
     local instructions_dir="$HOME/.copilot"
     local instructions_file="${instructions_dir}/copilot-instructions.md"
-    mkdir -p "$instructions_dir"
+    run mkdir -p "$instructions_dir"
 
     if [[ -f "$instructions_file" ]]; then
         ok "Global instructions already exist at ${instructions_file}."
     else
         log "Writing global Copilot instructions..."
-        cat > "$instructions_file" << 'INSTRUCTIONS'
+        if [[ "$DRY_RUN" == "true" ]]; then
+            printf '\e[2;37m  [dry] write Copilot instructions to %s\e[0m\n' "$instructions_file"
+        else
+            cat > "$instructions_file" << 'INSTRUCTIONS'
 # Global Copilot Instructions
 
 ## Assistant Preference
@@ -844,23 +931,149 @@ You are an expert in:
 - Never guess. Only provide answers that can be verified.
 - Base answers on the latest stable version of the technology being discussed.
 INSTRUCTIONS
+        fi
         ok "Global instructions written to ${instructions_file}."
     fi
 
     log "To authenticate, run: copilot /login"
 }
 
+# ── Verification (--verify mode) ─────────────────────────────────────────────
+
+verify_packages() {
+    case "$OS" in
+        macos)
+            command_exists brew \
+                && pass "Homebrew installed" \
+                || fail "Homebrew not installed" ;;
+        linux|wsl)
+            case "$(detect_linux_distro)" in
+                debian) command_exists apt-get && pass "apt-get available" || fail "apt-get not available" ;;
+                rhel*)  { command_exists dnf || command_exists yum; } && pass "dnf/yum available" || fail "no package manager found" ;;
+                arch)   command_exists pacman && pass "pacman available" || fail "pacman not available" ;;
+                *)      skip_check "unknown distro — cannot verify packages" ;;
+            esac ;;
+        *) skip_check "unknown OS — cannot verify packages" ;;
+    esac
+}
+
+verify_gnubin() {
+    if [[ "$OS" != "macos" ]]; then skip_check "gnubin is macOS-only"; return; fi
+    [[ -d "$HOME/.gnubin" ]]        && pass "~/.gnubin directory exists"       || fail "~/.gnubin directory missing"
+    [[ -L "$HOME/.gnubin/sed" ]]    && pass "GNU sed linked in ~/.gnubin"      || fail "GNU sed not linked in ~/.gnubin"
+    [[ -L "$HOME/.gnubin/find" ]]   && pass "GNU find linked in ~/.gnubin"     || fail "GNU find not linked in ~/.gnubin"
+}
+
+verify_fonts() {
+    if command_exists fc-list && fc-list 2>/dev/null | grep -qi "powerline\|MesloLGM\|Nerd Font"; then
+        pass "Powerline/Nerd fonts installed"
+    elif [[ "$OS" == "macos" ]] && \
+         find ~/Library/Fonts /Library/Fonts \
+              \( -name "*Powerline*" -o -name "*MesloLGM*" -o -name "*NerdFont*" \) \
+              -print 2>/dev/null | grep -q .; then
+        pass "Powerline/Nerd fonts installed"
+    else
+        fail "No Powerline/Nerd fonts found"
+    fi
+}
+
+verify_tmux() {
+    [[ -d "$HOME/.tmux" ]]             && pass "~/.tmux cloned"                    || fail "~/.tmux not cloned"
+    [[ -L "$HOME/.tmux.conf" ]]        && pass "~/.tmux.conf is a symlink"         || fail "~/.tmux.conf is not a symlink"
+    [[ -f "$HOME/.tmux.conf.local" ]]  && pass "~/.tmux.conf.local exists"         || fail "~/.tmux.conf.local missing"
+    local conf="$HOME/.tmux.conf.local"
+    grep -q "uE0B0"              "$conf" 2>/dev/null && pass "Powerline separators configured"  || fail "Powerline separators not configured"
+    grep -q "^set -g prefix C-a" "$conf" 2>/dev/null && pass "C-a prefix configured"           || fail "C-a prefix not configured"
+    grep -q "^unbind C-b"        "$conf" 2>/dev/null && pass "C-b unbound"                     || fail "C-b not unbound"
+    grep -q "^bind a last-window" "$conf" 2>/dev/null && pass "bind a last-window set"         || fail "bind a last-window not set"
+    grep -q "^bind n next-window" "$conf" 2>/dev/null && pass "bind n next-window set"         || fail "bind n next-window not set"
+    grep -q "^bind F "           "$conf" 2>/dev/null && pass "bind F focus-events toggle set"  || fail "bind F focus-events toggle not set"
+}
+
+verify_zsh() {
+    [[ -d "$HOME/.oh-my-zsh" ]]         && pass "Oh My Zsh installed"                          || fail "Oh My Zsh not installed"
+    local zshrc="$HOME/.zshrc"
+    [[ -f "$zshrc" ]]                   && pass "~/.zshrc exists"                              || { fail "~/.zshrc missing"; return; }
+    grep -q 'ZSH_THEME="agnoster"' "$zshrc"               && pass "agnoster theme set"         || fail "agnoster theme not set"
+    grep -q "zsh-syntax-highlighting"   "$zshrc"           && pass "zsh-syntax-highlighting present" || fail "zsh-syntax-highlighting missing"
+    grep -q "# >>> dotfiles customizations <<<" "$zshrc"   && pass "customization block present"     || fail "customization block missing"
+    grep -q "^ssh()"    "$zshrc"  && pass "ssh() focus-events wrapper present"   || fail "ssh() focus-events wrapper missing"
+    grep -q "^aws()"    "$zshrc"  && pass "aws() focus-events wrapper present"   || fail "aws() focus-events wrapper missing"
+    grep -q "WORKON_HOME" "$zshrc" && pass "WORKON_HOME set in .zshrc"           || fail "WORKON_HOME not set in .zshrc"
+    grep -q 'uv-virtualenvwrapper.sh' "$zshrc" && pass "uv-virtualenvwrapper sourced in .zshrc" || fail "uv-virtualenvwrapper not sourced in .zshrc"
+}
+
+verify_vim() {
+    [[ -d "$HOME/.vim" ]]               && pass "~/.vim cloned"                                || fail "~/.vim not cloned"
+    [[ -L "$HOME/.vimrc" ]]             && pass "~/.vimrc symlinked"                           || fail "~/.vimrc not symlinked"
+    [[ -f "$HOME/.vimrc.local" ]]       && pass "~/.vimrc.local exists"                        || fail "~/.vimrc.local missing"
+    local branch
+    branch="$(cd "$HOME/.vim" 2>/dev/null && git symbolic-ref --short HEAD 2>/dev/null || true)"
+    [[ "$branch" == "Divine" ]]         && pass "~/.vim on Divine branch"                      || fail "~/.vim not on Divine branch (got: ${branch:-none})"
+    local uninit
+    uninit="$(cd "$HOME/.vim" 2>/dev/null && git submodule status 2>/dev/null | grep -c '^-' || echo 0)"
+    [[ "$uninit" -eq 0 ]]               && pass "All vim submodules initialized"               || fail "$uninit vim submodule(s) not initialized"
+}
+
+verify_alacritty() {
+    command_exists alacritty           && pass "alacritty installed"                           || fail "alacritty not installed"
+    local cfg="$HOME/.config/alacritty/alacritty.toml"
+    [[ -L "$cfg" ]]                    && pass "alacritty.toml symlinked"                      || fail "alacritty.toml not symlinked"
+    local target; target="$(readlink "$cfg" 2>/dev/null || true)"
+    [[ "$target" == *"terminal_configs/alacritty.toml" ]] \
+                                        && pass "alacritty.toml points to dotfiles"            || fail "alacritty.toml symlink target unexpected: $target"
+}
+
+verify_wsl() {
+    if [[ "$OS" != "wsl" ]]; then skip_check "WSL section not applicable on $OS"; return; fi
+    command_exists wslview              && pass "wslu installed"                                || fail "wslu not installed"
+    command_exists win32yank.exe        && pass "win32yank installed"                          || fail "win32yank not installed"
+    [[ -f /etc/wsl.conf ]]             && pass "/etc/wsl.conf present"                        || fail "/etc/wsl.conf missing"
+    grep -q "# >>> WSL config <<<" "$HOME/.tmux.conf.local" 2>/dev/null \
+                                        && pass "tmux WSL config present"                      || fail "tmux WSL config not in ~/.tmux.conf.local"
+    grep -q "\" >>> WSL config <<<" "$HOME/.vimrc.local" 2>/dev/null \
+                                        && pass "vim WSL config present"                       || fail "vim WSL config not in ~/.vimrc.local"
+}
+
+verify_python() {
+    local uv_bin="${HOME}/.local/bin/uv"
+    { command_exists uv || [[ -x "$uv_bin" ]]; } \
+                                        && pass "uv installed"                                 || fail "uv not installed"
+    [[ -f "$HOME/.local/bin/uv-virtualenvwrapper.sh" ]] \
+                                        && pass "uv-virtualenvwrapper.sh present"              || fail "uv-virtualenvwrapper.sh missing"
+    local venv="${WORKON_HOME:-$HOME/.venvs}/base"
+    [[ -d "$venv" ]]                   && pass "base virtualenv exists"                        || { fail "base virtualenv missing ($venv)"; return; }
+    [[ -x "$venv/bin/python" ]]        && pass "base venv python executable"                  || fail "base venv python not executable"
+    local pkg
+    for pkg in requests boto3 kubernetes rich ipython weasyprint cryptography prometheus_client paramiko; do
+        "$venv/bin/python" -c "import $pkg" 2>/dev/null \
+                                        && pass "package: $pkg"                                || fail "package missing: $pkg"
+    done
+}
+
+verify_copilot() {
+    command_exists copilot              && pass "Copilot CLI installed"                        || fail "Copilot CLI not installed"
+    [[ -f "$HOME/.copilot/copilot-instructions.md" ]] \
+                                        && pass "Copilot instructions written"                 || fail "Copilot instructions missing"
+}
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 log "Detected OS: ${OS}"
-log "Sections to run:$(for s in "${ALL_SECTIONS[@]}"; do [[ "${RUN[$s]}" == "true" ]] && printf ' %s' "$s"; done)"
+if [[ "$DRY_RUN" == "true" ]]; then
+    log "Mode: DRY RUN — no changes will be made"
+elif [[ "$CHECK_ONLY" == "true" ]]; then
+    log "Mode: VERIFY — checking post-conditions only"
+fi
+log "Sections:$(for s in "${ALL_SECTIONS[@]}"; do [[ "${RUN[$s]}" == "true" ]] && printf ' %s' "$s"; done)"
 
-should_run packages  && section_packages
-should_run gnubin    && section_gnubin
+should_run packages && { [[ "$CHECK_ONLY" == "true" ]] && verify_packages || section_packages; }
+should_run gnubin   && { [[ "$CHECK_ONLY" == "true" ]] && verify_gnubin   || section_gnubin;   }
 
 # On macOS, prepend all Homebrew GNU tool paths into PATH for this session so
 # that gnu-sed (and friends) are used in subsequent sections rather than BSD tools.
-if [[ "$OS" == "macos" ]] && command_exists brew; then
+# Skip in verify mode (read-only checks don't need GNU sed).
+if [[ "$OS" == "macos" ]] && [[ "$CHECK_ONLY" != "true" ]] && command_exists brew; then
     _brew_prefix="$(brew --prefix)"
     for _gnu_dir in "${_brew_prefix}/opt"/*/libexec/gnubin; do
         [[ -d "$_gnu_dir" ]] && PATH="$_gnu_dir:$PATH"
@@ -869,13 +1082,22 @@ if [[ "$OS" == "macos" ]] && command_exists brew; then
     unset _brew_prefix _gnu_dir
 fi
 
-should_run fonts     && section_fonts
-should_run tmux      && section_tmux
-should_run zsh       && section_zsh
-should_run vim       && section_vim
-should_run alacritty && section_alacritty
-should_run wsl       && section_wsl
-should_run python    && section_python
-should_run copilot   && section_copilot
+should_run fonts     && { [[ "$CHECK_ONLY" == "true" ]] && verify_fonts     || section_fonts;     }
+should_run tmux      && { [[ "$CHECK_ONLY" == "true" ]] && verify_tmux      || section_tmux;      }
+should_run zsh       && { [[ "$CHECK_ONLY" == "true" ]] && verify_zsh       || section_zsh;       }
+should_run vim       && { [[ "$CHECK_ONLY" == "true" ]] && verify_vim       || section_vim;       }
+should_run alacritty && { [[ "$CHECK_ONLY" == "true" ]] && verify_alacritty || section_alacritty; }
+should_run wsl       && { [[ "$CHECK_ONLY" == "true" ]] && verify_wsl       || section_wsl;       }
+should_run python    && { [[ "$CHECK_ONLY" == "true" ]] && verify_python    || section_python;    }
+should_run copilot   && { [[ "$CHECK_ONLY" == "true" ]] && verify_copilot   || section_copilot;   }
 
-log "Done! Start a new shell session (or run: exec zsh -l) to apply changes."
+if [[ "$CHECK_ONLY" == "true" ]]; then
+    if [[ "$_check_failed" == "true" ]]; then
+        log "Verify complete — some checks FAILED"
+        exit 1
+    else
+        log "Verify complete — all checks passed"
+    fi
+else
+    log "Done! Start a new shell (or run: exec zsh -l) to apply changes."
+fi
