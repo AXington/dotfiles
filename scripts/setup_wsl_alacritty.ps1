@@ -1,4 +1,4 @@
-﻿﻿<#
+﻿<#
 .SYNOPSIS
     Bootstrap WSL2 with the latest Ubuntu LTS, Alacritty, and dotfiles on Windows 11.
 
