@@ -1,16 +1,16 @@
-<#
+﻿<#
 .SYNOPSIS
     Bootstrap WSL2 with the latest Ubuntu LTS, Alacritty, and dotfiles on Windows 11.
 
 .DESCRIPTION
-    Run from an elevated PowerShell session (right-click PowerShell → Run as Administrator).
+    Run from an elevated PowerShell session (right-click PowerShell -> Run as Administrator).
     Automatically detects the latest Ubuntu LTS available in the WSL store.
 
     After this script completes:
       1. Run 'wsl -d <distro>' to finish first-time Ubuntu setup (username + password)
       2. Inside Ubuntu, run: ~/dotfiles/setup.sh
 
-    Idempotent — safe to re-run after a reboot or partial install.
+    Idempotent -- safe to re-run after a reboot or partial install.
 
 .NOTES
     Requires: Windows 11, PowerShell 5.1+, administrator privileges
@@ -28,7 +28,7 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-# ── Constants ─────────────────────────────────────────────────────────────────
+# -- Constants -----------------------------------------------------------------
 $DOTFILES_REPO      = 'https://github.com/AXington/dotfiles.git'
 $DOTFILES_RAW       = 'https://raw.githubusercontent.com/AXington/dotfiles/master'
 $ALACRITTY_CFG_DIR  = "$env:APPDATA\alacritty"
@@ -45,7 +45,7 @@ $MESLO_M_FONTS = [ordered]@{
     'Meslo LG M Bold Italic for Powerline.ttf' = "$POWERLINE_BASE_URL/Meslo%20LG%20M%20Bold%20Italic%20for%20Powerline.ttf"
 }
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# -- Helpers -------------------------------------------------------------------
 function Write-Step { param([string]$Msg) Write-Host "`n==> $Msg" -ForegroundColor Cyan }
 function Write-Ok   { param([string]$Msg) Write-Host "  [ok] $Msg" -ForegroundColor Green }
 function Write-Warn { param([string]$Msg) Write-Host "  [!!] $Msg" -ForegroundColor Yellow }
@@ -89,15 +89,15 @@ function Get-LatestUbuntuLTS {
     return 'Ubuntu-24.04'
 }
 
-# ── 1. WSL2 ───────────────────────────────────────────────────────────────────
+# -- 1. WSL2 -------------------------------------------------------------------
 Write-Step 'Setting up WSL2...'
 
 $wslVersionOutput = (wsl --version 2>&1) -join ' '
 if ($LASTEXITCODE -ne 0 -or $wslVersionOutput -notmatch 'WSL version') {
-    Write-Warn 'WSL not detected — installing...'
+    Write-Warn 'WSL not detected -- installing...'
     wsl --install --no-launch
     if ($LASTEXITCODE -ne 0) {
-        Write-Warn 'WSL install returned a non-zero exit code — a reboot is likely required.'
+        Write-Warn 'WSL install returned a non-zero exit code -- a reboot is likely required.'
         Write-Host ''
         Write-Host '  Please reboot and re-run this script to continue.' -ForegroundColor Yellow
         exit 0
@@ -109,25 +109,25 @@ if ($LASTEXITCODE -ne 0 -or $wslVersionOutput -notmatch 'WSL version') {
 
 wsl --set-default-version 2 2>$null
 
-# ── 2. Latest Ubuntu LTS ──────────────────────────────────────────────────────
+# -- 2. Latest Ubuntu LTS ------------------------------------------------------
 Write-Step 'Installing latest Ubuntu LTS...'
 
 $UbuntuDistro    = Get-LatestUbuntuLTS
 $installedDistros = (wsl --list --quiet 2>&1) -join ' '
 
 if ($installedDistros -notmatch [regex]::Escape($UbuntuDistro)) {
-    Write-Warn "Installing $UbuntuDistro — this may take a few minutes..."
+    Write-Warn "Installing $UbuntuDistro -- this may take a few minutes..."
     wsl --install -d $UbuntuDistro --no-launch
     if ($LASTEXITCODE -eq 0) {
         Write-Ok "$UbuntuDistro installed"
     } else {
-        Write-Warn "$UbuntuDistro install returned exit code $LASTEXITCODE — try the Microsoft Store if this persists"
+        Write-Warn "$UbuntuDistro install returned exit code $LASTEXITCODE -- try the Microsoft Store if this persists"
     }
 } else {
     Write-Ok "$UbuntuDistro already installed"
 }
 
-# ── 3. Alacritty ──────────────────────────────────────────────────────────────
+# -- 3. Alacritty --------------------------------------------------------------
 Write-Step 'Installing Alacritty...'
 
 if (-not (Test-CommandExists 'alacritty')) {
@@ -136,13 +136,13 @@ if (-not (Test-CommandExists 'alacritty')) {
             --accept-package-agreements --accept-source-agreements --silent
         Write-Ok 'Alacritty installed via winget'
     } else {
-        Write-Warn 'winget not available — download Alacritty manually from https://alacritty.org'
+        Write-Warn 'winget not available -- download Alacritty manually from https://alacritty.org'
     }
 } else {
     Write-Ok 'Alacritty already installed'
 }
 
-# ── 4. Meslo LG M for Powerline fonts ────────────────────────────────────────
+# -- 4. Meslo LG M for Powerline fonts ----------------------------------------
 Write-Step 'Installing Meslo LG M for Powerline fonts...'
 
 foreach ($entry in $MESLO_M_FONTS.GetEnumerator()) {
@@ -165,7 +165,7 @@ foreach ($entry in $MESLO_M_FONTS.GetEnumerator()) {
     }
 }
 
-# ── 5. Alacritty config ───────────────────────────────────────────────────────
+# -- 5. Alacritty config -------------------------------------------------------
 Write-Step 'Writing Alacritty config...'
 
 New-Item -ItemType Directory -Force -Path $ALACRITTY_CFG_DIR | Out-Null
@@ -183,7 +183,7 @@ args = ["--distribution", "$UbuntuDistro"]
 Set-Content -Path $ALACRITTY_TOML -Value $tomlContent -Encoding UTF8
 Write-Ok "Config written: $ALACRITTY_TOML"
 
-# ── 6. .wslconfig ─────────────────────────────────────────────────────────────
+# -- 6. .wslconfig -------------------------------------------------------------
 Write-Step 'Writing .wslconfig...'
 
 if (-not (Test-Path $WSLCONFIG_PATH)) {
@@ -191,10 +191,10 @@ if (-not (Test-Path $WSLCONFIG_PATH)) {
     Write-Ok "Written: $WSLCONFIG_PATH"
     Write-Warn "Edit $WSLCONFIG_PATH to tune memory/CPU for your machine, then run: wsl --shutdown"
 } else {
-    Write-Ok '.wslconfig already exists — not overwriting'
+    Write-Ok '.wslconfig already exists -- not overwriting'
 }
 
-# ── 7. Clone dotfiles into WSL ────────────────────────────────────────────────
+# -- 7. Clone dotfiles into WSL ------------------------------------------------
 Write-Step 'Cloning dotfiles into WSL...'
 
 $wslReady = ''
@@ -209,10 +209,10 @@ if ($wslReady -eq 'ready') {
         Write-Ok 'Dotfiles already present in WSL'
     }
 } else {
-    Write-Warn 'WSL not yet initialized — dotfiles will be cloned after first-time Ubuntu setup.'
+    Write-Warn 'WSL not yet initialized -- dotfiles will be cloned after first-time Ubuntu setup.'
 }
 
-# ── Done ──────────────────────────────────────────────────────────────────────
+# -- Done ----------------------------------------------------------------------
 $sep = '=' * 52
 Write-Host "`n$sep" -ForegroundColor Cyan
 Write-Host '  Bootstrap complete!' -ForegroundColor Cyan
@@ -228,7 +228,7 @@ Write-Host '  2. Inside WSL, run the dotfiles bootstrap:' -ForegroundColor White
 Write-Host '       ~/dotfiles/setup.sh' -ForegroundColor Gray
 Write-Host "     (or clone first if needed: git clone $DOTFILES_REPO ~/dotfiles)" -ForegroundColor Gray
 Write-Host ''
-Write-Host "  3. Open Alacritty — it will launch directly into $UbuntuDistro." -ForegroundColor White
+Write-Host "  3. Open Alacritty -- it will launch directly into $UbuntuDistro." -ForegroundColor White
 Write-Host ''
 Write-Host '  4. Tune .wslconfig memory/CPU for your machine, then apply:' -ForegroundColor White
 Write-Host "       notepad $WSLCONFIG_PATH" -ForegroundColor Gray
