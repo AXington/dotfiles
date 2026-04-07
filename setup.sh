@@ -1011,7 +1011,7 @@ verify_vim() {
     branch="$(cd "$HOME/.vim" 2>/dev/null && git symbolic-ref --short HEAD 2>/dev/null || true)"
     [[ "$branch" == "Divine" ]]         && pass "~/.vim on Divine branch"                      || fail "~/.vim not on Divine branch (got: ${branch:-none})"
     local uninit
-    uninit="$(cd "$HOME/.vim" 2>/dev/null && git submodule status 2>/dev/null | grep -c '^-' || echo 0)"
+    uninit="$(cd "$HOME/.vim" 2>/dev/null && { git submodule status 2>/dev/null | { grep '^-' || true; } | wc -l | tr -d ' '; } || echo 0)"
     [[ "$uninit" -eq 0 ]]               && pass "All vim submodules initialized"               || fail "$uninit vim submodule(s) not initialized"
 }
 
@@ -1044,9 +1044,10 @@ verify_python() {
     local venv="${WORKON_HOME:-$HOME/.venvs}/base"
     [[ -d "$venv" ]]                   && pass "base virtualenv exists"                        || { fail "base virtualenv missing ($venv)"; return; }
     [[ -x "$venv/bin/python" ]]        && pass "base venv python executable"                  || fail "base venv python not executable"
+    local uv_bin="${HOME}/.local/bin/uv"
     local pkg
     for pkg in requests boto3 kubernetes rich ipython weasyprint cryptography prometheus_client paramiko; do
-        "$venv/bin/python" -c "import $pkg" 2>/dev/null \
+        "$uv_bin" pip show "$pkg" --python "$venv/bin/python" &>/dev/null \
                                         && pass "package: $pkg"                                || fail "package missing: $pkg"
     done
 }
