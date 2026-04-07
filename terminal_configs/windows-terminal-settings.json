@@ -5,7 +5,7 @@
         "1. Merge the object inside 'schemes' into the top-level 'schemes' array",
         "2. Merge the object inside 'profiles.defaults' into your existing 'profiles.defaults'",
         "3. Set 'colorScheme' in your WSL profile to 'AliceThomas'",
-        "4. Make sure MesloLGM Nerd Font is installed on Windows first (see setup.sh wsl section)"
+        "4. Make sure Meslo LG M for Powerline is installed on Windows first (see setup.sh wsl section)"
     ],
 
     "schemes": [
@@ -39,7 +39,7 @@
         "defaults": {
             "colorScheme": "AliceThomas",
             "font": {
-                "face": "MesloLGM Nerd Font",
+                "face": "Meslo LG M for Powerline",
                 "size": 13.5,
                 "weight": "bold"
             },

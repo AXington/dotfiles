@@ -1,5 +1,5 @@
 Fonts:
-Meslo with Powerline
+Meslo LG M for Powerline Bold
 
 Terminal ANSI Colors
 
@@ -7,17 +7,16 @@ Black     #000000
 Red       #CD1919
 Green     #19CD19
 Yellow    #CDCD00
-Blue      #1919CD
+Blue      #5959D9
 Magenta   #CD00CD
 Cyan      #00CDCD
 White     #FFFFFF
-Grey      #4C4C4C
+B Black   #848484
 B Red     #FF2F2F
 B Green   #2FFF2F
 B Yellow  #FFFF2F
-B Blue    #2F2FFF
+B Blue    #6666FF
 B Magenta #FF2FFF
 B Cyan    #2FFFFF
-Dark Gray #6E6E6E
-Gray      #848484
+B White   #FFFFFF
 
