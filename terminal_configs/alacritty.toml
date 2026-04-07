@@ -31,7 +31,7 @@ style = "Block"
 unfocused_hollow = true
 
 [font]
-normal = {family = "Menlo", style = "Bold"}
+normal = {family = "Meslo LG M for Powerline", style = "Bold"}
 size = 13.5
 builtin_box_drawing = true
 
