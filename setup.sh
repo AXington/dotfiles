@@ -12,7 +12,7 @@ set -euo pipefail
 #
 # Sections: packages gnubin fonts tmux zsh vim alacritty wsl python copilot
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# -- Helpers -------------------------------------------------------------------
 
 log()  { printf '\n\e[1;34m==> %s\e[0m\n' "$*"; }
 ok()   { printf '\e[1;32m    ✓ %s\e[0m\n' "$*"; }
@@ -38,7 +38,7 @@ pass()       { printf '\e[1;32m  ✓ %s\e[0m\n' "$*"; }
 fail()       { printf '\e[1;31m  ✗ %s\e[0m\n' "$*"; _check_failed=true; }
 skip_check() { printf '\e[2;37m  – %s\e[0m\n' "$*"; }
 
-# ── OS / distro detection ─────────────────────────────────────────────────────
+# -- OS / distro detection -----------------------------------------------------
 
 detect_os() {
     if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -66,7 +66,7 @@ detect_linux_distro() {
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OS="$(detect_os)"
 
-# ── Argument parsing ──────────────────────────────────────────────────────────
+# -- Argument parsing ----------------------------------------------------------
 
 ALL_SECTIONS=(packages gnubin fonts tmux zsh vim alacritty wsl python copilot)
 declare -A RUN
@@ -132,7 +132,7 @@ done
 
 should_run() { [[ "${RUN[${1}]:-false}" == "true" ]]; }
 
-# ── 1. Packages ───────────────────────────────────────────────────────────────
+# -- 1. Packages ---------------------------------------------------------------
 
 install_packages_macos() {
     if ! command_exists brew; then
@@ -187,13 +187,13 @@ section_packages() {
                 debian)  install_packages_debian ;;
                 rhel*)   install_packages_rhel ;;
                 arch)    install_packages_arch ;;
-                *) warn "Unsupported distro — skipping package install" ;;
+                *) warn "Unsupported distro  - skipping package install" ;;
             esac ;;
-        *) warn "Unsupported OS — skipping package install" ;;
+        *) warn "Unsupported OS  - skipping package install" ;;
     esac
 }
 
-# ── 2. GNU tools (macOS only) ─────────────────────────────────────────────────
+# -- 2. GNU tools (macOS only) -------------------------------------------------
 
 section_gnubin() {
     if [[ "$OS" != "macos" ]]; then
@@ -213,7 +213,7 @@ section_gnubin() {
     ok "GNU tools linked in ~/.gnubin"
 }
 
-# ── 3. Powerline fonts ────────────────────────────────────────────────────────
+# -- 3. Powerline fonts --------------------------------------------------------
 
 section_fonts() {
     log "Installing Powerline fonts..."
@@ -244,7 +244,7 @@ section_fonts() {
     trap - EXIT
 }
 
-# ── 4. tmux ───────────────────────────────────────────────────────────────────
+# -- 4. tmux -------------------------------------------------------------------
 
 section_tmux() {
     log "Setting up tmux..."
@@ -315,7 +315,7 @@ TMUX_BINDINGS
     ok "tmux configured."
 }
 
-# ── 5. ZSH / Oh My Zsh ───────────────────────────────────────────────────────
+# -- 5. ZSH / Oh My Zsh -------------------------------------------------------
 
 section_zsh() {
     log "Setting up Zsh + Oh My Zsh..."
@@ -348,7 +348,7 @@ section_zsh() {
         run rm -f "${zshrc}.bak"
 
         # Fix bare unguarded 'tmux attach || tmux new' left by older setup runs.
-        # Must use Python — sed chokes on || in the match pattern.
+        # Must use Python  - sed chokes on || in the match pattern.
         if command_exists python3; then
             python3 - "$zshrc" << 'PYFIX'
 import sys
@@ -375,7 +375,7 @@ if changed:
         f.write(content)
 PYFIX
         else
-            warn "python3 not found — skipping legacy zshrc cleanup (check for bare 'tmux attach || tmux new' manually)"
+            warn "python3 not found  - skipping legacy zshrc cleanup (check for bare 'tmux attach || tmux new' manually)"
         fi
     fi
 
@@ -471,7 +471,7 @@ EOF
     local zsh_path
     zsh_path="$(command -v zsh || true)"
     if [[ -z "$zsh_path" ]]; then
-        warn "zsh not found in PATH — skipping default shell change"
+        warn "zsh not found in PATH  - skipping default shell change"
     elif [[ "$SHELL" != "$zsh_path" ]]; then
         grep -qxF "$zsh_path" /etc/shells || {
             if [[ "$DRY_RUN" == "true" ]]; then
@@ -481,7 +481,7 @@ EOF
             fi
         }
         run sudo chsh -s "$zsh_path" "$USER" \
-            || warn "chsh failed — run manually: chsh -s $zsh_path"
+            || warn "chsh failed  - run manually: chsh -s $zsh_path"
     fi
 
     if command_exists update-alternatives && command_exists vim; then
@@ -491,7 +491,7 @@ EOF
     ok "Zsh configured."
 }
 
-# ── 6. Vim ────────────────────────────────────────────────────────────────────
+# -- 6. Vim --------------------------------------------------------------------
 
 section_vim() {
     log "Setting up Vim..."
@@ -514,7 +514,7 @@ section_vim() {
     ok "Vim configured."
 }
 
-# ── 7. Alacritty ─────────────────────────────────────────────────────────────
+# -- 7. Alacritty -------------------------------------------------------------
 
 _alacritty_install_mac() {
     command_exists brew || bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
@@ -570,14 +570,14 @@ section_alacritty() {
                 debian)  _alacritty_install_debian ;;
                 rhel*)   _alacritty_install_rhel ;;
                 arch)    _alacritty_install_arch ;;
-                *) warn "Unsupported distro — install alacritty manually." ;;
+                *) warn "Unsupported distro  - install alacritty manually." ;;
             esac ;;
-        *) warn "Unsupported OS — install alacritty manually." ;;
+        *) warn "Unsupported OS  - install alacritty manually." ;;
     esac
 
     # Bail out early if alacritty still isn't available (install step warned already)
     if ! command_exists alacritty; then
-        warn "alacritty not found after install attempt — skipping man page, completions, and terminfo"
+        warn "alacritty not found after install attempt  - skipping man page, completions, and terminfo"
         return 1
     fi
 
@@ -607,7 +607,7 @@ section_alacritty() {
             https://raw.githubusercontent.com/alacritty/alacritty/master/extra/completions/_alacritty
     fi
 
-    # terminfo — requires tic (ncurses); present on macOS and most Linux distros
+    # terminfo  - requires tic (ncurses); present on macOS and most Linux distros
     if command_exists tic; then
         local terminfo_tmp
         terminfo_tmp="$(mktemp)"
@@ -618,7 +618,7 @@ section_alacritty() {
         rm -f "$terminfo_tmp"
         trap - RETURN
     else
-        warn "tic not found — skipping alacritty terminfo install (run: sudo tic -xe alacritty,alacritty-direct alacritty.info)"
+        warn "tic not found  - skipping alacritty terminfo install (run: sudo tic -xe alacritty,alacritty-direct alacritty.info)"
     fi
 
     # Symlink config
@@ -629,7 +629,7 @@ section_alacritty() {
     ok "Alacritty configured."
 }
 
-# ── 8. WSL2 ──────────────────────────────────────────────────────────────────
+# -- 8. WSL2 ------------------------------------------------------------------
 
 section_wsl() {
     if [[ "$OS" != "wsl" ]]; then
@@ -645,7 +645,7 @@ section_wsl() {
         ok "wslu already installed."
     fi
 
-    # win32yank.exe — bidirectional clipboard, handles CRLF automatically.
+    # win32yank.exe  - bidirectional clipboard, handles CRLF automatically.
     # Better than clip.exe (write-only) + powershell paste (slow).
     if ! command_exists win32yank.exe; then
         log "Installing win32yank for clipboard integration..."
@@ -666,7 +666,7 @@ section_wsl() {
         ok "win32yank already installed."
     fi
 
-    # /etc/wsl.conf — enable systemd, lock in the default user.
+    # /etc/wsl.conf  - enable systemd, lock in the default user.
     # Only written if the file doesn't exist; never overwrites existing config.
     if [[ ! -f /etc/wsl.conf ]]; then
         log "Writing /etc/wsl.conf (systemd + interop settings)..."
@@ -687,10 +687,10 @@ EOF
         fi
         ok "/etc/wsl.conf written. Run 'wsl --shutdown' from PowerShell to apply."
     else
-        ok "/etc/wsl.conf already exists — not overwriting."
+        ok "/etc/wsl.conf already exists  - not overwriting."
     fi
 
-    # ~/.tmux.conf.local — true color + win32yank clipboard (idempotent)
+    # ~/.tmux.conf.local  - true color + win32yank clipboard (idempotent)
     local tmux_conf="$HOME/.tmux.conf.local"
     if [[ -f "$tmux_conf" ]] && ! grep -q "# >>> WSL config <<<" "$tmux_conf"; then
         log "Patching ~/.tmux.conf.local for WSL2 (true color + clipboard)..."
@@ -701,13 +701,13 @@ EOF
 
 # >>> WSL config <<<
 
-# True color passthrough — required for termguicolors in vim to render correctly
+# True color passthrough  - required for termguicolors in vim to render correctly
 # in Windows Terminal. Must match what Windows Terminal reports as TERM.
 set -g default-terminal "tmux-256color"
 set -ga terminal-overrides ",xterm-256color:Tc"
 set -ga terminal-overrides ",*256col*:Tc"
 
-# Clipboard via win32yank — bidirectional, strips CRLF on paste automatically.
+# Clipboard via win32yank  - bidirectional, strips CRLF on paste automatically.
 # Overrides gpakosz framework's xsel/xclip path which requires X11.
 if -b 'command -v win32yank.exe > /dev/null 2>&1' {
     set -s copy-command 'win32yank.exe -i --crlf'
@@ -725,7 +725,7 @@ TMUX_WSL
         ok "tmux WSL config already present."
     fi
 
-    # ~/.vimrc.local — true color + win32yank clipboard (idempotent)
+    # ~/.vimrc.local  - true color + win32yank clipboard (idempotent)
     local vimrc_local="$HOME/.vimrc.local"
     if ! grep -q "\" >>> WSL config <<<" "$vimrc_local" 2>/dev/null; then
         log "Patching ~/.vimrc.local for WSL2 (true color + clipboard)..."
@@ -736,7 +736,7 @@ TMUX_WSL
 
 " >>> WSL config <<<
 
-" True color — vim is compiled with +termguicolors; Windows Terminal supports it.
+" True color  - vim is compiled with +termguicolors; Windows Terminal supports it.
 " t_8f/t_8b sequences are required when not running a true GUI vim.
 if has('termguicolors')
   let &t_8f = "\<Esc>[38;2;%lu;%lu;%lum"
@@ -767,27 +767,27 @@ VIM_WSL
 
     # Print the Windows-side steps that can't be scripted from inside WSL
     printf '\n'
-    printf '  \e[1;33m┌─ Windows-side steps (run these in PowerShell) ──────────────────────────┐\e[0m\n'
+    printf '  \e[1;33m┌- Windows-side steps (run these in PowerShell) --------------------------┐\e[0m\n'
     printf '  \e[1;33m│\e[0m                                                                          \e[1;33m│\e[0m\n'
     printf '  \e[1;33m│\e[0m  1. Install MesloLGM Nerd Font:                                         \e[1;33m│\e[0m\n'
     printf '  \e[1;33m│\e[0m     Invoke-WebRequest -Uri "https://github.com/ryanoasis/nerd-fonts/    \e[1;33m│\e[0m\n'
     printf '  \e[1;33m│\e[0m       releases/latest/download/Meslo.zip" -OutFile "$env:TEMP\Meslo.zip"\e[1;33m│\e[0m\n'
     printf '  \e[1;33m│\e[0m     Expand-Archive "$env:TEMP\Meslo.zip" "$env:TEMP\Meslo" -Force       \e[1;33m│\e[0m\n'
-    printf '  \e[1;33m│\e[0m     # Then right-click each .ttf → Install for all users               \e[1;33m│\e[0m\n'
+    printf '  \e[1;33m│\e[0m     # Then right-click each .ttf -> Install for all users               \e[1;33m│\e[0m\n'
     printf '  \e[1;33m│\e[0m                                                                          \e[1;33m│\e[0m\n'
-    printf '  \e[1;33m│\e[0m  2. Copy wslconfig.template → %%USERPROFILE%%\\.wslconfig               \e[1;33m│\e[0m\n'
+    printf '  \e[1;33m│\e[0m  2. Copy wslconfig.template -> %%USERPROFILE%%\\.wslconfig               \e[1;33m│\e[0m\n'
     printf '  \e[1;33m│\e[0m     (adjust memory/cpu values for your machine)                         \e[1;33m│\e[0m\n'
     printf '  \e[1;33m│\e[0m                                                                          \e[1;33m│\e[0m\n'
     printf '  \e[1;33m│\e[0m  3. Import Windows Terminal color scheme from:                          \e[1;33m│\e[0m\n'
     printf '  \e[1;33m│\e[0m     terminal_configs/windows-terminal-settings.json                     \e[1;33m│\e[0m\n'
-    printf '  \e[1;33m│\e[0m     (Settings → Open JSON → merge "schemes" + "profiles.defaults")      \e[1;33m│\e[0m\n'
+    printf '  \e[1;33m│\e[0m     (Settings -> Open JSON -> merge "schemes" + "profiles.defaults")      \e[1;33m│\e[0m\n'
     printf '  \e[1;33m│\e[0m                                                                          \e[1;33m│\e[0m\n'
     printf '  \e[1;33m│\e[0m  4. Apply /etc/wsl.conf: run  wsl --shutdown  then reopen              \e[1;33m│\e[0m\n'
     printf '  \e[1;33m│\e[0m                                                                          \e[1;33m│\e[0m\n'
-    printf '  \e[1;33m└──────────────────────────────────────────────────────────────────────────┘\e[0m\n'
+    printf '  \e[1;33m└--------------------------------------------------------------------------┘\e[0m\n'
 }
 
-# ── 9. Python (uv + uv-virtualenvwrapper + base virtualenv) ──────────────────
+# -- 9. Python (uv + uv-virtualenvwrapper + base virtualenv) ------------------
 
 section_python() {
     log "Setting up Python (uv + uv-virtualenvwrapper + base virtualenv)..."
@@ -855,7 +855,7 @@ section_python() {
     ok "Python base virtualenv configured."
 }
 
-# ── 10. GitHub Copilot CLI ────────────────────────────────────────────────────
+# -- 10. GitHub Copilot CLI ----------------------------------------------------
 
 section_copilot() {
     log "Setting up GitHub Copilot CLI..."
@@ -903,12 +903,12 @@ section_copilot() {
 
 ## Context
 
-The user is a DevOps/Site Reliability engineer. Apply that lens to all responses — prefer operational clarity, reliability, and maintainability.
+The user is a DevOps/Site Reliability engineer. Apply that lens to all responses  - prefer operational clarity, reliability, and maintainability.
 
 ## General Expertise
 
 You are an expert in:
-- Cloud infrastructure (AWS, Azure, GCP) — with deepest focus on AWS
+- Cloud infrastructure (AWS, Azure, GCP)  - with deepest focus on AWS
 - AWS services: EC2, EKS, IAM, Identity Center/SSO, CloudFormation, S3, RDS, Route53, VPC, and related
 - AWS CLI and SDK tooling
 - Kubernetes and container orchestration
@@ -923,7 +923,7 @@ You are an expert in:
 
 - Follow the naming conventions of the language and repository in use.
 - Prefer shorter, concise, efficient code by default.
-- Only comment code that genuinely needs clarification — do not over-comment.
+- Only comment code that genuinely needs clarification  - do not over-comment.
 
 ## Quality Rules
 
@@ -938,7 +938,7 @@ INSTRUCTIONS
     log "To authenticate, run: copilot /login"
 }
 
-# ── Verification (--verify mode) ─────────────────────────────────────────────
+# -- Verification (--verify mode) ---------------------------------------------
 
 verify_packages() {
     case "$OS" in
@@ -951,9 +951,9 @@ verify_packages() {
                 debian) command_exists apt-get && pass "apt-get available" || fail "apt-get not available" ;;
                 rhel*)  { command_exists dnf || command_exists yum; } && pass "dnf/yum available" || fail "no package manager found" ;;
                 arch)   command_exists pacman && pass "pacman available" || fail "pacman not available" ;;
-                *)      skip_check "unknown distro — cannot verify packages" ;;
+                *)      skip_check "unknown distro  - cannot verify packages" ;;
             esac ;;
-        *) skip_check "unknown OS — cannot verify packages" ;;
+        *) skip_check "unknown OS  - cannot verify packages" ;;
     esac
 }
 
@@ -1058,13 +1058,13 @@ verify_copilot() {
                                         && pass "Copilot instructions written"                 || fail "Copilot instructions missing"
 }
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# -- Main ----------------------------------------------------------------------
 
 log "Detected OS: ${OS}"
 if [[ "$DRY_RUN" == "true" ]]; then
-    log "Mode: DRY RUN — no changes will be made"
+    log "Mode: DRY RUN  - no changes will be made"
 elif [[ "$CHECK_ONLY" == "true" ]]; then
-    log "Mode: VERIFY — checking post-conditions only"
+    log "Mode: VERIFY  - checking post-conditions only"
 fi
 log "Sections:$(for s in "${ALL_SECTIONS[@]}"; do [[ "${RUN[$s]}" == "true" ]] && printf ' %s' "$s"; done)"
 
@@ -1094,10 +1094,10 @@ should_run copilot   && { [[ "$CHECK_ONLY" == "true" ]] && verify_copilot   || s
 
 if [[ "$CHECK_ONLY" == "true" ]]; then
     if [[ "$_check_failed" == "true" ]]; then
-        log "Verify complete — some checks FAILED"
+        log "Verify complete  - some checks FAILED"
         exit 1
     else
-        log "Verify complete — all checks passed"
+        log "Verify complete  - all checks passed"
     fi
 else
     log "Done! Start a new shell (or run: exec zsh -l) to apply changes."
