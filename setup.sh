@@ -252,17 +252,17 @@ section_tmux() {
             "$conf"
     fi
 
-    # Disable C-a as secondary prefix (gpakosz adds it by default).
-    # Instead, <prefix> + b sends a literal C-b to the pane so you can control
-    # a nested/remote tmux session running inside a local pane.
-    if ! grep -q "send-keys C-b" "$conf"; then
-        cat >> "$conf" << 'TMUX_NESTED'
+    # Use C-a as sole prefix; unbind C-b so it passes through to remote/nested
+    # tmux sessions which reliably use C-b.
+    if ! grep -q "set -g prefix C-a" "$conf"; then
+        cat >> "$conf" << 'TMUX_PREFIX'
 
-# Disable C-a as secondary prefix; use <prefix> b to send C-b to nested tmux
+# Use C-a as the sole prefix; C-b is freed for remote/nested tmux sessions
 set -gu prefix2
-unbind C-a
-bind b send-keys C-b
-TMUX_NESTED
+unbind C-b
+set -g prefix C-a
+bind C-a send-prefix
+TMUX_PREFIX
     fi
 
     # Window navigation bindings

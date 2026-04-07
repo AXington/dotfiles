@@ -73,11 +73,10 @@ Customisations applied to `~/.tmux.conf.local` by setup:
 
 | Setting | Value |
 |---------|-------|
-| Prefix | `C-b` (stock tmux default; gpakosz adds `C-a` but it is disabled) |
+| Prefix | `C-a` (sole prefix; `C-b` unbound so it passes through to remote/nested tmux) |
 | Mouse | Enabled |
 | OS clipboard copy | Enabled |
 | Separators | Powerline Nerd Font (`\uE0B0`–`\uE0B3`) |
-| `b` | Send `C-b` to nested/remote tmux in current pane |
 | `a` | Last window |
 | `n` | Next window |
 
