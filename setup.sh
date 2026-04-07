@@ -485,7 +485,14 @@ EOF
     fi
 
     if command_exists update-alternatives && command_exists vim; then
-        run sudo update-alternatives --set editor "$(command -v vim)"
+        local vim_path
+        vim_path="$(command -v vim)"
+        # Register vim in the alternatives system before selecting it.
+        # --install is idempotent; without this, --set fails if vim was never registered.
+        run sudo update-alternatives --install /usr/bin/editor editor "$vim_path" 50 \
+            || warn "update-alternatives --install editor failed (non-fatal)"
+        run sudo update-alternatives --set editor "$vim_path" \
+            || warn "update-alternatives --set editor failed (non-fatal)"
     fi
 
     ok "Zsh configured."
