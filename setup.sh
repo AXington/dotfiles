@@ -223,29 +223,49 @@ section_tmux() {
     if [[ ! -d "$HOME/.tmux" ]]; then
         git clone https://github.com/gpakosz/.tmux.git "$HOME/.tmux"
     fi
+    # Per gpakosz/.tmux instructions: symlink main conf, copy local conf
     ln -sf "$HOME/.tmux/.tmux.conf" "$HOME/.tmux.conf"
     if [[ ! -f "$HOME/.tmux.conf.local" ]]; then
         cp "$HOME/.tmux/.tmux.conf.local" "$HOME/.tmux.conf.local"
     fi
 
     local conf="$HOME/.tmux.conf.local"
-    sed -i.bak \
-        -e 's/^tmux_conf_theme_left_separator/#tmux_conf_theme_left_separator/g' \
-        -e 's/^tmux_conf_theme_right_separator/#tmux_conf_theme_right_separator/g' \
-        -e "s/#tmux_conf_theme_left_separator_main=''/tmux_conf_theme_left_separator_main=''/" \
-        -e "s/#tmux_conf_theme_left_separator_sub=''/tmux_conf_theme_left_separator_sub=''/" \
-        -e "s/#tmux_conf_theme_right_separator_main=''/tmux_conf_theme_right_separator_main=''/" \
-        -e "s/#tmux_conf_theme_right_separator_sub=''/tmux_conf_theme_right_separator_sub=''/" \
-        -e 's/tmux_conf_copy_to_os_clipboard=false/tmux_conf_copy_to_os_clipboard=true/' \
-        -e 's/#set -g mouse on/set -g mouse on/' \
-        -e 's/# set -gu prefix2/set -gu prefix2/' \
-        -e 's/# unbind C-a/unbind C-a/' \
-        -e 's/# unbind C-b/unbind C-b/' \
-        -e 's/# set -g prefix C-a/set -g prefix C-a/' \
-        -e 's/# bind C-a send-prefix/bind C-a send-prefix/' \
-        "$conf"
-    rm -f "${conf}.bak"
 
+    # Enable Powerline/Nerd Font separators (idempotent: skip if already applied).
+    # Two-pass sed: first comment out the plain/empty separator lines that ship in
+    # upstream, then uncomment the \uE0Bx lines that upstream ships but leaves
+    # commented. Uses GNU sed (-i without backup suffix) which is guaranteed in
+    # PATH on macOS because gnu-sed is in brew_packages.txt and gnubin is prepended
+    # to PATH before this section runs.
+    if ! grep -q "uE0B0" "$conf" || grep -q '^tmux_conf_theme_left_separator_main=""' "$conf"; then
+        sed -i \
+            -e 's@^tmux_conf_theme_left_separator_main=""$@#tmux_conf_theme_left_separator_main=""@' \
+            -e 's@^tmux_conf_theme_left_separator_sub="|"$@#tmux_conf_theme_left_separator_sub="|"@' \
+            -e 's@^tmux_conf_theme_right_separator_main=""$@#tmux_conf_theme_right_separator_main=""@' \
+            -e 's@^tmux_conf_theme_right_separator_sub="|"$@#tmux_conf_theme_right_separator_sub="|"@' \
+            "$conf"
+        sed -i \
+            -e "s@^#\(tmux_conf_theme_left_separator_main='\\\\uE0B0'.*\)@\1@" \
+            -e "s@^#\(tmux_conf_theme_left_separator_sub='\\\\uE0B1'.*\)@\1@" \
+            -e "s@^#\(tmux_conf_theme_right_separator_main='\\\\uE0B2'.*\)@\1@" \
+            -e "s@^#\(tmux_conf_theme_right_separator_sub='\\\\uE0B3'.*\)@\1@" \
+            "$conf"
+    fi
+
+    # Disable C-a as secondary prefix (gpakosz adds it by default).
+    # Instead, <prefix> + b sends a literal C-b to the pane so you can control
+    # a nested/remote tmux session running inside a local pane.
+    if ! grep -q "send-keys C-b" "$conf"; then
+        cat >> "$conf" << 'TMUX_NESTED'
+
+# Disable C-a as secondary prefix; use <prefix> b to send C-b to nested tmux
+set -gu prefix2
+unbind C-a
+bind b send-keys C-b
+TMUX_NESTED
+    fi
+
+    # Window navigation bindings
     if ! grep -q "bind a last-window" "$conf"; then
         printf '\nbind a last-window\nbind n next-window\n' >> "$conf"
     fi
@@ -347,7 +367,7 @@ section_vim() {
     if [[ ! -d "$HOME/.vim" ]]; then
         git clone https://github.com/AXington/.vim.git "$HOME/.vim"
     fi
-    (cd "$HOME/.vim" && git checkout heavenly && git submodule init && git submodule update)
+    (cd "$HOME/.vim" && git checkout Divine && git submodule init && git submodule update)
     ln -sf "$HOME/.vim/.vimrc" "$HOME/.vimrc"
     # .vimrc.local is machine-specific (WSL patches it at runtime); copy rather than
     # symlink so changes don't propagate back into the .vim git repo.
@@ -673,6 +693,18 @@ log "Sections to run:$(for s in "${ALL_SECTIONS[@]}"; do [[ "${RUN[$s]}" == "tru
 
 should_run packages  && section_packages
 should_run gnubin    && section_gnubin
+
+# On macOS, prepend all Homebrew GNU tool paths into PATH for this session so
+# that gnu-sed (and friends) are used in subsequent sections rather than BSD tools.
+if [[ "$OS" == "macos" ]] && command_exists brew; then
+    _brew_prefix="$(brew --prefix)"
+    for _gnu_dir in "${_brew_prefix}/opt"/*/libexec/gnubin; do
+        [[ -d "$_gnu_dir" ]] && PATH="$_gnu_dir:$PATH"
+    done
+    export PATH
+    unset _brew_prefix _gnu_dir
+fi
+
 should_run fonts     && section_fonts
 should_run tmux      && section_tmux
 should_run zsh       && section_zsh

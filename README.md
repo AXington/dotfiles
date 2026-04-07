@@ -31,7 +31,7 @@ opt-in).
 | `fonts` | Powerline fonts cloned and installed |
 | `tmux` | [gpakosz/.tmux](https://github.com/gpakosz/.tmux) framework, symlinked config, customisations applied to `~/.tmux.conf.local` |
 | `zsh` | Oh My Zsh (non-interactive install), zsh-syntax-highlighting plugin, agnoster theme, dotfiles customisation block appended to `~/.zshrc` |
-| `vim` | [AXington/.vim](https://github.com/AXington/.vim) on the `heavenly` branch, submodules initialised, `.vimrc` symlinked; `.vimrc.local` copied (not symlinked — it's machine-specific and patched by the WSL section) |
+| `vim` | [AXington/.vim](https://github.com/AXington/.vim) on the `Divine` branch, submodules initialised, `.vimrc` symlinked; `.vimrc.local` copied (not symlinked — it's machine-specific and patched by the WSL section) |
 | `alacritty` | Alacritty terminal installed, config symlinked from `terminal_configs/alacritty.toml`, man page, terminfo, and zsh completions set up |
 | `wsl` | *(WSL2 only)* `wslu`, `win32yank.exe`, `/etc/wsl.conf`, clipboard + true-color patches to `~/.tmux.conf.local` and `~/.vimrc.local` |
 | `copilot` | *(opt-in)* GitHub Copilot CLI installed, global instructions bootstrapped to `~/.copilot/copilot-instructions.md` |
@@ -73,10 +73,11 @@ Customisations applied to `~/.tmux.conf.local` by setup:
 
 | Setting | Value |
 |---------|-------|
-| Prefix | `C-a` (GNU Screen-style) |
+| Prefix | `C-b` (stock tmux default; gpakosz adds `C-a` but it is disabled) |
 | Mouse | Enabled |
 | OS clipboard copy | Enabled |
-| Separators | Disabled (plain ASCII) |
+| Separators | Powerline Nerd Font (`\uE0B0`–`\uE0B3`) |
+| `b` | Send `C-b` to nested/remote tmux in current pane |
 | `a` | Last window |
 | `n` | Next window |
 
@@ -91,7 +92,7 @@ To deploy the tmux config to a remote VM:
 
 ## Vim
 
-Uses [AXington/.vim](https://github.com/AXington/.vim) (`heavenly` branch) with
+Uses [AXington/.vim](https://github.com/AXington/.vim) (`Divine` branch) with
 [Pathogen](https://github.com/tpope/vim-pathogen) for plugin management.
 
 Key plugins: `airline`, `fzf` + `fzf.vim`, `fugitive`, `nerdtree`, `nerdtree-git`,
