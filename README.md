@@ -148,8 +148,8 @@ Copy `wslconfig.template` to `%USERPROFILE%\.wslconfig` on Windows and adjust
 ## GitHub Copilot CLI
 
 Run setup with `--copilot` to install the CLI and bootstrap
-`~/.copilot/copilot-instructions.md` with context about the working environment
-(SRE/DevOps focus, AWS, Kubernetes, preferred tools and coding style).
+`~/.copilot/copilot-instructions.md` with assistant/user preferences plus
+coding and quality rules.
 
 ```bash
 ./setup.sh --only copilot
