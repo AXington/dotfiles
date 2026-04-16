@@ -16,4 +16,3 @@ dirs = [x[0] for x in os.walk(cdir)]
 for dir in dirs:
     if '/.git' not in dir and '__pycache__' in dir:
         rmtree(dir)
-

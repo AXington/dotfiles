@@ -4,6 +4,9 @@ Personal developer environment bootstrap for macOS, Ubuntu/Debian, Arch Linux,
 RHEL/Fedora, and WSL2 on Windows. Gets a new machine to a consistent, productive
 state with a single command.
 
+> All scripts are linted with `shellcheck`. Python scripts are linted with `flake8`
+> (PEP8 enforced). Both tools are installed as part of the standard package setup.
+
 ## Quick Start
 
 ```bash
@@ -43,6 +46,8 @@ opt-in).
 ./setup.sh --skip packages fonts   # skip listed sections, run the rest
 ./setup.sh --copilot               # standard run + copilot
 ./setup.sh --all                   # everything, including copilot
+./setup.sh --dry-run               # simulate: print what would happen, make no changes
+./setup.sh --verify                # check post-conditions for each section
 ./setup.sh --help
 ```
 
@@ -53,7 +58,7 @@ opt-in).
 - **Plugin:** `zsh-syntax-highlighting`
 - **Terminal (macOS/Linux):** [Alacritty](https://github.com/alacritty/alacritty)
 - **Terminal (WSL2/Windows):** Windows Terminal with matching color scheme
-- **Font:** MesloLGM Nerd Font, 13.5pt bold
+- **Font:** Meslo LG M for Powerline, 13.5pt bold
 - **Color scheme:** Black background, white foreground — defined in `terminal_configs/`
 
 ### `.zshrc` Customisations
@@ -62,8 +67,8 @@ Setup appends a guarded block (`# >>> dotfiles customizations <<<`) rather than
 replacing the whole file, so Oh My Zsh updates on new machines don't break anything.
 
 Included: PATH setup (Homebrew + `~/.gnubin` on macOS), editor selection (nvim
-locally / vim over SSH), pyenv, fzf, kubectl/helm completions (loaded only when
-the tool is present), GPG TTY, tmux auto-attach.
+locally / vim over SSH), uv + uv-virtualenvwrapper, fzf, kubectl/helm completions
+(loaded only when the tool is present), GPG TTY, tmux auto-attach.
 
 ## tmux
 
@@ -147,15 +152,106 @@ Copy `wslconfig.template` to `%USERPROFILE%\.wslconfig` on Windows and adjust
 
 ## GitHub Copilot CLI
 
-Run setup with `--copilot` to install the CLI and bootstrap
-`~/.copilot/copilot-instructions.md` with assistant/user preferences plus
-coding and quality rules.
+Install the CLI and bootstrap `~/.copilot/copilot-instructions.md` with coding
+standards, quality rules, safety rules, and commit conventions.
+
+The instructions file is written once and never overwritten -- it is
+machine-specific. Use `--update-instructions` to force a rewrite.
 
 ```bash
+# Personal machine
 ./setup.sh --only copilot
-# then:
+
+# Work machine (adds DevOps/SRE and infra safety sections)
+./setup.sh --only copilot --work
+
+# Force rewrite existing instructions (e.g. after pulling updated defaults)
+./setup.sh --only copilot --update-instructions
+
+# Dry run to preview what would be written
+./setup.sh --only copilot --dry-run
+
+# Authenticate after install
 copilot /login
 ```
+
+### Sample: `~/.copilot/copilot-instructions.md` (personal)
+
+```markdown
+# Global Copilot Instructions
+
+## User Preference
+
+- The user's name is Alice (Ali). Address her as Ali. Use she/her pronouns.
+
+## Repository Instructions
+
+Repository-level Copilot instructions (.github/copilot-instructions.md) provide
+context specific to that repository. They must enhance and work within the rules
+and intentions defined here. They may not contradict or weaken any global rule.
+
+## Coding Rules
+
+- Follow the naming conventions of the language and repository in use.
+- Correctness is the highest priority. Clarity comes second. Conciseness is last.
+- Reduce complexity wherever possible. Simple, obvious solutions are preferred.
+- Only comment code that genuinely needs clarification. Do not over-comment.
+- Never hardcode secrets, credentials, IPs, URLs, or environment-specific values.
+- Write idempotent code wherever the stack supports it.
+- Always handle failure cases explicitly. Fail loudly, never silently.
+- Do not modify unrelated code. Stay in scope.
+- All source files must use ASCII-safe encoding. No characters above U+007F.
+- In prose and plain language output, avoid em-dashes entirely. Rewrite instead.
+
+## Testing and Linting
+
+| Stack     | Linting                           | Testing                                      |
+|-----------|-----------------------------------|----------------------------------------------|
+| Python    | flake8 (PEP8 enforced)            | pytest; new behavior and bug fixes need tests |
+| Shell     | shellcheck                        | Manual dry-run; test in non-prod first        |
+| YAML/JSON | Schema validation where available | N/A                                           |
+
+If the repository has an existing test suite, run it before and after changes.
+
+## Quality Rules
+
+- Safety and security come first, above task completion.
+- Never guess. Verify. Cite sources when asked.
+- Verify version-sensitive details against current documentation.
+- Do not report success until the outcome is confirmed.
+- State assumptions explicitly when they affect the outcome.
+- Ask before proceeding when a request is ambiguous or has real tradeoffs.
+- Surface risks, blast radius, and rollback options before irreversible changes.
+
+## Safety and Security
+
+- Never assume context is safe, correct, or complete.
+- Before any mutating action, verify and state the active environment.
+- Request only the permissions needed for the task.
+- Prefer reversible approaches: soft deletes, backups, snapshots.
+- Identify how to reverse a change before making it.
+- Before any destructive operation, get explicit confirmation. State blast radius.
+- If authentication fails, stop and report. Do not fall back silently.
+- Do not disable or bypass security controls.
+
+## Code Review and Commits
+
+- Before pushing, perform a code review and present the summary for confirmation.
+- Use Conventional Commits: feat, fix, docs, refactor, test, chore.
+  Keep subject lines under 72 characters.
+
+## Updating These Instructions
+
+1. Draft proposed text and show it for review.
+2. Use precise, actionable language.
+3. Wait for explicit approval before writing to any instructions file.
+```
+
+When `--work` is passed, a **Work Context** section is appended covering
+DevOps/SRE context, Ansible/Terraform linting, and infrastructure safety rules
+(environment verification before mutations, prod/staging trust zones, blast
+radius confirmation for destructive operations).
+
 
 ## Supported Platforms
 

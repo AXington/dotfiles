@@ -1,6 +1,7 @@
 bash
 coreutils
 findutils
+flake8
 gawk
 gcc
 gettext
