@@ -18,6 +18,7 @@ macvim
 pkg-config
 readline
 reattach-to-user-namespace
+shellcheck
 tmux
 tree
 unrar

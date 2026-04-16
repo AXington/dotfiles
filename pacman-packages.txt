@@ -9,6 +9,7 @@ libffi
 make
 openssh
 python
+shellcheck
 tmux
 unzip
 tree

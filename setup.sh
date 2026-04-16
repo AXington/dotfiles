@@ -73,6 +73,7 @@ declare -A RUN
 for s in "${ALL_SECTIONS[@]}"; do RUN[$s]=true; done
 RUN[copilot]=false                                    # opt-in; use --copilot or --all
 WORK_SETUP=false                                      # opt-in; use --work for work-context instructions
+UPDATE_INSTRUCTIONS=false                             # opt-in; use --update-instructions to force-rewrite
 if [[ "$OS" == "macos" ]]; then RUN[gnubin]=true; else RUN[gnubin]=false; fi  # macOS-only
 if [[ "$OS" == "wsl"   ]]; then RUN[wsl]=true;   else RUN[wsl]=false;   fi   # WSL-only
 
@@ -85,6 +86,7 @@ Options:
   --skip <s> [s...]   Skip the listed sections, run the rest
   --copilot           Include Copilot CLI setup (off by default)
   --work              Write work-context rules into Copilot instructions (requires --copilot or --only copilot)
+  --update-instructions  Force-rewrite Copilot instructions even if file already exists (implies --copilot)
   --all               Run all sections including copilot
   --dry-run           Simulate: print what would be done without making changes
   --verify            Check post-conditions for each section (acts as test suite)
@@ -125,6 +127,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         --copilot) RUN[copilot]=true;                                    shift ;;
         --work)    WORK_SETUP=true;                                      shift ;;
+        --update-instructions) UPDATE_INSTRUCTIONS=true; RUN[copilot]=true; shift ;;
         --all)     for s in "${ALL_SECTIONS[@]}"; do RUN[$s]=true; done; shift ;;
         --dry-run)  DRY_RUN=true;    shift ;;
         --verify)   CHECK_ONLY=true; shift ;;
@@ -893,13 +896,23 @@ section_copilot() {
     run mkdir -p "$instructions_dir"
 
     if [[ -f "$instructions_file" ]]; then
-        ok "Global instructions already exist at ${instructions_file} -- skipping (machine-specific, never overwritten)."
+        if [[ "$UPDATE_INSTRUCTIONS" != "true" ]]; then
+            if [[ "$DRY_RUN" == "true" ]]; then
+                printf '\e[2;37m  [dry] instructions already exist -- skipping (use --update-instructions to overwrite)\e[0m\n'
+            else
+                ok "Global instructions already exist at ${instructions_file} -- skipping (machine-specific, never overwritten)."
+            fi
+            log "To authenticate, run: copilot /login"
+            return 0
+        fi
+        log "Overwriting existing instructions (--update-instructions)..."
+    fi
+
+    log "Writing global Copilot instructions..."
+    if [[ "$DRY_RUN" == "true" ]]; then
+        printf '\e[2;37m  [dry] write Copilot instructions to %s\e[0m\n' "$instructions_file"
+        [[ "$WORK_SETUP" == "true" ]] && printf '\e[2;37m  [dry] append work-context section\e[0m\n'
     else
-        log "Writing global Copilot instructions..."
-        if [[ "$DRY_RUN" == "true" ]]; then
-            printf '\e[2;37m  [dry] write Copilot instructions to %s\e[0m\n' "$instructions_file"
-            [[ "$WORK_SETUP" == "true" ]] && printf '\e[2;37m  [dry] append work-context section\e[0m\n'
-        else
             cat > "$instructions_file" << 'INSTRUCTIONS'
 # Global Copilot Instructions
 
@@ -1050,8 +1063,7 @@ action.
 WORK_INSTRUCTIONS
                 ok "Work-context section appended."
             fi
-        fi
-        ok "Global instructions written to ${instructions_file}."
+            ok "Global instructions written to ${instructions_file}."
     fi
 
     log "To authenticate, run: copilot /login"
