@@ -513,7 +513,11 @@ section_vim() {
     else
         (cd "$HOME/.vim" \
             && { git symbolic-ref --short HEAD 2>/dev/null | grep -qx "Divine" || git checkout Divine; } \
-            && git submodule update --init --recursive)
+            && GIT_TERMINAL_PROMPT=0 git \
+                -c http.lowSpeedLimit=1000 \
+                -c http.lowSpeedTime=30 \
+                -c http.timeout=60 \
+                submodule update --init --recursive)
     fi
     run ln -sf "$HOME/.vim/.vimrc" "$HOME/.vimrc"
     # .vimrc.local is machine-specific (WSL patches it at runtime); copy rather than
