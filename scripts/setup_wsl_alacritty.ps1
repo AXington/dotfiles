@@ -238,7 +238,7 @@ try {
 
 [shell]
 program = "wsl.exe"
-args = ["--distribution", "$UbuntuDistro", "--cd", "~"]
+args = ["--distribution", "$UbuntuDistro"]
 "@
     # Write UTF-8 without BOM -- PS 5.1's Set-Content -Encoding UTF8 adds a BOM
     # which Alacritty's TOML parser does not expect.

@@ -1,6 +1,5 @@
 curl
 git
-gitflow-avh
 gcc
 gettext
 htop
@@ -9,7 +8,6 @@ libffi
 make
 openssh
 python
-shellcheck
 tmux
 unzip
 tree

@@ -9,8 +9,10 @@ set -euo pipefail
 #   ./setup.sh --only zsh vim alacritty      # run only the listed sections
 #   ./setup.sh --skip packages fonts         # skip the listed sections, run the rest
 #   ./setup.sh --copilot                     # include copilot in the standard run
+#   ./setup.sh --chatgpt                     # include OpenAI Codex CLI in the standard run
+#   ./setup.sh --shellgpt                    # include ShellGPT in the standard run
 #
-# Sections: packages gnubin fonts tmux zsh vim alacritty wsl python copilot
+# Sections: packages gnubin fonts tmux zsh vim alacritty wsl python copilot chatgpt shellgpt
 
 # -- Helpers -------------------------------------------------------------------
 
@@ -68,14 +70,15 @@ OS="$(detect_os)"
 
 # -- Argument parsing ----------------------------------------------------------
 
-ALL_SECTIONS=(packages gnubin fonts tmux zsh vim alacritty wsl python copilot)
+ALL_SECTIONS=(packages gnubin fonts tmux zsh vim alacritty wsl python copilot chatgpt shellgpt)
 declare -A RUN
 for s in "${ALL_SECTIONS[@]}"; do RUN[$s]=true; done
 RUN[copilot]=false                                    # opt-in; use --copilot or --all
-WORK_SETUP=false                                      # opt-in; use --work for work-context instructions
-UPDATE_INSTRUCTIONS=false                             # opt-in; use --update-instructions to force-rewrite
+RUN[chatgpt]=false                                    # opt-in; use --chatgpt or --all
+RUN[shellgpt]=false                                   # opt-in; use --shellgpt or --all
 if [[ "$OS" == "macos" ]]; then RUN[gnubin]=true; else RUN[gnubin]=false; fi  # macOS-only
 if [[ "$OS" == "wsl"   ]]; then RUN[wsl]=true;   else RUN[wsl]=false;   fi   # WSL-only
+if [[ "$(detect_linux_distro 2>/dev/null)" == "arch" ]]; then RUN[fonts]=false; fi  # Arch: fonts managed via pacman
 
 usage() {
     cat << EOF
@@ -85,9 +88,9 @@ Options:
   --only <s> [s...]   Run only the listed sections
   --skip <s> [s...]   Skip the listed sections, run the rest
   --copilot           Include Copilot CLI setup (off by default)
-  --work              Write work-context rules into Copilot instructions (requires --copilot or --only copilot)
-  --update-instructions  Force-rewrite Copilot instructions even if file already exists (implies --copilot)
-  --all               Run all sections including copilot
+  --chatgpt           Include OpenAI Codex CLI setup (off by default)
+  --shellgpt          Include ShellGPT setup (off by default)
+  --all               Run all sections including copilot, chatgpt, and shellgpt
   --dry-run           Simulate: print what would be done without making changes
   --verify            Check post-conditions for each section (acts as test suite)
   --help              Show this help
@@ -110,11 +113,31 @@ collect_list() {
     [[ ${#COLLECTED[@]} -gt 0 ]] || { echo "Flag requires at least one section name." >&2; usage 1; }
 }
 
+is_valid_section() {
+    local candidate="$1"
+    local section
+    for section in "${ALL_SECTIONS[@]}"; do
+        [[ "$section" == "$candidate" ]] && return 0
+    done
+    return 1
+}
+
+validate_collected_sections() {
+    local section
+    for section in "${COLLECTED[@]}"; do
+        if ! is_valid_section "$section"; then
+            echo "Unknown section: $section" >&2
+            usage 1
+        fi
+    done
+}
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --only)
             shift
             collect_list "$@"
+            validate_collected_sections
             for s in "${ALL_SECTIONS[@]}"; do RUN[$s]=false; done
             for s in "${COLLECTED[@]}";    do RUN[$s]=true;  done
             shift "$SHIFT_BY"
@@ -122,12 +145,13 @@ while [[ $# -gt 0 ]]; do
         --skip)
             shift
             collect_list "$@"
+            validate_collected_sections
             for s in "${COLLECTED[@]}"; do RUN[$s]=false; done
             shift "$SHIFT_BY"
             ;;
         --copilot) RUN[copilot]=true;                                    shift ;;
-        --work)    WORK_SETUP=true;                                      shift ;;
-        --update-instructions) UPDATE_INSTRUCTIONS=true; RUN[copilot]=true; shift ;;
+        --chatgpt) RUN[chatgpt]=true;                                    shift ;;
+        --shellgpt) RUN[shellgpt]=true;                                  shift ;;
         --all)     for s in "${ALL_SECTIONS[@]}"; do RUN[$s]=true; done; shift ;;
         --dry-run)  DRY_RUN=true;    shift ;;
         --verify)   CHECK_ONLY=true; shift ;;
@@ -244,7 +268,7 @@ section_fonts() {
     tmp_dir="$(mktemp -d)"
     trap 'rm -rf "$tmp_dir"' EXIT
 
-    run git clone --depth=1 https://github.com/powerline/fonts.git "$tmp_dir/fonts"
+    run git clone --depth=1 git@github.com:powerline/fonts.git "$tmp_dir/fonts"
     run bash "$tmp_dir/fonts/install.sh"
     rm -rf "$tmp_dir"
     trap - EXIT
@@ -255,7 +279,7 @@ section_fonts() {
 section_tmux() {
     log "Setting up tmux..."
     if [[ ! -d "$HOME/.tmux" ]]; then
-        run git clone https://github.com/gpakosz/.tmux.git "$HOME/.tmux"
+        run git clone git@github.com:gpakosz/.tmux.git "$HOME/.tmux"
     fi
     # Per gpakosz/.tmux instructions: symlink main conf, copy local conf
     run ln -sf "$HOME/.tmux/.tmux.conf" "$HOME/.tmux.conf"
@@ -340,7 +364,7 @@ section_zsh() {
     local plugin_dir="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting"
     if [[ ! -d "$plugin_dir" ]]; then
         run git clone --depth=1 \
-            https://github.com/zsh-users/zsh-syntax-highlighting.git \
+            git@github.com:zsh-users/zsh-syntax-highlighting.git \
             "$plugin_dir"
     fi
 
@@ -391,7 +415,6 @@ PYFIX
         if [[ "$DRY_RUN" == "true" ]]; then
             printf '\e[2;37m  [dry] append dotfiles customizations to %s\e[0m\n' "$zshrc"
         else
-            # shellcheck disable=SC2016
             local path_prefix='$HOME/.gnubin'
             if [[ "$OS" == "macos" ]]; then
                 local brew_prefix
@@ -427,6 +450,10 @@ command -v kubectl &>/dev/null && source <(kubectl completion zsh)
 command -v helm    &>/dev/null && source <(helm completion zsh)
 
 [ -f "\$HOME/.fzf.zsh" ] && source "\$HOME/.fzf.zsh"
+
+export PYENV_ROOT="\$HOME/.pyenv"
+[[ -d "\$PYENV_ROOT/bin" ]] && export PATH="\$PYENV_ROOT/bin:\$PATH"
+command -v pyenv &>/dev/null && eval "\$(pyenv init -)"
 
 # uv
 [ -f "\$HOME/.local/bin/env" ] && . "\$HOME/.local/bin/env"
@@ -506,18 +533,14 @@ EOF
 section_vim() {
     log "Setting up Vim..."
     if [[ ! -d "$HOME/.vim" ]]; then
-        run git clone https://github.com/AXington/.vim.git "$HOME/.vim"
+        run git clone git@github.com:AXington/.vim.git "$HOME/.vim"
     fi
     if [[ "$DRY_RUN" == "true" ]]; then
         printf '\e[2;37m  [dry] checkout Divine branch and update submodules in ~/.vim\e[0m\n'
     else
         (cd "$HOME/.vim" \
             && { git symbolic-ref --short HEAD 2>/dev/null | grep -qx "Divine" || git checkout Divine; } \
-            && GIT_TERMINAL_PROMPT=0 git \
-                -c http.lowSpeedLimit=1000 \
-                -c http.lowSpeedTime=30 \
-                -c http.timeout=60 \
-                submodule update --init --recursive)
+            && git submodule update --init --recursive)
     fi
     run ln -sf "$HOME/.vim/.vimrc" "$HOME/.vimrc"
     # .vimrc.local is machine-specific (WSL patches it at runtime); copy rather than
@@ -538,7 +561,6 @@ _alacritty_install_mac() {
         eval "$(/usr/local/bin/brew shellenv)"
     fi
     run brew install --cask alacritty
-    command_exists gzip || run brew install gzip
 }
 
 _alacritty_install_debian() {
@@ -549,7 +571,6 @@ _alacritty_install_debian() {
     else
         warn "alacritty not in default apt repos. Install via cargo or your distro's method."
     fi
-    command_exists gzip || run sudo apt-get install -y gzip
 }
 
 _alacritty_install_rhel() {
@@ -560,75 +581,75 @@ _alacritty_install_rhel() {
     elif command_exists cargo; then
         warn "alacritty not in dnf repos. Building from source via cargo (slow)..."
         run sudo "$m" install -y cmake freetype-devel fontconfig-devel libxcb-devel \
-            libxkbcommon-devel g++ gzip
+            libxkbcommon-devel g++
         run cargo install alacritty
     else
         warn "alacritty not in dnf repos and flatpak/cargo not available."
         warn "Install flatpak first: sudo $m install -y flatpak && flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo"
         return 1
     fi
-    command_exists gzip || run sudo "$m" install -y gzip
 }
 
 _alacritty_install_arch() {
-    run sudo pacman -S --needed --noconfirm alacritty gzip
+    run sudo pacman -S --needed --noconfirm alacritty
 }
 
 section_alacritty() {
     log "Setting up Alacritty..."
 
-    case "$OS" in
-        macos)    _alacritty_install_mac ;;
-        linux|wsl)
-            case "$(detect_linux_distro)" in
-                debian)  _alacritty_install_debian ;;
-                rhel*)   _alacritty_install_rhel ;;
-                arch)    _alacritty_install_arch ;;
-                *) warn "Unsupported distro  - install alacritty manually." ;;
-            esac ;;
-        *) warn "Unsupported OS  - install alacritty manually." ;;
-    esac
+    if command_exists alacritty; then
+        ok "Alacritty already installed."
+    else
+        case "$OS" in
+            macos)    _alacritty_install_mac ;;
+            linux|wsl)
+                case "$(detect_linux_distro)" in
+                    debian)  _alacritty_install_debian ;;
+                    rhel*)   _alacritty_install_rhel ;;
+                    arch)    _alacritty_install_arch ;;
+                    *) warn "Unsupported distro  - install alacritty manually." ;;
+                esac ;;
+            *) warn "Unsupported OS  - install alacritty manually." ;;
+        esac
+    fi
 
     # Bail out early if alacritty still isn't available (install step warned already)
     if ! command_exists alacritty; then
         warn "alacritty not found after install attempt  - skipping man page, completions, and terminfo"
-        return 1
+        return 0
     fi
 
     # Man page
     local man_path="/usr/local/share/man/man1"
-    if [[ ! -f "${man_path}/alacritty.1.gz" ]]; then
-        run sudo mkdir -p "$man_path"
-        local man_tmp
-        man_tmp="$(mktemp)"
-        trap 'rm -f "$man_tmp"' RETURN
-        run curl -fsSL -o "$man_tmp" \
-            https://raw.githubusercontent.com/alacritty/alacritty/master/extra/alacritty.man
-        if [[ "$DRY_RUN" == "true" ]]; then
-            printf '\e[2;37m  [dry] download and install man page to %s\e[0m\n' "${man_path}/alacritty.1.gz"
-        else
-            gzip -c "$man_tmp" | sudo tee "${man_path}/alacritty.1.gz" > /dev/null
-        fi
-        rm -f "$man_tmp"
-        trap - RETURN
+    if command_exists man && man -w alacritty &>/dev/null; then
+        ok "Alacritty man page already available."
+    elif [[ ! -f "${man_path}/alacritty.1.gz" ]]; then
+        warn "Alacritty man page is not installed locally; skipping manual install (upstream path changed)."
     fi
 
     # Zsh completions
     local zsh_fn_dir="${ZDOTDIR:-$HOME}/.zsh_functions"
     if [[ ! -f "${zsh_fn_dir}/_alacritty" ]]; then
         run mkdir -p "$zsh_fn_dir"
-        run curl -fsSL -o "${zsh_fn_dir}/_alacritty" \
-            https://raw.githubusercontent.com/alacritty/alacritty/master/extra/completions/_alacritty
+        if ! run curl -fsSL -o "${zsh_fn_dir}/_alacritty" \
+            https://raw.githubusercontent.com/alacritty/alacritty/master/extra/completions/_alacritty; then
+            warn "Failed to download Alacritty zsh completions  - skipping"
+        fi
     fi
 
     # terminfo  - requires tic (ncurses); present on macOS and most Linux distros
-    if command_exists tic; then
+    if infocmp alacritty &>/dev/null; then
+        ok "Alacritty terminfo already available."
+    elif command_exists tic; then
         local terminfo_tmp
         terminfo_tmp="$(mktemp)"
         trap 'rm -f "$terminfo_tmp"' RETURN
-        run curl -fsSL -o "$terminfo_tmp" \
-            https://raw.githubusercontent.com/alacritty/alacritty/master/extra/alacritty.info
-        run sudo tic -xe alacritty,alacritty-direct "$terminfo_tmp"
+        if run curl -fsSL -o "$terminfo_tmp" \
+            https://raw.githubusercontent.com/alacritty/alacritty/master/extra/alacritty.info; then
+            run sudo tic -xe alacritty,alacritty-direct "$terminfo_tmp"
+        else
+            warn "Failed to download Alacritty terminfo  - skipping"
+        fi
         rm -f "$terminfo_tmp"
         trap - RETURN
     else
@@ -734,7 +755,7 @@ if -b 'command -v win32yank.exe > /dev/null 2>&1' {
 # <<< WSL config <<<
 TMUX_WSL
         fi
-        ok "$HOME/.tmux.conf.local patched."
+        ok "~/.tmux.conf.local patched."
     else
         ok "tmux WSL config already present."
     fi
@@ -774,7 +795,7 @@ endif
 " <<< WSL config <<<
 VIM_WSL
         fi
-        ok "$HOME/.vimrc.local patched."
+        ok "~/.vimrc.local patched."
     else
         ok "vim WSL config already present."
     fi
@@ -785,9 +806,7 @@ VIM_WSL
     printf '  \e[1;33m│\e[0m                                                                          \e[1;33m│\e[0m\n'
     printf '  \e[1;33m│\e[0m  1. Install MesloLGM Nerd Font:                                         \e[1;33m│\e[0m\n'
     printf '  \e[1;33m│\e[0m     Invoke-WebRequest -Uri "https://github.com/ryanoasis/nerd-fonts/    \e[1;33m│\e[0m\n'
-    # shellcheck disable=SC2016
     printf '  \e[1;33m│\e[0m       releases/latest/download/Meslo.zip" -OutFile "$env:TEMP\Meslo.zip"\e[1;33m│\e[0m\n'
-    # shellcheck disable=SC2016
     printf '  \e[1;33m│\e[0m     Expand-Archive "$env:TEMP\Meslo.zip" "$env:TEMP\Meslo" -Force       \e[1;33m│\e[0m\n'
     printf '  \e[1;33m│\e[0m     # Then right-click each .ttf -> Install for all users               \e[1;33m│\e[0m\n'
     printf '  \e[1;33m│\e[0m                                                                          \e[1;33m│\e[0m\n'
@@ -805,20 +824,55 @@ VIM_WSL
 
 # -- 9. Python (uv + uv-virtualenvwrapper + base virtualenv) ------------------
 
+append_local_bin_hook() {
+    local target="$1"
+    if grep -q "# >>> dotfiles local bin <<<" "$target" 2>/dev/null; then
+        return 0
+    fi
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        printf '\e[2;37m  [dry] append local bin hook to %s\e[0m\n' "$target"
+        return 0
+    fi
+
+    cat >> "$target" << 'LOCAL_BIN_HOOK'
+
+# >>> dotfiles local bin <<<
+export PATH="$HOME/.local/bin:$PATH"
+[ -f "$HOME/.local/bin/env" ] && . "$HOME/.local/bin/env"
+# <<< dotfiles local bin <<<
+LOCAL_BIN_HOOK
+}
+
+ensure_local_bin_shell_path() {
+    export PATH="$HOME/.local/bin:$PATH"
+    append_local_bin_hook "$HOME/.profile"
+    append_local_bin_hook "$HOME/.zprofile"
+}
+
+ensure_uv() {
+    if command_exists uv; then
+        ok "uv already installed: $(uv --version)"
+        ensure_local_bin_shell_path
+        return 0
+    fi
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        printf '\e[2;37m  [dry] install uv via curl | sh\e[0m\n'
+        ensure_local_bin_shell_path
+        return 0
+    fi
+
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    ensure_local_bin_shell_path
+
+    command_exists uv || [[ -x "$HOME/.local/bin/uv" ]] || { warn "uv not found after install"; return 1; }
+}
+
 section_python() {
     log "Setting up Python (uv + uv-virtualenvwrapper + base virtualenv)..."
 
-    # Install uv via the official installer (works on all platforms)
-    if ! command_exists uv; then
-        if [[ "$DRY_RUN" == "true" ]]; then
-            printf '\e[2;37m  [dry] install uv via curl | sh\e[0m\n'
-        else
-            curl -LsSf https://astral.sh/uv/install.sh | sh
-            export PATH="$HOME/.local/bin:$PATH"
-        fi
-    else
-        ok "uv already installed: $(uv --version)"
-    fi
+    ensure_uv || return 1
 
     # uv-virtualenvwrapper provides a shell script; install as a uv tool
     if [[ ! -f "$HOME/.local/bin/uv-virtualenvwrapper.sh" ]]; then
@@ -826,16 +880,6 @@ section_python() {
     else
         ok "uv-virtualenvwrapper already installed."
     fi
-
-    # Install global dev tools via uv tool (available system-wide in PATH)
-    local uv_tools=(flake8 mypy)
-    for tool in "${uv_tools[@]}"; do
-        if ! command_exists "$tool"; then
-            run uv tool install "$tool"
-        else
-            ok "$tool already installed: $($tool --version 2>&1 | head -1)"
-        fi
-    done
 
     # Create the base virtualenv (acts as a system-level scripting environment)
     local venv_home="${WORKON_HOME:-$HOME/.venvs}"
@@ -909,177 +953,160 @@ section_copilot() {
     run mkdir -p "$instructions_dir"
 
     if [[ -f "$instructions_file" ]]; then
-        if [[ "$UPDATE_INSTRUCTIONS" != "true" ]]; then
-            if [[ "$DRY_RUN" == "true" ]]; then
-                printf '\e[2;37m  [dry] instructions already exist -- skipping (use --update-instructions to overwrite)\e[0m\n'
-            else
-                ok "Global instructions already exist at ${instructions_file} -- skipping (machine-specific, never overwritten)."
-            fi
-            log "To authenticate, run: copilot /login"
-            return 0
-        fi
-        log "Overwriting existing instructions (--update-instructions)..."
-    fi
-
-    log "Writing global Copilot instructions..."
-    if [[ "$DRY_RUN" == "true" ]]; then
-        printf '\e[2;37m  [dry] write Copilot instructions to %s\e[0m\n' "$instructions_file"
-        [[ "$WORK_SETUP" == "true" ]] && printf '\e[2;37m  [dry] append work-context section\e[0m\n'
+        ok "Global instructions already exist at ${instructions_file}."
     else
+        log "Writing global Copilot instructions..."
+        if [[ "$DRY_RUN" == "true" ]]; then
+            printf '\e[2;37m  [dry] write Copilot instructions to %s\e[0m\n' "$instructions_file"
+        else
             cat > "$instructions_file" << 'INSTRUCTIONS'
 # Global Copilot Instructions
 
+## Assistant Preference
+
+- The assistant prefers to be referred to as `Sam`.
+- The assistant prefers they/them pronouns.
+
 ## User Preference
 
-- The user's name is Alice (Ali). Address her as Ali. Use she/her pronouns.
+- The user's name is Alice (Ali). Use she/her pronouns when referring to her.
 
-## Repository Instructions
+## Model Preference
 
-Repository-level Copilot instructions (.github/copilot-instructions.md) provide
-context specific to that repository. They must enhance and work within the rules
-and intentions defined here. They may add repo-specific conventions, directory
-structure, key commands, and tooling notes. They must not contradict or weaken
-any rule defined in these global instructions.
+- Prefer Anthropic (Claude) models over OpenAI models when a choice is available.
+- Default to Claude Sonnet for standard tasks; use Claude Opus for complex, multi-step reasoning.
 
 ## Coding Rules
 
 - Follow the naming conventions of the language and repository in use.
-- Correctness is the highest priority. Clarity comes second. Conciseness is last.
-  Never sacrifice correctness or clarity for brevity.
-- Reduce complexity wherever possible. Simple, obvious solutions are preferred
-  over clever ones.
-- Only comment code that genuinely needs clarification. Do not over-comment.
-- Never hardcode secrets, credentials, IPs, URLs, or environment-specific values.
-  Use variables, config files, or secret stores appropriate to the stack.
-- Write idempotent code wherever the stack supports it. Operations must be safe
-  to re-run without side effects.
-- Always handle failure cases explicitly. Fail loudly with a clear error rather
-  than silently continuing in a broken state.
-- Do not modify unrelated code. When fixing a specific issue, stay in scope.
-  Scope creep in automated changes is a reliability risk.
-- All source files must use ASCII-safe encoding. Do not introduce any non-ASCII
-  characters (Unicode codepoints above U+007F) anywhere in code, comments,
-  configs, or scripts. This includes curly quotes, smart apostrophes,
-  non-breaking spaces, ellipses, em-dashes, and any other Unicode typography.
-  Use plain ASCII equivalents at all times. Non-ASCII characters cause silent,
-  hard-to-diagnose failures in shells, parsers, and cross-platform tooling.
-- In prose and plain language output, avoid em-dashes entirely. Do not substitute
-  them with hyphens or double hyphens used as punctuation. Rewrite the sentence
-  instead. This applies especially to output written in Ali's voice.
-
-## Testing and Linting
-
-Linting is always required. Run it before declaring any task complete.
-
-| Stack     | Linting                           | Testing                                                              |
-|-----------|-----------------------------------|----------------------------------------------------------------------|
-| Python    | flake8 (PEP8 enforced)            | pytest; new behavior requires tests; bug fixes need regression tests |
-| Shell     | shellcheck                        | Manual dry-run; test in non-prod first                               |
-| YAML/JSON | Schema validation where available | N/A                                                                  |
-
-If the repository has an existing test suite, run it before and after any code
-change to establish a baseline and confirm nothing regressed. Do not declare a
-task done without verifying the expected outcome.
-
-If a repo has no linting setup, note it as tech debt but do not block the current
-task on it.
+- Prefer concise, efficient code; prefer completeness over brevity when the two conflict.
+- Only comment code that genuinely needs clarification - do not over-comment.
+- Always analyze code for robustness, completeness, and explicit error handling.
+- Use UTF-8 encoding for all source files; keep scripts and configs ASCII-safe.
+- Mentally trace through code against multiple input scenarios before declaring it correct.
+- Generate unit tests where applicable and ensure they pass before declaring code complete.
 
 ## Quality Rules
 
-- Safety and security come first, above all else including task completion. An
-  answer that introduces a vulnerability or causes an unrecoverable change is worse
-  than no answer at all.
-- Never guess. Only provide answers that can be verified. Be ready to cite sources
-  when asked.
-- For anything version-sensitive (API syntax, tool behavior, config options, CLI
-  flags): verify against current documentation before answering. Training data goes
-  stale; docs do not.
-- Do not report success until the outcome is confirmed by checking the exit code,
-  API response, or resource state.
-- State assumptions explicitly when they significantly affect the outcome. Wrong
-  silent assumptions cause incidents.
-- When a request is ambiguous or has multiple valid approaches with meaningfully
-  different tradeoffs, ask before proceeding. State the options, give a
-  recommendation, and let Ali decide.
-- When proposing changes that could be difficult or impossible to reverse, surface
-  the risks, blast radius, and rollback options before proceeding.
-
-## Safety and Security
-
-Safety and security are non-negotiable and take priority over completing the task.
-
-- Never assume context is safe, correct, or complete. Verify explicitly.
-- Before any mutating action, verify and state the active environment.
-- Request only the permissions, access, and scope needed for the task.
-- When two approaches achieve the same goal, prefer the one that can be undone:
-  soft deletes, backups before overwrites, snapshots before resizes.
-- Before any change to shared infrastructure, identify how to reverse it. If
-  reversal is not possible, say so before acting.
-- Before any destructive operation, stop and get explicit confirmation from Ali.
-  State the blast radius first: what breaks, what is lost, what cannot be undone.
-- If credentials are missing or authentication fails, stop and report clearly.
-  Do not fall back to a different credential source without telling Ali.
-- Do not disable, weaken, or work around security controls for convenience. If a
-  control is blocking legitimate work, surface it and find an approved path.
-
-## Code Review and Commits
-
-- Before pushing any code to a remote repository, perform a code review. Check
-  for correctness, security issues, unintended side effects, and scope creep.
-  Present the review summary and wait for Ali's confirmation before pushing.
-- Use Conventional Commits: <type>: <description>. Types: feat, fix, docs,
-  refactor, test, chore. Keep the subject line under 72 characters. Use the
-  commit body to explain what changed and why.
-
-## Updating These Instructions
-
-Before writing any new or modified instruction to any Copilot instructions file
-(including ~/.copilot/copilot-instructions.md and any repo-level
-.github/copilot-instructions.md):
-
-1. Draft the proposed text and show it to Ali for review.
-2. Use precise, actionable language.
-3. Wait for explicit approval before writing to the file.
+- Prioritize accuracy over speed.
+- Never guess. Only provide answers that can be verified.
+- Base answers on the latest stable version of the technology being discussed.
+- Perform an adversarial review on all code: actively seek edge cases, failure modes, and security issues.
 INSTRUCTIONS
-
-            if [[ "$WORK_SETUP" == "true" ]]; then
-                cat >> "$instructions_file" << 'WORK_INSTRUCTIONS'
-
-## Work Context
-
-Ali is a DevOps/Site Reliability engineer. Apply that lens to all responses.
-Prefer operational clarity, reliability, and maintainability.
-
-## Work: Additional Testing and Linting
-
-| Stack     | Linting                        | Testing                                            |
-|-----------|--------------------------------|----------------------------------------------------|
-| Ansible   | ansible-lint                   | --check --diff dry-run; molecule where it exists   |
-| Terraform | tflint, terraform validate     | terraform plan; terratest where it exists          |
-
-## Work: Infrastructure Safety
-
-Before any mutating action on cloud or shared infrastructure, verify and state
-the active environment explicitly:
-- AWS: account ID, region, and profile
-- Kubernetes: active cluster context and namespace
-- Terraform: workspace and backend
-
-Treat prod, staging, and dev as distinct trust zones with separate credentials.
-An action safe in dev is not automatically safe in prod.
-
-Before executing any operation that deletes data, modifies production, or is
-irreversible: stop and get explicit confirmation from Ali. State the blast radius
-first. Never run terraform destroy, kubectl delete, DROP TABLE, or
-aws s3 rm --recursive without a clear, affirmative go-ahead for that specific
-action.
-WORK_INSTRUCTIONS
-                ok "Work-context section appended."
-            fi
-            ok "Global instructions written to ${instructions_file}."
+        fi
+        ok "Global instructions written to ${instructions_file}."
     fi
 
     log "To authenticate, run: copilot /login"
+}
+
+# -- 11. OpenAI Codex CLI (ChatGPT CLI) ---------------------------------------
+
+ensure_npm() {
+    if command_exists npm; then
+        ok "npm already installed: $(npm --version)"
+        return 0
+    fi
+
+    log "Installing Node.js + npm for OpenAI Codex CLI..."
+    case "$OS" in
+        macos)
+            if ! command_exists brew; then
+                if [[ "$DRY_RUN" == "true" ]]; then
+                    printf '\e[2;37m  [dry] install Homebrew\e[0m\n'
+                else
+                    bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+                fi
+            fi
+            if [[ -x /opt/homebrew/bin/brew ]]; then
+                eval "$(/opt/homebrew/bin/brew shellenv)"
+            elif [[ -x /usr/local/bin/brew ]]; then
+                eval "$(/usr/local/bin/brew shellenv)"
+            fi
+            run brew install node
+            ;;
+        linux|wsl)
+            case "$(detect_linux_distro)" in
+                debian)
+                    run sudo apt-get update -y
+                    run sudo apt-get install -y nodejs npm
+                    ;;
+                rhel*)
+                    local mgr; command_exists dnf && mgr="dnf" || mgr="yum"
+                    run sudo "$mgr" install -y nodejs npm
+                    ;;
+                arch)
+                    run sudo pacman -S --needed --noconfirm nodejs npm
+                    ;;
+                *)
+                    warn "Unsupported distro  - install Node.js and npm manually for Codex CLI"
+                    return 1
+                    ;;
+            esac
+            ;;
+        *)
+            warn "Unsupported OS  - install Node.js and npm manually for Codex CLI"
+            return 1
+            ;;
+    esac
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        ok "Node.js + npm install queued."
+        return 0
+    fi
+
+    if ! command_exists npm; then
+        warn "npm not found after install attempt"
+        return 1
+    fi
+}
+
+install_npm_global_package() {
+    local package="$1"
+    local prefix
+    local brew_prefix=""
+    prefix="$(npm prefix -g 2>/dev/null || true)"
+    if [[ "$OS" == "macos" ]] && command_exists brew; then
+        brew_prefix="$(brew --prefix 2>/dev/null || true)"
+    fi
+
+    if [[ "$prefix" == "$HOME"* ]] || [[ -n "$brew_prefix" && "$prefix" == "$brew_prefix"* ]]; then
+        run npm i -g "$package"
+    else
+        run sudo npm i -g "$package"
+    fi
+}
+
+section_chatgpt() {
+    log "Setting up OpenAI Codex CLI (ChatGPT CLI)..."
+
+    ensure_npm || return 1
+
+    if command_exists codex; then
+        ok "OpenAI Codex CLI already installed."
+    else
+        install_npm_global_package @openai/codex
+    fi
+
+    ok "OpenAI Codex CLI configured."
+    log "To authenticate, run: codex"
+}
+
+# -- 12. ShellGPT (unofficial open-source ChatGPT CLI) ------------------------
+
+section_shellgpt() {
+    log "Setting up ShellGPT (unofficial chat-focused CLI)..."
+
+    ensure_uv || return 1
+
+    if [[ -x "$HOME/.local/bin/sgpt" ]] || command_exists sgpt; then
+        ok "ShellGPT already installed."
+    else
+        run uv tool install shell-gpt
+    fi
+
+    ok "ShellGPT configured."
+    log "To use it, set OPENAI_API_KEY and run: sgpt \"hello\""
 }
 
 # -- Verification (--verify mode) ---------------------------------------------
@@ -1087,12 +1114,14 @@ WORK_INSTRUCTIONS
 verify_packages() {
     case "$OS" in
         macos)
-            if command_exists brew; then pass "Homebrew installed"; else fail "Homebrew not installed"; fi ;;
+            command_exists brew \
+                && pass "Homebrew installed" \
+                || fail "Homebrew not installed" ;;
         linux|wsl)
             case "$(detect_linux_distro)" in
-                debian) if command_exists apt-get; then pass "apt-get available"; else fail "apt-get not available"; fi ;;
-                rhel*)  if { command_exists dnf || command_exists yum; }; then pass "dnf/yum available"; else fail "no package manager found"; fi ;;
-                arch)   if command_exists pacman; then pass "pacman available"; else fail "pacman not available"; fi ;;
+                debian) command_exists apt-get && pass "apt-get available" || fail "apt-get not available" ;;
+                rhel*)  { command_exists dnf || command_exists yum; } && pass "dnf/yum available" || fail "no package manager found" ;;
+                arch)   command_exists pacman && pass "pacman available" || fail "pacman not available" ;;
                 *)      skip_check "unknown distro  - cannot verify packages" ;;
             esac ;;
         *) skip_check "unknown OS  - cannot verify packages" ;;
@@ -1101,9 +1130,9 @@ verify_packages() {
 
 verify_gnubin() {
     if [[ "$OS" != "macos" ]]; then skip_check "gnubin is macOS-only"; return; fi
-    if [[ -d "$HOME/.gnubin" ]]; then pass "$HOME/.gnubin directory exists"; else fail "$HOME/.gnubin directory missing"; fi
-    if [[ -L "$HOME/.gnubin/sed" ]]; then pass "GNU sed linked in $HOME/.gnubin"; else fail "GNU sed not linked in $HOME/.gnubin"; fi
-    if [[ -L "$HOME/.gnubin/find" ]]; then pass "GNU find linked in $HOME/.gnubin"; else fail "GNU find not linked in $HOME/.gnubin"; fi
+    [[ -d "$HOME/.gnubin" ]]        && pass "~/.gnubin directory exists"       || fail "~/.gnubin directory missing"
+    [[ -L "$HOME/.gnubin/sed" ]]    && pass "GNU sed linked in ~/.gnubin"      || fail "GNU sed not linked in ~/.gnubin"
+    [[ -L "$HOME/.gnubin/find" ]]   && pass "GNU find linked in ~/.gnubin"     || fail "GNU find not linked in ~/.gnubin"
 }
 
 verify_fonts() {
@@ -1120,77 +1149,108 @@ verify_fonts() {
 }
 
 verify_tmux() {
-    if [[ -d "$HOME/.tmux" ]]; then pass "$HOME/.tmux cloned"; else fail "$HOME/.tmux not cloned"; fi
-    if [[ -L "$HOME/.tmux.conf" ]]; then pass "$HOME/.tmux.conf is a symlink"; else fail "$HOME/.tmux.conf is not a symlink"; fi
-    if [[ -f "$HOME/.tmux.conf.local" ]]; then pass "$HOME/.tmux.conf.local exists"; else fail "$HOME/.tmux.conf.local missing"; fi
+    [[ -d "$HOME/.tmux" ]]             && pass "~/.tmux cloned"                    || fail "~/.tmux not cloned"
+    [[ -L "$HOME/.tmux.conf" ]]        && pass "~/.tmux.conf is a symlink"         || fail "~/.tmux.conf is not a symlink"
+    [[ -f "$HOME/.tmux.conf.local" ]]  && pass "~/.tmux.conf.local exists"         || fail "~/.tmux.conf.local missing"
     local conf="$HOME/.tmux.conf.local"
-    if grep -q "uE0B0"              "$conf" 2>/dev/null; then pass "Powerline separators configured"; else fail "Powerline separators not configured"; fi
-    if grep -q "^set -g prefix C-a" "$conf" 2>/dev/null; then pass "C-a prefix configured"; else fail "C-a prefix not configured"; fi
-    if grep -q "^unbind C-b"        "$conf" 2>/dev/null; then pass "C-b unbound"; else fail "C-b not unbound"; fi
-    if grep -q "^bind a last-window" "$conf" 2>/dev/null; then pass "bind a last-window set"; else fail "bind a last-window not set"; fi
-    if grep -q "^bind n next-window" "$conf" 2>/dev/null; then pass "bind n next-window set"; else fail "bind n next-window not set"; fi
-    if grep -q "^bind F "           "$conf" 2>/dev/null; then pass "bind F focus-events toggle set"; else fail "bind F focus-events toggle not set"; fi
+    grep -q "uE0B0"              "$conf" 2>/dev/null && pass "Powerline separators configured"  || fail "Powerline separators not configured"
+    grep -q "^set -g prefix C-a" "$conf" 2>/dev/null && pass "C-a prefix configured"           || fail "C-a prefix not configured"
+    grep -q "^unbind C-b"        "$conf" 2>/dev/null && pass "C-b unbound"                     || fail "C-b not unbound"
+    grep -q "^bind a last-window" "$conf" 2>/dev/null && pass "bind a last-window set"         || fail "bind a last-window not set"
+    grep -q "^bind n next-window" "$conf" 2>/dev/null && pass "bind n next-window set"         || fail "bind n next-window not set"
+    grep -q "^bind F "           "$conf" 2>/dev/null && pass "bind F focus-events toggle set"  || fail "bind F focus-events toggle not set"
 }
 
 verify_zsh() {
-    if [[ -d "$HOME/.oh-my-zsh" ]]; then pass "Oh My Zsh installed"; else fail "Oh My Zsh not installed"; fi
+    [[ -d "$HOME/.oh-my-zsh" ]]         && pass "Oh My Zsh installed"                          || fail "Oh My Zsh not installed"
     local zshrc="$HOME/.zshrc"
-    if [[ -f "$zshrc" ]]; then pass "$HOME/.zshrc exists"; else fail "$HOME/.zshrc missing"; return; fi
-    if grep -q 'ZSH_THEME="agnoster"' "$zshrc"; then pass "agnoster theme set"; else fail "agnoster theme not set"; fi
-    if grep -q "zsh-syntax-highlighting"   "$zshrc"; then pass "zsh-syntax-highlighting present"; else fail "zsh-syntax-highlighting missing"; fi
-    if grep -q "# >>> dotfiles customizations <<<" "$zshrc"; then pass "customization block present"; else fail "customization block missing"; fi
-    if grep -q "^ssh()"    "$zshrc"; then pass "ssh() focus-events wrapper present"; else fail "ssh() focus-events wrapper missing"; fi
-    if grep -q "^aws()"    "$zshrc"; then pass "aws() focus-events wrapper present"; else fail "aws() focus-events wrapper missing"; fi
-    if grep -q "WORKON_HOME" "$zshrc"; then pass "WORKON_HOME set in .zshrc"; else fail "WORKON_HOME not set in .zshrc"; fi
-    if grep -q 'uv-virtualenvwrapper.sh' "$zshrc"; then pass "uv-virtualenvwrapper sourced in .zshrc"; else fail "uv-virtualenvwrapper not sourced in .zshrc"; fi
+    [[ -f "$zshrc" ]]                   && pass "~/.zshrc exists"                              || { fail "~/.zshrc missing"; return; }
+    grep -q 'ZSH_THEME="agnoster"' "$zshrc"               && pass "agnoster theme set"         || fail "agnoster theme not set"
+    grep -q "zsh-syntax-highlighting"   "$zshrc"           && pass "zsh-syntax-highlighting present" || fail "zsh-syntax-highlighting missing"
+    grep -q "# >>> dotfiles customizations <<<" "$zshrc"   && pass "customization block present"     || fail "customization block missing"
+    grep -q "^ssh()"    "$zshrc"  && pass "ssh() focus-events wrapper present"   || fail "ssh() focus-events wrapper missing"
+    grep -q "^aws()"    "$zshrc"  && pass "aws() focus-events wrapper present"   || fail "aws() focus-events wrapper missing"
+    grep -q "WORKON_HOME" "$zshrc" && pass "WORKON_HOME set in .zshrc"           || fail "WORKON_HOME not set in .zshrc"
+    grep -q 'uv-virtualenvwrapper.sh' "$zshrc" && pass "uv-virtualenvwrapper sourced in .zshrc" || fail "uv-virtualenvwrapper not sourced in .zshrc"
 }
 
 verify_vim() {
-    if [[ -d "$HOME/.vim" ]]; then pass "$HOME/.vim cloned"; else fail "$HOME/.vim not cloned"; fi
-    if [[ -L "$HOME/.vimrc" ]]; then pass "$HOME/.vimrc symlinked"; else fail "$HOME/.vimrc not symlinked"; fi
-    if [[ -f "$HOME/.vimrc.local" ]]; then pass "$HOME/.vimrc.local exists"; else fail "$HOME/.vimrc.local missing"; fi
+    [[ -d "$HOME/.vim" ]]               && pass "~/.vim cloned"                                || fail "~/.vim not cloned"
+    [[ -L "$HOME/.vimrc" ]]             && pass "~/.vimrc symlinked"                           || fail "~/.vimrc not symlinked"
+    [[ -f "$HOME/.vimrc.local" ]]       && pass "~/.vimrc.local exists"                        || fail "~/.vimrc.local missing"
     local branch
     branch="$(cd "$HOME/.vim" 2>/dev/null && git symbolic-ref --short HEAD 2>/dev/null || true)"
-    if [[ "$branch" == "Divine" ]]; then pass "$HOME/.vim on Divine branch"; else fail "$HOME/.vim not on Divine branch (got: ${branch:-none})"; fi
+    [[ "$branch" == "Divine" ]]         && pass "~/.vim on Divine branch"                      || fail "~/.vim not on Divine branch (got: ${branch:-none})"
     local uninit
     uninit="$(cd "$HOME/.vim" 2>/dev/null && { git submodule status 2>/dev/null | { grep '^-' || true; } | wc -l | tr -d ' '; } || echo 0)"
-    if [[ "$uninit" -eq 0 ]]; then pass "All vim submodules initialized"; else fail "$uninit vim submodule(s) not initialized"; fi
+    [[ "$uninit" -eq 0 ]]               && pass "All vim submodules initialized"               || fail "$uninit vim submodule(s) not initialized"
 }
 
 verify_alacritty() {
-    if command_exists alacritty; then pass "alacritty installed"; else fail "alacritty not installed"; fi
+    command_exists alacritty           && pass "alacritty installed"                           || fail "alacritty not installed"
     local cfg="$HOME/.config/alacritty/alacritty.toml"
-    if [[ -L "$cfg" ]]; then pass "alacritty.toml symlinked"; else fail "alacritty.toml not symlinked"; fi
+    [[ -L "$cfg" ]]                    && pass "alacritty.toml symlinked"                      || fail "alacritty.toml not symlinked"
     local target; target="$(readlink "$cfg" 2>/dev/null || true)"
-    if [[ "$target" == *"terminal_configs/alacritty.toml" ]]; then pass "alacritty.toml points to dotfiles"; else fail "alacritty.toml symlink target unexpected: $target"; fi
+    [[ "$target" == *"terminal_configs/alacritty.toml" ]] \
+                                        && pass "alacritty.toml points to dotfiles"            || fail "alacritty.toml symlink target unexpected: $target"
 }
 
 verify_wsl() {
     if [[ "$OS" != "wsl" ]]; then skip_check "WSL section not applicable on $OS"; return; fi
-    if command_exists wslview; then pass "wslu installed"; else fail "wslu not installed"; fi
-    if command_exists win32yank.exe; then pass "win32yank installed"; else fail "win32yank not installed"; fi
-    if [[ -f /etc/wsl.conf ]]; then pass "/etc/wsl.conf present"; else fail "/etc/wsl.conf missing"; fi
-    if grep -q "# >>> WSL config <<<" "$HOME/.tmux.conf.local" 2>/dev/null; then pass "tmux WSL config present"; else fail "tmux WSL config not in $HOME/.tmux.conf.local"; fi
-    if grep -q "\" >>> WSL config <<<" "$HOME/.vimrc.local" 2>/dev/null; then pass "vim WSL config present"; else fail "vim WSL config not in $HOME/.vimrc.local"; fi
+    command_exists wslview              && pass "wslu installed"                                || fail "wslu not installed"
+    command_exists win32yank.exe        && pass "win32yank installed"                          || fail "win32yank not installed"
+    [[ -f /etc/wsl.conf ]]             && pass "/etc/wsl.conf present"                        || fail "/etc/wsl.conf missing"
+    grep -q "# >>> WSL config <<<" "$HOME/.tmux.conf.local" 2>/dev/null \
+                                        && pass "tmux WSL config present"                      || fail "tmux WSL config not in ~/.tmux.conf.local"
+    grep -q "\" >>> WSL config <<<" "$HOME/.vimrc.local" 2>/dev/null \
+                                        && pass "vim WSL config present"                       || fail "vim WSL config not in ~/.vimrc.local"
 }
 
 verify_python() {
     local uv_bin="${HOME}/.local/bin/uv"
-    if { command_exists uv || [[ -x "$uv_bin" ]]; }; then pass "uv installed"; else fail "uv not installed"; fi
-    if [[ -f "$HOME/.local/bin/uv-virtualenvwrapper.sh" ]]; then pass "uv-virtualenvwrapper.sh present"; else fail "uv-virtualenvwrapper.sh missing"; fi
+    { command_exists uv || [[ -x "$uv_bin" ]]; } \
+                                        && pass "uv installed"                                 || fail "uv not installed"
+    [[ -f "$HOME/.local/bin/uv-virtualenvwrapper.sh" ]] \
+                                        && pass "uv-virtualenvwrapper.sh present"              || fail "uv-virtualenvwrapper.sh missing"
     local venv="${WORKON_HOME:-$HOME/.venvs}/base"
-    if [[ -d "$venv" ]]; then pass "base virtualenv exists"; else fail "base virtualenv missing ($venv)"; return; fi
-    if [[ -x "$venv/bin/python" ]]; then pass "base venv python executable"; else fail "base venv python not executable"; fi
+    [[ -d "$venv" ]]                   && pass "base virtualenv exists"                        || { fail "base virtualenv missing ($venv)"; return; }
+    [[ -x "$venv/bin/python" ]]        && pass "base venv python executable"                  || fail "base venv python not executable"
     local uv_bin="${HOME}/.local/bin/uv"
     local pkg
     for pkg in requests boto3 kubernetes rich ipython weasyprint cryptography prometheus_client paramiko; do
-        if "$uv_bin" pip show "$pkg" --python "$venv/bin/python" &>/dev/null; then pass "package: $pkg"; else fail "package missing: $pkg"; fi
+        "$uv_bin" pip show "$pkg" --python "$venv/bin/python" &>/dev/null \
+                                        && pass "package: $pkg"                                || fail "package missing: $pkg"
     done
 }
 
 verify_copilot() {
-    if command_exists copilot; then pass "Copilot CLI installed"; else fail "Copilot CLI not installed"; fi
-    if [[ -f "$HOME/.copilot/copilot-instructions.md" ]]; then pass "Copilot instructions written"; else fail "Copilot instructions missing"; fi
+    command_exists copilot              && pass "Copilot CLI installed"                        || fail "Copilot CLI not installed"
+    [[ -f "$HOME/.copilot/copilot-instructions.md" ]] \
+                                        && pass "Copilot instructions written"                 || fail "Copilot instructions missing"
+}
+
+verify_chatgpt() {
+    command_exists npm                  && pass "npm installed"                                || fail "npm not installed"
+    command_exists codex                && pass "OpenAI Codex CLI installed"                   || fail "OpenAI Codex CLI not installed"
+    if command_exists codex; then
+        codex --version &>/dev/null     && pass "codex --version works"                        || fail "codex --version failed"
+    fi
+}
+
+verify_shellgpt() {
+    local uv_bin="${HOME}/.local/bin/uv"
+    local sgpt_bin="${HOME}/.local/bin/sgpt"
+
+    { command_exists uv || [[ -x "$uv_bin" ]]; } \
+                                        && pass "uv installed"                                 || fail "uv not installed"
+    { command_exists sgpt || [[ -x "$sgpt_bin" ]]; } \
+                                        && pass "ShellGPT installed"                           || fail "ShellGPT not installed"
+    grep -q "# >>> dotfiles local bin <<<" "$HOME/.profile" 2>/dev/null \
+                                        && pass "~/.profile local bin hook present"            || fail "~/.profile local bin hook missing"
+    grep -q "# >>> dotfiles local bin <<<" "$HOME/.zprofile" 2>/dev/null \
+                                        && pass "~/.zprofile local bin hook present"           || fail "~/.zprofile local bin hook missing"
+    { "$uv_bin" tool list 2>/dev/null || uv tool list 2>/dev/null; } | grep -q '^shell-gpt ' \
+                                        && pass "uv tool list includes shell-gpt"              || fail "shell-gpt not registered as a uv tool"
 }
 
 # -- Main ----------------------------------------------------------------------
@@ -1203,12 +1263,8 @@ elif [[ "$CHECK_ONLY" == "true" ]]; then
 fi
 log "Sections:$(for s in "${ALL_SECTIONS[@]}"; do [[ "${RUN[$s]}" == "true" ]] && printf ' %s' "$s"; done)"
 
-if should_run packages; then
-    if [[ "$CHECK_ONLY" == "true" ]]; then verify_packages; else section_packages; fi
-fi
-if should_run gnubin; then
-    if [[ "$CHECK_ONLY" == "true" ]]; then verify_gnubin; else section_gnubin; fi
-fi
+should_run packages && { [[ "$CHECK_ONLY" == "true" ]] && verify_packages || section_packages; }
+should_run gnubin   && { [[ "$CHECK_ONLY" == "true" ]] && verify_gnubin   || section_gnubin;   }
 
 # On macOS, prepend all Homebrew GNU tool paths into PATH for this session so
 # that gnu-sed (and friends) are used in subsequent sections rather than BSD tools.
@@ -1222,30 +1278,16 @@ if [[ "$OS" == "macos" ]] && [[ "$CHECK_ONLY" != "true" ]] && command_exists bre
     unset _brew_prefix _gnu_dir
 fi
 
-if should_run fonts; then
-    if [[ "$CHECK_ONLY" == "true" ]]; then verify_fonts; else section_fonts; fi
-fi
-if should_run tmux; then
-    if [[ "$CHECK_ONLY" == "true" ]]; then verify_tmux; else section_tmux; fi
-fi
-if should_run zsh; then
-    if [[ "$CHECK_ONLY" == "true" ]]; then verify_zsh; else section_zsh; fi
-fi
-if should_run vim; then
-    if [[ "$CHECK_ONLY" == "true" ]]; then verify_vim; else section_vim; fi
-fi
-if should_run alacritty; then
-    if [[ "$CHECK_ONLY" == "true" ]]; then verify_alacritty; else section_alacritty; fi
-fi
-if should_run wsl; then
-    if [[ "$CHECK_ONLY" == "true" ]]; then verify_wsl; else section_wsl; fi
-fi
-if should_run python; then
-    if [[ "$CHECK_ONLY" == "true" ]]; then verify_python; else section_python; fi
-fi
-if should_run copilot; then
-    if [[ "$CHECK_ONLY" == "true" ]]; then verify_copilot; else section_copilot; fi
-fi
+should_run fonts     && { [[ "$CHECK_ONLY" == "true" ]] && verify_fonts     || section_fonts;     }
+should_run tmux      && { [[ "$CHECK_ONLY" == "true" ]] && verify_tmux      || section_tmux;      }
+should_run zsh       && { [[ "$CHECK_ONLY" == "true" ]] && verify_zsh       || section_zsh;       }
+should_run vim       && { [[ "$CHECK_ONLY" == "true" ]] && verify_vim       || section_vim;       }
+should_run alacritty && { [[ "$CHECK_ONLY" == "true" ]] && verify_alacritty || section_alacritty; }
+should_run wsl       && { [[ "$CHECK_ONLY" == "true" ]] && verify_wsl       || section_wsl;       }
+should_run python    && { [[ "$CHECK_ONLY" == "true" ]] && verify_python    || section_python;    }
+should_run copilot   && { [[ "$CHECK_ONLY" == "true" ]] && verify_copilot   || section_copilot;   }
+should_run chatgpt   && { [[ "$CHECK_ONLY" == "true" ]] && verify_chatgpt   || section_chatgpt;   }
+should_run shellgpt  && { [[ "$CHECK_ONLY" == "true" ]] && verify_shellgpt  || section_shellgpt;  }
 
 if [[ "$CHECK_ONLY" == "true" ]]; then
     if [[ "$_check_failed" == "true" ]]; then

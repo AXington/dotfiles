@@ -27,7 +27,7 @@ background = "0x000000"
 foreground = "0xffffff"
 
 [cursor]
-style = {shape = "Block"}
+style = "Block"
 unfocused_hollow = true
 
 [font]

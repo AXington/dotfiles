@@ -1,82 +1,38 @@
-# dotfiles -- Copilot Instructions
+# Copilot Instructions
 
-## Purpose
-Personal developer environment bootstrap repo. Manages shell config, terminal
-emulator settings, tmux, Vim, editor configs, and package lists across macOS,
-Ubuntu/Debian, Arch Linux, RHEL/Fedora, and WSL2 (Windows 11).
+## Commands
 
-These instructions add context specific to this repository. They work within
-and enhance the rules defined in the global Copilot instructions
-(~/.copilot/copilot-instructions.md). They do not override any global rule.
-
-## Languages & Tools
-- Bash (primary): `setup.sh`, `scripts/*.sh`
-- PowerShell: `scripts/setup_wsl_alacritty.ps1` (Windows WSL2 bootstrap; Windows only)
-- Python: `scripts/strip_proofpoint_url`, `scripts/clean_python_cache`
-- Config formats: TOML (Alacritty), JSON (VSCode), XML (JetBrains color scheme)
-
-## Directory Structure
-```
-dotfiles/
-|-- setup.sh                          # Main OS-aware bootstrap entry point
-|-- scripts/
-|   |-- setup_wsl_alacritty.ps1      # Windows 11 WSL2 + Alacritty bootstrap
-|   |-- setup_tmux_remote_vm.sh      # Deploy tmux config to remote VM
-|   |-- update_eks_kube_config        # Auto-configure all EKS cluster kubeconfigs
-|   |-- strip_proofpoint_url          # Decode Proofpoint URL defense links
-|   |-- clean_python_cache            # Remove __pycache__ directories
-|   `-- add_disk.sh                   # Format disk and update /etc/fstab
-|-- terminal_configs/                 # alacritty.toml, iTerm2 colors, Windows Terminal
-|-- idea_ides/                        # PyCharm/IntelliJ exported settings + Superdark theme
-|-- vscode/                           # vscode_settings.json
-|-- brew_packages.txt                 # macOS packages
-|-- apt-packages.txt                  # Ubuntu/Debian packages
-|-- dnf-packages.txt                  # RHEL/Fedora packages
-|-- pacman-packages.txt               # Arch Linux packages
-`-- wslconfig.template                # WSL2 memory/CPU tuning template
-```
-
-## Key Commands
 ```bash
-./setup.sh                                        # Bootstrap current OS
-./setup.sh --only copilot                         # Install and configure Copilot CLI only
-./setup.sh --only copilot --work                  # Include work-context Copilot instructions
-./scripts/setup_tmux_remote_vm.sh <HOST> <USER>  # Deploy tmux config to remote VM
-./scripts/update_eks_kube_config                  # Auto-configure all EKS cluster kubeconfigs
-./scripts/strip_proofpoint_url                    # Decode Proofpoint URL defense links
-./scripts/add_disk.sh [DEVICE]                    # Format disk and update /etc/fstab
+./setup.sh
+./setup.sh --skip alacritty
+./setup.sh --copilot
+./setup.sh --chatgpt
+./setup.sh --shellgpt
+./setup.sh --all
+./setup.sh --only zsh vim
+./setup.sh --only chatgpt
+./setup.sh --only shellgpt
+./setup.sh --skip packages fonts
+./setup.sh --dry-run --only tmux
+./setup.sh --verify
+./setup.sh --verify --only zsh
+powershell -ExecutionPolicy Bypass -File .\scripts\setup_wsl_alacritty.ps1
 ```
 
-## What `setup.sh` Manages
-- Homebrew + packages (macOS), apt/dpkg (Ubuntu/Debian), dnf/yum (RHEL/Fedora),
-  or pacman (Arch)
-- `~/.gnubin` PATH prepend for GNU tools on macOS
-- gpakosz/.tmux framework + `.tmux.conf.local` customizations:
-  - Prefix: `C-a`, mouse enabled, OS clipboard copy on
-  - Separators disabled; bindings: `a`=last-window, `n`=next-window
-- AXington/.vim cloned on `heavenly` branch with submodule init
-- `.zshrc` customization block (appended between markers, never overwrites existing content)
-- GitHub Copilot CLI install + global instructions bootstrap (skips if file already present)
+`setup.sh` is the primary entrypoint. The supported section names are `packages`, `gnubin`, `fonts`, `tmux`, `zsh`, `vim`, `alacritty`, `wsl`, `python`, `copilot`, `chatgpt`, and `shellgpt`. Use `./setup.sh --verify --only <section>` as the closest equivalent to a single test for one area.
 
-## Conventions
-- Script naming: `snake_case` (no extension for executables, `.sh` for utility scripts)
-- Shebang: `#!/usr/bin/env bash`
-- OS detection: `$OSTYPE` (`darwin*`, `linux-gnu`, `linux-musl`) with WSL detection
-  via `/proc/version`
-- All scripts are idempotent. Operations are safe to re-run without side effects.
-- All scripts handle errors explicitly and fail loudly.
-- All scripts in `scripts/` run standalone. None are sourced.
-- Font: Meslo LG M for Powerline across all terminal emulators.
-- PowerShell scripts must be saved with a UTF-8 BOM (EF BB BF). All other files
-  use UTF-8 without BOM.
+## High-level architecture
 
-## Platform Notes
-- macOS: Homebrew, iTerm2 colors, `~/.gnubin` symlinks. No Windows or Linux-only tooling.
-- Linux (all distros): apt, dnf, or pacman depending on distro. No Homebrew or Windows tooling.
-- WSL2: Linux setup applies. `wslconfig.template` governs VM resource limits.
-- Windows: only `scripts/setup_wsl_alacritty.ps1` is Windows-native. Do not apply
-  Windows-specific configs or tooling to macOS or Linux contexts.
+- `setup.sh` contains almost all repository behavior. It detects the current OS/distro, enables or disables sections by default, then runs either `section_*` functions or `verify_*` functions for the selected sections.
+- The package lists (`brew_packages.txt`, `apt-packages.txt`, `dnf-packages.txt`, `pacman-packages.txt`) are data inputs for the `packages` section; the script chooses the matching file based on the detected platform.
+- Most tracked files are source artifacts consumed by `setup.sh`: `terminal_configs/` for terminal appearance, `vscode/` and `idea_ides/` for editor exports, and `wslconfig.template` plus `terminal_configs/windows-terminal-settings.json` for Windows-side WSL setup.
+- `scripts/` contains standalone utilities for adjacent machine-setup tasks (`setup_wsl_alacritty.ps1` and small helper scripts). They are part of the repo's tooling surface, but the main bootstrap flow is still `setup.sh`.
 
-## No CI/CD or Tests
-No automated testing. Validation is through OS detection and package manager checks.
-Run `./setup.sh --verify` to check machine state.
+## Key conventions
+
+- Treat the repo as a section-based, idempotent bootstrap system. If a change belongs to an existing concern, extend the matching `section_*` and `verify_*` functions instead of adding a parallel setup path.
+- Preserve the platform defaults defined near the top of `setup.sh`: `copilot`, `chatgpt`, and `shellgpt` are opt-in; `gnubin` is macOS-only by default; `wsl` is enabled only when running inside WSL.
+- Do not overwrite whole user config files when changing bootstrap behavior. The script intentionally appends guarded blocks to `~/.zshrc`, `~/.tmux.conf.local`, and `~/.vimrc.local`, and the verify mode checks for those markers.
+- Keep the "shared vs machine-local" split intact. Shared repo artifacts such as `terminal_configs/alacritty.toml` are symlinked into place, while machine-local files such as `~/.vimrc.local` are copied and then patched.
+- Keep terminal appearance changes synchronized across `terminal_configs/alacritty.toml` and `terminal_configs/windows-terminal-settings.json`; the repo treats those as matching Linux/macOS and Windows variants of the same theme/font setup.
+- When changing clone/install behavior for external dependencies, the repo prefers GitHub SSH remotes (`git@github.com:...`) for cloned dotfile dependencies like `.vim`, `.tmux`, Powerline fonts, and zsh plugins.

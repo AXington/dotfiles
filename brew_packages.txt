@@ -1,7 +1,6 @@
 bash
 coreutils
 findutils
-flake8
 gawk
 gcc
 gettext
@@ -19,7 +18,6 @@ macvim
 pkg-config
 readline
 reattach-to-user-namespace
-shellcheck
 tmux
 tree
 unrar
