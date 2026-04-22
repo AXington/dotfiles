@@ -1,3 +1,4 @@
+auto-cpufreq
 curl
 git
 gcc

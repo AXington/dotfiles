@@ -70,7 +70,7 @@ OS="$(detect_os)"
 
 # -- Argument parsing ----------------------------------------------------------
 
-ALL_SECTIONS=(packages gnubin fonts tmux zsh vim alacritty wsl python keyd copilot chatgpt shellgpt)
+ALL_SECTIONS=(packages gnubin fonts tmux zsh vim alacritty wsl python keyd auto_cpufreq copilot chatgpt shellgpt)
 declare -A RUN
 for s in "${ALL_SECTIONS[@]}"; do RUN[$s]=true; done
 RUN[copilot]=false                                    # opt-in; use --copilot or --all
@@ -78,7 +78,8 @@ RUN[chatgpt]=false                                    # opt-in; use --chatgpt or
 RUN[shellgpt]=false                                   # opt-in; use --shellgpt or --all
 if [[ "$OS" == "macos" ]]; then RUN[gnubin]=true; else RUN[gnubin]=false; fi  # macOS-only
 if [[ "$OS" == "wsl"   ]]; then RUN[wsl]=true;   else RUN[wsl]=false;   fi   # WSL-only
-if [[ "$OS" != "linux" ]]; then RUN[keyd]=false;  fi                          # Linux-only (key remap daemon)
+if [[ "$OS" != "linux" ]]; then RUN[keyd]=false;        fi  # Linux-only (key remap daemon)
+if [[ "$OS" != "linux" ]] || [[ "$OS" == "wsl" ]]; then RUN[auto_cpufreq]=false; fi  # Linux bare-metal only
 if [[ "$(detect_linux_distro 2>/dev/null)" == "arch" ]]; then RUN[fonts]=false; fi  # Arch: fonts managed via pacman
 
 usage() {
@@ -964,7 +965,35 @@ section_keyd() {
     ok "keyd active. Re-login for group membership to take effect."
 }
 
-# -- 11. GitHub Copilot CLI ----------------------------------------------------
+# -- 11. auto-cpufreq (load-based CPU frequency scaling) -----------------------
+
+section_auto_cpufreq() {
+    if [[ "$OS" != "linux" ]] || [[ "$OS" == "wsl" ]]; then
+        log "auto-cpufreq: skipping (bare-metal Linux only)"
+        return 0
+    fi
+    log "Setting up auto-cpufreq..."
+
+    if ! command_exists auto-cpufreq; then
+        case "$(detect_linux_distro)" in
+            arch)   run sudo pacman -S --noconfirm auto-cpufreq ;;
+            debian) run sudo apt-get install -y auto-cpufreq ;;
+            *)      warn "Unknown distro — install auto-cpufreq manually." ; return 0 ;;
+        esac
+    else
+        ok "auto-cpufreq already installed."
+    fi
+
+    run sudo systemctl enable --now auto-cpufreq
+    ok "auto-cpufreq active — CPU frequency scales automatically with load."
+}
+
+verify_auto_cpufreq() {
+    check_cmd auto-cpufreq
+    check "auto-cpufreq service active" "systemctl is-active --quiet auto-cpufreq"
+}
+
+# -- 12. GitHub Copilot CLI ----------------------------------------------------
 
 section_copilot() {
     log "Setting up GitHub Copilot CLI..."
@@ -1245,6 +1274,13 @@ verify_keyd() {
                                        && pass "user in keyd group"                             || fail "user not in keyd group (re-login required)"
 }
 
+verify_auto_cpufreq() {
+    if [[ "$OS" != "linux" ]] || [[ "$OS" == "wsl" ]]; then skip_check "auto-cpufreq section not applicable on $OS"; return; fi
+    command_exists auto-cpufreq           && pass "auto-cpufreq installed"                       || fail "auto-cpufreq not installed"
+    systemctl is-active --quiet auto-cpufreq \
+                                          && pass "auto-cpufreq service active"                  || fail "auto-cpufreq service not active"
+}
+
 verify_wsl() {
     if [[ "$OS" != "wsl" ]]; then skip_check "WSL section not applicable on $OS"; return; fi
     command_exists wslview              && pass "wslu installed"                                || fail "wslu not installed"
@@ -1335,7 +1371,8 @@ should_run vim       && { [[ "$CHECK_ONLY" == "true" ]] && verify_vim       || s
 should_run alacritty && { [[ "$CHECK_ONLY" == "true" ]] && verify_alacritty || section_alacritty; }
 should_run wsl       && { [[ "$CHECK_ONLY" == "true" ]] && verify_wsl       || section_wsl;       }
 should_run python    && { [[ "$CHECK_ONLY" == "true" ]] && verify_python    || section_python;    }
-should_run keyd      && { [[ "$CHECK_ONLY" == "true" ]] && verify_keyd      || section_keyd;      }
+should_run keyd        && { [[ "$CHECK_ONLY" == "true" ]] && verify_keyd        || section_keyd;        }
+should_run auto_cpufreq && { [[ "$CHECK_ONLY" == "true" ]] && verify_auto_cpufreq || section_auto_cpufreq; }
 should_run copilot   && { [[ "$CHECK_ONLY" == "true" ]] && verify_copilot   || section_copilot;   }
 should_run chatgpt   && { [[ "$CHECK_ONLY" == "true" ]] && verify_chatgpt   || section_chatgpt;   }
 should_run shellgpt  && { [[ "$CHECK_ONLY" == "true" ]] && verify_shellgpt  || section_shellgpt;  }
