@@ -28,13 +28,14 @@ and `copilot`, `chatgpt`, plus `shellgpt` are opt-in.
 |---------|----------------|
 | `packages` | Homebrew (macOS), apt, dnf/yum, or pacman packages from the relevant package list |
 | `gnubin` | *(macOS only)* Symlinks all GNU tool binaries into `~/.gnubin` so they shadow BSD tools |
-| `fonts` | Powerline fonts cloned and installed |
+| `fonts` | Powerline fonts cloned and installed *(skipped on Arch — fonts managed via pacman)* |
 | `tmux` | [gpakosz/.tmux](https://github.com/gpakosz/.tmux) framework, symlinked config, customisations applied to `~/.tmux.conf.local` |
 | `zsh` | Oh My Zsh (non-interactive install), zsh-syntax-highlighting plugin, agnoster theme, dotfiles customisation block appended to `~/.zshrc` |
 | `vim` | [AXington/.vim](https://github.com/AXington/.vim) on the `Divine` branch, submodules initialised, `.vimrc` symlinked; `.vimrc.local` copied (not symlinked — it's machine-specific and patched by the WSL section) |
 | `alacritty` | Alacritty terminal installed, config symlinked from `terminal_configs/alacritty.toml`, man page, terminfo, and zsh completions set up |
 | `wsl` | *(WSL2 only)* `wslu`, `win32yank.exe`, `/etc/wsl.conf`, clipboard + true-color patches to `~/.tmux.conf.local` and `~/.vimrc.local` |
 | `python` | `uv`, `uv-virtualenvwrapper`, a base virtualenv at `~/.venvs/base`, and a preinstalled package set for local scripting/research |
+| `keyd` | *(Linux only)* Installs and enables [keyd](https://github.com/rvaiya/keyd); deploys `configs/keyd.conf` which remaps Meta+C/V/X/Z/A to Ctrl equivalents system-wide for Mac-like muscle memory |
 | `copilot` | *(opt-in)* GitHub Copilot CLI installed, global instructions bootstrapped to `~/.copilot/copilot-instructions.md` |
 | `chatgpt` | *(opt-in)* Official OpenAI Codex CLI installed via npm (`codex` command, ChatGPT/API key sign-in on first run) |
 | `shellgpt` | *(opt-in)* Unofficial open-source ShellGPT installed via `uv tool install shell-gpt` (`sgpt` command, requires `OPENAI_API_KEY`) |
@@ -144,11 +145,54 @@ Copy `wslconfig.template` to `%USERPROFILE%\.wslconfig` on Windows and adjust
 
 | Script | Description |
 |--------|-------------|
-| `scripts/add_disk.sh [device]` | Partition, format (ext4), mount at `/data`, and add to `/etc/fstab`. Idempotent. Requires root. |
 | `scripts/setup_tmux_remote_vm.sh <host> <user>` | SCP `~/.tmux.conf.local` to a remote host and clone the gpakosz/.tmux framework there |
-| `scripts/update_eks_kube_config` | Auto-update kubeconfig for all EKS clusters in the current AWS account/region |
-| `scripts/strip_proofpoint_url` | Decode Proofpoint URL Defense links (v1/v2/v3) back to the original URL |
 | `scripts/clean_python_cache` | Recursively remove `.pyc` files and `__pycache__` directories from the current directory |
+
+## KDE Plasma (Linux)
+
+### Mac-like Key Shortcuts
+
+The `keyd` section installs a system-level key remapping daemon. `configs/keyd.conf`
+maps Meta (Super/Windows key, the Linux equivalent of ⌘) as follows:
+
+| Shortcut | Action |
+|----------|--------|
+| `Meta+C` | Copy |
+| `Meta+V` | Paste |
+| `Meta+X` | Cut |
+| `Meta+Z` | Undo |
+| `Meta+A` | Select all |
+
+All other Meta+key combinations (Meta alone, Meta+Space, Meta+Tab, Meta+D, etc.)
+pass through unchanged so KDE system shortcuts continue to work.
+
+> **After first install:** log out and back in for the `keyd` group membership
+> to take effect.
+
+### Virtual Desktops / Spaces
+
+[MACsimize6](https://github.com/Ubiquitine/MACsimize6) is installed as a KWin
+script. Fullscreening or maximising a window automatically moves it to its own
+dedicated virtual desktop (macOS Spaces behaviour); restoring the window returns
+it to the main desktop and removes the temporary one.
+
+Desktop switching shortcuts:
+
+| Shortcut | Action |
+|----------|--------|
+| `Meta+Ctrl+←` / `→` | Switch to adjacent desktop |
+| `Ctrl+F1` / `F2` / `F3` / `F4` | Jump directly to desktop 1–4 |
+| `Meta+W` | Overview — all windows and desktops (like Mission Control) |
+| `Meta+F9` / `Ctrl+F9` | Exposé — windows on current desktop |
+| `Meta+F10` / `Ctrl+F10` | Exposé — windows across all desktops |
+
+### Per-Monitor Desktops (Plasma 6.7+)
+
+KDE Plasma 6.7 (scheduled June 2026) adds **independent virtual desktops per
+monitor** — each display can show a different desktop simultaneously, matching
+macOS Spaces behaviour across multiple screens. The feature is Wayland-only
+(no X11 support). Once Plasma 6.7 is available via pacman on CachyOS, enable it
+in **System Settings → Display & Monitor → Virtual Desktops → Per-screen virtual desktops**.
 
 ## GitHub Copilot CLI
 
