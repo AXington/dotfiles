@@ -37,8 +37,8 @@ foreach ($var in @('APPDATA', 'USERPROFILE', 'TEMP')) {
 }
 
 # -- Constants -----------------------------------------------------------------
-$DOTFILES_REPO      = 'https://github.com/AXington/dotfiles.git'
-$DOTFILES_RAW       = 'https://raw.githubusercontent.com/AXington/dotfiles/master'
+$DOTFILES_REPO      = 'https://github.com/alistardust/dotfiles.git'
+$DOTFILES_RAW       = 'https://raw.githubusercontent.com/alistardust/dotfiles/master'
 $ALACRITTY_CFG_DIR  = "$env:APPDATA\alacritty"
 $ALACRITTY_TOML     = "$ALACRITTY_CFG_DIR\alacritty.toml"
 $WSLCONFIG_PATH     = "$env:USERPROFILE\.wslconfig"
@@ -287,7 +287,7 @@ if ($wslReady -eq 'ready') {
         if ($LASTEXITCODE -eq 0) {
             Write-Ok 'Dotfiles cloned to ~/dotfiles in WSL'
         } else {
-            Write-Warn 'git clone failed -- clone manually inside WSL: git clone https://github.com/AXington/dotfiles.git ~/dotfiles'
+            Write-Warn 'git clone failed -- clone manually inside WSL: git clone https://github.com/alistardust/dotfiles.git ~/dotfiles'
         }
     } else {
         Write-Ok 'Dotfiles already present in WSL'
