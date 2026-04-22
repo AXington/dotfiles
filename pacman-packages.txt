@@ -4,6 +4,7 @@ gcc
 gettext
 htop
 jq
+keyd
 libffi
 make
 openssh

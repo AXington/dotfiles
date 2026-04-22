@@ -38,6 +38,9 @@ builtin_box_drawing = true
 [general]
 live_config_reload = true
 
+[selection]
+save_to_clipboard = true
+
 [window]
 padding = {x = 5, y = 5}
 dynamic_padding = true

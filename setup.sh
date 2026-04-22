@@ -12,7 +12,7 @@ set -euo pipefail
 #   ./setup.sh --chatgpt                     # include OpenAI Codex CLI in the standard run
 #   ./setup.sh --shellgpt                    # include ShellGPT in the standard run
 #
-# Sections: packages gnubin fonts tmux zsh vim alacritty wsl python copilot chatgpt shellgpt
+# Sections: packages gnubin fonts tmux zsh vim alacritty wsl python keyd copilot chatgpt shellgpt
 
 # -- Helpers -------------------------------------------------------------------
 
@@ -70,7 +70,7 @@ OS="$(detect_os)"
 
 # -- Argument parsing ----------------------------------------------------------
 
-ALL_SECTIONS=(packages gnubin fonts tmux zsh vim alacritty wsl python copilot chatgpt shellgpt)
+ALL_SECTIONS=(packages gnubin fonts tmux zsh vim alacritty wsl python keyd copilot chatgpt shellgpt)
 declare -A RUN
 for s in "${ALL_SECTIONS[@]}"; do RUN[$s]=true; done
 RUN[copilot]=false                                    # opt-in; use --copilot or --all
@@ -78,6 +78,7 @@ RUN[chatgpt]=false                                    # opt-in; use --chatgpt or
 RUN[shellgpt]=false                                   # opt-in; use --shellgpt or --all
 if [[ "$OS" == "macos" ]]; then RUN[gnubin]=true; else RUN[gnubin]=false; fi  # macOS-only
 if [[ "$OS" == "wsl"   ]]; then RUN[wsl]=true;   else RUN[wsl]=false;   fi   # WSL-only
+if [[ "$OS" != "linux" ]]; then RUN[keyd]=false;  fi                          # Linux-only (key remap daemon)
 if [[ "$(detect_linux_distro 2>/dev/null)" == "arch" ]]; then RUN[fonts]=false; fi  # Arch: fonts managed via pacman
 
 usage() {
@@ -925,7 +926,45 @@ section_python() {
     ok "Python base virtualenv configured."
 }
 
-# -- 10. GitHub Copilot CLI ----------------------------------------------------
+# -- 10. keyd (Linux key-remapping daemon) -------------------------------------
+
+section_keyd() {
+    if [[ "$OS" != "linux" ]]; then
+        log "keyd: skipping (Linux only)"
+        return 0
+    fi
+    log "Setting up keyd (Mac-like key remapping)..."
+
+    if ! command_exists keyd; then
+        case "$(detect_linux_distro)" in
+            arch)   run sudo pacman -S --noconfirm keyd ;;
+            debian) run sudo apt-get install -y keyd ;;
+            rhel*)  warn "keyd not in default RHEL repos — install manually." ; return 0 ;;
+            *)      warn "Unknown distro — install keyd manually." ; return 0 ;;
+        esac
+    else
+        ok "keyd already installed."
+    fi
+
+    # Deploy config (needs root — copy rather than symlink so keyd's root daemon can read it)
+    local src="${SCRIPT_DIR}/configs/keyd.conf"
+    local dst="/etc/keyd/default.conf"
+    if [[ ! -f "$src" ]]; then
+        warn "configs/keyd.conf not found in dotfiles — skipping keyd config deploy"
+    elif ! diff -q "$src" "$dst" &>/dev/null; then
+        run sudo mkdir -p /etc/keyd
+        run sudo cp "$src" "$dst"
+        ok "keyd config deployed."
+    else
+        ok "keyd config already up to date."
+    fi
+
+    run sudo systemctl enable --now keyd
+    run sudo usermod -aG keyd "$(whoami)"
+    ok "keyd active. Re-login for group membership to take effect."
+}
+
+# -- 11. GitHub Copilot CLI ----------------------------------------------------
 
 section_copilot() {
     log "Setting up GitHub Copilot CLI..."
@@ -1000,7 +1039,7 @@ INSTRUCTIONS
     log "To authenticate, run: copilot /login"
 }
 
-# -- 11. OpenAI Codex CLI (ChatGPT CLI) ---------------------------------------
+# -- 12. OpenAI Codex CLI (ChatGPT CLI) ---------------------------------------
 
 ensure_npm() {
     if command_exists npm; then
@@ -1092,7 +1131,7 @@ section_chatgpt() {
     log "To authenticate, run: codex"
 }
 
-# -- 12. ShellGPT (unofficial open-source ChatGPT CLI) ------------------------
+# -- 13. ShellGPT (unofficial open-source ChatGPT CLI) ------------------------
 
 section_shellgpt() {
     log "Setting up ShellGPT (unofficial chat-focused CLI)..."
@@ -1195,6 +1234,17 @@ verify_alacritty() {
                                         && pass "alacritty.toml points to dotfiles"            || fail "alacritty.toml symlink target unexpected: $target"
 }
 
+verify_keyd() {
+    if [[ "$OS" != "linux" ]]; then skip_check "keyd section not applicable on $OS"; return; fi
+    command_exists keyd                && pass "keyd installed"                                 || fail "keyd not installed"
+    [[ -f /etc/keyd/default.conf ]]   && pass "/etc/keyd/default.conf present"                 || fail "/etc/keyd/default.conf missing"
+    grep -q '\[meta\]' /etc/keyd/default.conf 2>/dev/null \
+                                       && pass "keyd meta layer configured"                     || fail "keyd [meta] layer not found in config"
+    systemctl is-active --quiet keyd  && pass "keyd service active"                            || fail "keyd service not active"
+    id -nG 2>/dev/null | grep -qw keyd \
+                                       && pass "user in keyd group"                             || fail "user not in keyd group (re-login required)"
+}
+
 verify_wsl() {
     if [[ "$OS" != "wsl" ]]; then skip_check "WSL section not applicable on $OS"; return; fi
     command_exists wslview              && pass "wslu installed"                                || fail "wslu not installed"
@@ -1285,6 +1335,7 @@ should_run vim       && { [[ "$CHECK_ONLY" == "true" ]] && verify_vim       || s
 should_run alacritty && { [[ "$CHECK_ONLY" == "true" ]] && verify_alacritty || section_alacritty; }
 should_run wsl       && { [[ "$CHECK_ONLY" == "true" ]] && verify_wsl       || section_wsl;       }
 should_run python    && { [[ "$CHECK_ONLY" == "true" ]] && verify_python    || section_python;    }
+should_run keyd      && { [[ "$CHECK_ONLY" == "true" ]] && verify_keyd      || section_keyd;      }
 should_run copilot   && { [[ "$CHECK_ONLY" == "true" ]] && verify_copilot   || section_copilot;   }
 should_run chatgpt   && { [[ "$CHECK_ONLY" == "true" ]] && verify_chatgpt   || section_chatgpt;   }
 should_run shellgpt  && { [[ "$CHECK_ONLY" == "true" ]] && verify_shellgpt  || section_shellgpt;  }
