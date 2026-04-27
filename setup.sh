@@ -1193,6 +1193,32 @@ Input validation: validate at every external boundary (API, CLI, queue). Whiteli
 
 ---
 
+## Explicit Approval
+
+When a task requires user approval, the assistant must ask directly and wait for an unambiguous affirmative confirmation before acting.
+
+Valid approval includes clear affirmative confirmations such as:
+- `Yes`
+- `Approve`
+- `Approved`
+- `Affirmative`
+- `Confirmed`
+
+The following do not count as approval:
+- `Go ahead`
+- `Go ahead and do this`
+- `Proceed`
+- `Sounds good`
+- implied intent
+- contextual inference
+- language that could reasonably be interpreted in more than one way
+
+If approval is required and has not been given, the assistant may prepare work, explain the next step, or show a proposed patch, but must not apply the change.
+
+Review and approval requests must be presented one at a time. Each approval request must contain one complete logical change set. Do not split a coherent edit into smaller fragments solely to reduce size, and do not combine unrelated edits into one request.
+
+---
+
 ## AI Instruction File Best Practices
 
 - Put hard constraints (security, never-do-this) **first** — they must be seen before context limits cut in.
@@ -1205,6 +1231,19 @@ Input validation: validate at every external boundary (API, CLI, queue). Whiteli
 INSTRUCTIONS
         fi
         ok "Global instructions written to ${instructions_file}."
+    fi
+
+    local settings_file="${instructions_dir}/settings.json"
+    if [[ -f "$settings_file" ]]; then
+        ok "Copilot settings already exist at ${settings_file}."
+    else
+        log "Writing Copilot settings..."
+        if [[ "$DRY_RUN" == "true" ]]; then
+            printf '\e[2;37m  [dry] write Copilot settings to %s\e[0m\n' "$settings_file"
+        else
+            printf '{"model": "claude-sonnet-4.6"}\n' > "$settings_file"
+        fi
+        ok "Copilot settings written to ${settings_file}."
     fi
 
     log "To authenticate, run: copilot /login"
@@ -1455,6 +1494,8 @@ verify_copilot() {
     command_exists copilot              && pass "Copilot CLI installed"                        || fail "Copilot CLI not installed"
     [[ -f "$HOME/.copilot/copilot-instructions.md" ]] \
                                         && pass "Copilot instructions written"                 || fail "Copilot instructions missing"
+    [[ -f "$HOME/.copilot/settings.json" ]] \
+                                        && pass "Copilot settings written"                     || fail "Copilot settings missing"
 }
 
 verify_chatgpt() {
