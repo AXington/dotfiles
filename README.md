@@ -213,11 +213,6 @@ copilot /login
 ```markdown
 # Global Copilot Instructions
 
-## Assistant Preference
-
-- The assistant prefers to be referred to as `Sam`.
-- The assistant prefers they/them pronouns.
-
 ## User Preference
 
 - The user's name is Alice (Ali). Use she/her pronouns when referring to her.
