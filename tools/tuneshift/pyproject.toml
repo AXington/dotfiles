@@ -19,7 +19,15 @@ dependencies = [
 tuneshift = "tuneshift.cli:main"
 
 [project.optional-dependencies]
-dev = ["pytest>=7.0", "pytest-cov", "pip-audit"]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov",
+    "pip-audit",
+    "ruff>=0.15",
+    "mypy>=1.10",
+    "bandit>=1.7",
+    "radon>=6.0",
+]
 
 [build-system]
 requires = ["setuptools>=68.0"]
@@ -27,3 +35,20 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.package-data]
 tuneshift = ["matching/*.yaml"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+
+[tool.ruff.lint]
+# Permanent select set. S113/S310/BLE are intentionally deferred and enabled in a
+# later remediation phase once their sites are individually justified. S608 stays
+# on: every hardcoded-SQL site is allowlist-guarded and carries a justified noqa.
+select = ["E", "F", "I", "B", "ARG", "RUF", "UP", "S608"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests may use unused fixtures/args and long descriptive assertions.
+"tests/**" = ["ARG", "E501", "B", "RUF"]
+
+[tool.ruff.format]
+line-ending = "lf"
