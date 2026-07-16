@@ -401,6 +401,7 @@ def _greedy_build(
     narrative_mode: str,
     context_window: int,
     penalty_overrides: dict[str, float] | None,
+    rng: random.Random,
     intent: "PlaylistIntent | None" = None,
 ) -> list[TrackMetadata]:
     """Build sequence using greedy nearest-neighbor with bold jumps and block insertion."""  # noqa: E501
@@ -458,11 +459,11 @@ def _greedy_build(
             use_bold_jumps
             and not protect_region
             and bold_jump_cooldown == 0
-            and random.random() < bold_jump_chance
+            and rng.random() < bold_jump_chance
             and len(candidates) > 3
         ):
             bottom_start = max(1, int(len(candidates) * 0.7))
-            chosen = random.choice(candidates[bottom_start:])[1]
+            chosen = rng.choice(candidates[bottom_start:])[1]
             bold_jump_cooldown = 10
         else:
             chosen = candidates[0][1]
@@ -495,8 +496,14 @@ def optimize_sequence(
     penalty_overrides: dict[str, float] | None = None,
     pins: list | None = None,
     narrative: str | None = None,
+    seed: int | None = None,
 ) -> list[TrackMetadata]:
-    """Produce an optimized track sequence respecting pinned positions."""
+    """Produce an optimized track sequence respecting pinned positions.
+
+    ``seed`` makes the bold-jump exploration reproducible. When ``None`` a
+    fixed default (0) is used so output is deterministic by default; callers
+    that want per-playlist variation pass a stable playlist-derived seed.
+    """
     track_count = len(tracks)
     track_map = {track.track_id: track for track in tracks}
 
@@ -618,6 +625,7 @@ def optimize_sequence(
         narrative_mode,
         context_window,
         penalty_overrides,
+        random.Random(seed if seed is not None else 0),
         intent,
     )
 
@@ -675,6 +683,7 @@ def sequence_playlist(
     profile: str = "default",
     weights: dict[str, float] | None = None,
     availability_platform: str = "tidal",
+    seed: int | None = None,
 ) -> list[int]:
     """Sequence playlist tracks using the database as authoritative source.
 
@@ -743,6 +752,7 @@ def sequence_playlist(
         penalty_overrides=profile_config.penalty_overrides,
         pins=pins,
         narrative=narrative,
+        seed=seed if seed is not None else playlist_id,
     )
 
     optimized = [track.track_id for track in ordered_tracks]

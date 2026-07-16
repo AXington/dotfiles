@@ -159,7 +159,6 @@ class TestPrepareFreePool:
 
 class TestGreedyBuild:
     def test_produces_correct_length(self):
-        random.seed(42)
         tracks = [_make_track(i, energy=0.1 * i, artist=f"Artist{i}") for i in range(1, 11)]
         opener = tracks[0]
         closer = tracks[-1]
@@ -171,13 +170,13 @@ class TestGreedyBuild:
             track_count=10, weights=weights, arc="wave",
             bold_jump_chance=0.0, narrative_mode="river",
             context_window=5, penalty_overrides=None,
+            rng=random.Random(42),
         )
         assert len(result) == 10
         assert result[0] == opener
         assert result[-1] == closer
 
     def test_anchor_block_inserted_together(self):
-        random.seed(42)
         tracks = [_make_track(i, energy=0.5, artist=f"Artist{i}") for i in range(1, 8)]
         opener = tracks[0]
         closer = tracks[-1]
@@ -190,6 +189,7 @@ class TestGreedyBuild:
             track_count=7, weights=weights, arc="wave",
             bold_jump_chance=0.0, narrative_mode="river",
             context_window=5, penalty_overrides=None,
+            rng=random.Random(42),
         )
         # Block tracks should be adjacent in the result
         ids = [t.track_id for t in result]
@@ -198,7 +198,6 @@ class TestGreedyBuild:
         assert idx_4 == idx_3 + 1
 
     def test_opener_and_closer_positions_fixed(self):
-        random.seed(42)
         tracks = [_make_track(i, energy=0.1 * i) for i in range(1, 6)]
         opener = tracks[0]
         closer = tracks[-1]
@@ -210,6 +209,7 @@ class TestGreedyBuild:
             track_count=5, weights=weights, arc="wave",
             bold_jump_chance=0.0, narrative_mode="river",
             context_window=5, penalty_overrides=None,
+            rng=random.Random(42),
         )
         assert result[0].track_id == 1
         assert result[-1].track_id == 5
