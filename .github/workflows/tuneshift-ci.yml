@@ -1,0 +1,55 @@
+name: TuneShift CI
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "tools/tuneshift/**"
+      - ".github/workflows/tuneshift-ci.yml"
+  pull_request:
+    branches: [master]
+    paths:
+      - "tools/tuneshift/**"
+      - ".github/workflows/tuneshift-ci.yml"
+
+defaults:
+  run:
+    working-directory: tools/tuneshift
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install package and dev dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[dev]'
+          pip install 'ruff==0.15.17'
+
+      - name: Ruff lint
+        run: ruff check tuneshift
+
+      - name: Ruff format check
+        run: ruff format --check tuneshift
+
+      - name: Pytest
+        run: pytest -q
+
+      - name: Dependency audit (pip-audit)
+        run: pip-audit
+
+      - name: Type check (mypy)
+        continue-on-error: true
+        run: mypy tuneshift
