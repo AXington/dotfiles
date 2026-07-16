@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import json
-import urllib.request
 import urllib.parse
+import urllib.request
 from pathlib import Path
 
 from tuneshift.enrichment.retry import (
@@ -25,7 +25,7 @@ _lastfm_limiter = RateLimiter(max_per_second=1.5, adaptive=False)
 
 # Last.fm error codes that are transient (retryable)
 _LASTFM_TRANSIENT_ERRORS = {
-    8,   # Operation failed - try again
+    8,  # Operation failed - try again
     11,  # Service offline
     16,  # Temporarily unavailable
     29,  # Rate limit exceeded
@@ -35,6 +35,7 @@ _LASTFM_TRANSIENT_ERRORS = {
 def _load_api_key() -> str | None:
     """Load Last.fm API key from config file or environment."""
     import os
+
     key = os.environ.get("LASTFM_API_KEY")
     if key:
         return key
@@ -74,18 +75,27 @@ def _raw_request(url: str) -> dict:
     return data
 
 
-def _request(method: str, params: dict, *, stats: RetryStats | None = None,
-             config: RetryConfig | None = None) -> dict:
+def _request(
+    method: str,
+    params: dict,
+    *,
+    stats: RetryStats | None = None,
+    config: RetryConfig | None = None,
+) -> dict:
     """Make a rate-limited, retrying Last.fm API request."""
     api_key = _load_api_key()
     if not api_key:
-        raise ValueError("No Last.fm API key configured. Run: tuneshift config lastfm-key <key>")
+        raise ValueError(
+            "No Last.fm API key configured. Run: tuneshift config lastfm-key <key>"
+        )
 
-    params.update({
-        "method": method,
-        "api_key": api_key,
-        "format": "json",
-    })
+    params.update(
+        {
+            "method": method,
+            "api_key": api_key,
+            "format": "json",
+        }
+    )
     query = urllib.parse.urlencode(params)
     url = f"{_BASE_URL}?{query}"
 
@@ -93,19 +103,31 @@ def _request(method: str, params: dict, *, stats: RetryStats | None = None,
     return retry_api_call(_raw_request, url, config=config, stats=stats)
 
 
-def get_track_tags(title: str, artist: str, *, stats: RetryStats | None = None) -> list[str]:
+def get_track_tags(
+    title: str, artist: str, *, stats: RetryStats | None = None
+) -> list[str]:
     """Get top tags for a track from Last.fm."""
     try:
-        data = _request("track.getTopTags", {
-            "track": title,
-            "artist": artist,
-        }, stats=stats)
+        data = _request(
+            "track.getTopTags",
+            {
+                "track": title,
+                "artist": artist,
+            },
+            stats=stats,
+        )
         tags = data.get("toptags", {}).get("tag", [])
         if isinstance(tags, dict):
             tags = [tags]
         return [t["name"].lower() for t in tags[:15] if int(t.get("count", 0)) > 0]
-    except (OSError, ValueError, KeyError, json.JSONDecodeError, PermanentAPIError,
-            TransientAPIError):
+    except (
+        OSError,
+        ValueError,
+        KeyError,
+        json.JSONDecodeError,
+        PermanentAPIError,
+        TransientAPIError,
+    ):
         return []
 
 
@@ -117,8 +139,14 @@ def get_artist_tags(artist: str, *, stats: RetryStats | None = None) -> list[str
         if isinstance(tags, dict):
             tags = [tags]
         return [t["name"].lower() for t in tags[:15] if int(t.get("count", 0)) > 0]
-    except (OSError, ValueError, KeyError, json.JSONDecodeError, PermanentAPIError,
-            TransientAPIError):
+    except (
+        OSError,
+        ValueError,
+        KeyError,
+        json.JSONDecodeError,
+        PermanentAPIError,
+        TransientAPIError,
+    ):
         return []
 
 

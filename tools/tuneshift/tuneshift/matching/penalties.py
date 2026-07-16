@@ -14,6 +14,7 @@ All magic numbers live in :class:`Weights`; its defaults reproduce the current
 scorer exactly. Callers can pass a customised ``Weights`` (or per-playlist
 preferences, later) without touching this code.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
@@ -50,24 +51,24 @@ class Weights:
 
     # Title bonus tiers (ratio thresholds are exclusive/inclusive as noted).
     title_exact: int = 50
-    title_high: int = 30            # ratio > title_high_ratio
-    title_mid: int = 15             # ratio >= title_mid_ratio
+    title_high: int = 30  # ratio > title_high_ratio
+    title_mid: int = 15  # ratio >= title_mid_ratio
     title_high_ratio: float = 0.85
     title_mid_ratio: float = 0.70
 
     # Artist bonus/penalty tiers.
     artist_exact: int = 30
-    artist_high: int = 25           # ratio > artist_high_ratio
-    artist_mid: int = 15            # ratio > artist_mid_ratio
-    artist_low_penalty: int = 15    # ratio > artist_low_ratio -> -artist_low_penalty
-    artist_heavy_base: int = 30     # else -> -int(base * (1 - 2*ratio))
+    artist_high: int = 25  # ratio > artist_high_ratio
+    artist_mid: int = 15  # ratio > artist_mid_ratio
+    artist_low_penalty: int = 15  # ratio > artist_low_ratio -> -artist_low_penalty
+    artist_heavy_base: int = 30  # else -> -int(base * (1 - 2*ratio))
     artist_high_ratio: float = 0.85
     artist_mid_ratio: float = 0.70
     artist_low_ratio: float = 0.50
 
     # Album bonus tiers (only scored when a source album is present).
     album_exact: int = 20
-    album_high: int = 10            # ratio >= album_high_ratio
+    album_high: int = 10  # ratio >= album_high_ratio
     album_high_ratio: float = 0.75
 
     # ISRC exact-match bonus.
@@ -75,16 +76,16 @@ class Weights:
 
     # Duration band penalties (require a reference >= duration_ref_floor).
     duration_ref_floor: int = 60
-    duration_long_max: int = 20     # ratio > 2.0
-    duration_long_high: int = 15    # ratio > 1.6
-    duration_long_mid: int = 10     # ratio > 1.4
-    duration_short_max: int = 20    # ratio < 0.5
-    duration_short_high: int = 15   # ratio < 0.65
-    duration_short_mid: int = 10    # ratio < 0.75
+    duration_long_max: int = 20  # ratio > 2.0
+    duration_long_high: int = 15  # ratio > 1.6
+    duration_long_mid: int = 10  # ratio > 1.4
+    duration_short_max: int = 20  # ratio < 0.5
+    duration_short_high: int = 15  # ratio < 0.65
+    duration_short_mid: int = 10  # ratio < 0.75
 
     version: VersionWeights = field(default_factory=VersionWeights)
 
-    def with_overrides(self, **kwargs: object) -> "Weights":
+    def with_overrides(self, **kwargs: object) -> Weights:
         """Return a copy with the given top-level fields replaced."""
         return replace(self, **kwargs)
 
@@ -122,7 +123,9 @@ def _bonus_penalty(points: int, budget: int) -> float:
     return _clamp01(1.0 - points / budget)
 
 
-def title_signal(source_title: str, result_title: str, weights: Weights = DEFAULT_WEIGHTS) -> SignalPenalty:
+def title_signal(
+    source_title: str, result_title: str, weights: Weights = DEFAULT_WEIGHTS
+) -> SignalPenalty:
     """Score title similarity. Empty on either side yields no signal."""
     budget = weights.title_exact
     if not source_title or not result_title:
@@ -210,8 +213,10 @@ def artist_overlap_absent(
         return False
     src_tokens = set(src.split())
     res_tokens = set(res.split())
-    if src_tokens and res_tokens and (
-        src_tokens <= res_tokens or res_tokens <= src_tokens
+    if (
+        src_tokens
+        and res_tokens
+        and (src_tokens <= res_tokens or res_tokens <= src_tokens)
     ):
         return False  # directional containment (featured artist)
     return ratio(src, res) <= weights.artist_low_ratio
@@ -240,13 +245,17 @@ def album_signal(
     if src == res:
         points = weights.album_exact
     elif src and res:
-        points = weights.album_high if ratio(src, res) >= weights.album_high_ratio else 0
+        points = (
+            weights.album_high if ratio(src, res) >= weights.album_high_ratio else 0
+        )
     else:
         points = 0
     return SignalPenalty("album", points, _bonus_penalty(points, budget), budget)
 
 
-def isrc_signal(source_isrc: str | None, result_isrc: str | None, weights: Weights = DEFAULT_WEIGHTS) -> SignalPenalty:
+def isrc_signal(
+    source_isrc: str | None, result_isrc: str | None, weights: Weights = DEFAULT_WEIGHTS
+) -> SignalPenalty:
     """Exact-ISRC bonus. No signal unless both ISRCs are present and equal."""
     budget = weights.isrc_bonus
     if source_isrc and result_isrc and source_isrc.upper() == result_isrc.upper():
@@ -269,7 +278,9 @@ _VERSION_KEYWORDS: tuple[tuple[str, str, str], ...] = (
 )
 
 
-def version_signals(title: str, album: str, weights: Weights = DEFAULT_WEIGHTS) -> list[SignalPenalty]:
+def version_signals(
+    title: str, album: str, weights: Weights = DEFAULT_WEIGHTS
+) -> list[SignalPenalty]:
     """Return one penalty signal per undesirable version keyword present.
 
     Each keyword is an independent penalty (fully present -> penalty 1.0,
@@ -299,8 +310,10 @@ _RESIDUAL_KEYWORDS: tuple[tuple[str, str, str], ...] = (
 
 
 def _residual_version_signals(
-    source_title: str, source_album: str,
-    cand_title: str, cand_album: str,
+    source_title: str,
+    source_album: str,
+    cand_title: str,
+    cand_album: str,
     weights: Weights = DEFAULT_WEIGHTS,
     *,
     prefer: frozenset[str] = frozenset(),
@@ -359,8 +372,10 @@ def _residual_version_signals(
 
 
 def source_aware_version_signals(
-    source_title: str, source_album: str,
-    cand_title: str, cand_album: str,
+    source_title: str,
+    source_album: str,
+    cand_title: str,
+    cand_album: str,
     *,
     source_version: str | None = None,
     cand_version: str | None = None,
@@ -397,7 +412,9 @@ def source_aware_version_signals(
     )
 
     vw = weights.version
-    src = infer_version(source_title, source_album, source_version, explicit=source_explicit)
+    src = infer_version(
+        source_title, source_album, source_version, explicit=source_explicit
+    )
     cand = infer_version(cand_title, cand_album, cand_version, explicit=cand_explicit)
     verdict = compare_version(src, cand, prefer=prefer, avoid=avoid)
 
@@ -407,14 +424,24 @@ def source_aware_version_signals(
     elif verdict is VersionVerdict.SOFT:
         signals.append(SignalPenalty("version:soft", -vw.remaster, 0.15, vw.remaster))
     elif verdict is VersionVerdict.SUBSTITUTE:
-        signals.append(SignalPenalty("version:substitute", -vw.substitute, 0.55, vw.substitute))
+        signals.append(
+            SignalPenalty("version:substitute", -vw.substitute, 0.55, vw.substitute)
+        )
     else:  # REJECT
         signals.append(SignalPenalty("version:reject", -vw.reject, 1.0, vw.reject))
 
-    signals.extend(_residual_version_signals(
-        source_title, source_album, cand_title, cand_album, weights,
-        prefer=prefer, avoid=avoid, owned=owned,
-    ))
+    signals.extend(
+        _residual_version_signals(
+            source_title,
+            source_album,
+            cand_title,
+            cand_album,
+            weights,
+            prefer=prefer,
+            avoid=avoid,
+            owned=owned,
+        )
+    )
     return signals
 
 

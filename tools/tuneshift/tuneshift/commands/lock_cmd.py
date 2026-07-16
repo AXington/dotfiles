@@ -61,8 +61,10 @@ def handle_lock_list(args, db: Database) -> int:
     # (track, platform); mark the shadowed global rows as overridden.
     override_keys = {(row["track_id"], row["platform"]) for row in playlist_locks}
 
-    print(f'Effective locks (playlist "{name}"), precedence '
-          "global < playlist (most specific wins):")
+    print(
+        f'Effective locks (playlist "{name}"), precedence '
+        "global < playlist (most specific wins):"
+    )
     _print_lock_layer("global default", global_locks, overridden=override_keys)
     _print_lock_layer(f'playlist "{name}" override', playlist_locks, overridden=set())
     if not global_locks and not playlist_locks:
@@ -81,8 +83,10 @@ def _print_lock_layer(title: str, locks: list[dict], *, overridden: set) -> None
         shadowed = key in overridden
         marker = " " if shadowed else "*"
         note = "  (overridden)" if shadowed else ""
-        print(f"    {marker} #{lock['track_id']} {lock['title']} — {lock['artist']}: "
-              f"{lock['platform']}:{lock['platform_track_id']}{note}")
+        print(
+            f"    {marker} #{lock['track_id']} {lock['title']} — {lock['artist']}: "
+            f"{lock['platform']}:{lock['platform_track_id']}{note}"
+        )
 
 
 def handle_lock(args, db: Database) -> int:
@@ -144,8 +148,10 @@ def _resolve_scope(args, db: Database):
         return None, "global"
     name = getattr(args, "playlist", None)
     if not name:
-        print("--scope playlist requires a playlist name (the positional "
-              "<playlist>).", file=sys.stderr)
+        print(
+            "--scope playlist requires a playlist name (the positional <playlist>).",
+            file=sys.stderr,
+        )
         return False, ""
     playlist = db.find_playlist_by_name(name)
     if playlist is None:
@@ -172,8 +178,10 @@ def _emit_or_apply(args, db: Database, plan: Plan, label: str) -> int:
 
     if not getattr(args, "apply", False):
         path = write_plan(db.path, plan)
-        print(f"{label}: wrote plan {plan.plan_id} "
-              f"({len(plan.actionable_changes())} actionable change(s)).")
+        print(
+            f"{label}: wrote plan {plan.plan_id} "
+            f"({len(plan.actionable_changes())} actionable change(s))."
+        )
         print(f"  file: {path}")
         print(f"  review: tuneshift plan show {plan.plan_id}")
         print(f"  apply:  tuneshift plan apply {plan.plan_id} --include-locked")
@@ -191,14 +199,18 @@ def _emit_or_apply(args, db: Database, plan: Plan, label: str) -> int:
     if report.applied:
         print(f"{label}: applied.")
     else:
-        print(f"{label}: no changes applied "
-              f"(skipped {report.skipped}, failed {report.failed}).")
+        print(
+            f"{label}: no changes applied "
+            f"(skipped {report.skipped}, failed {report.failed})."
+        )
     for err in report.errors:
         print(f"  error: {err}", file=sys.stderr)
     return 1 if report.failed else 0
 
 
 def _describe(change: PlanChange) -> str:
-    return (f"  #{change.change_id} {change.op} {change.table}: {change.reason}\n"
-            f"      current:  {change.current}\n"
-            f"      proposed: {change.proposed}")
+    return (
+        f"  #{change.change_id} {change.op} {change.table}: {change.reason}\n"
+        f"      current:  {change.current}\n"
+        f"      proposed: {change.proposed}"
+    )

@@ -75,6 +75,7 @@ def _best_candidate(candidates: Sequence[ResolvedCandidate]) -> ResolvedCandidat
     Candidates are persisted in discovery order (for selection parity), so the
     best hydration source is chosen by score here rather than by position.
     """
+
     def _score(candidate: ResolvedCandidate) -> float:
         value = (candidate.metadata or {}).get("match_score")
         return float(value) if isinstance(value, (int, float)) else -1.0
@@ -180,7 +181,7 @@ class ResolutionWorker:
             )
             logger.info("resolution rate-limited, backing off: track=%s", track_id)
             return False
-        except Exception as exc:  # noqa: BLE001 - failure is classified below
+        except Exception as exc:
             return self._handle_failure(track_id, exc)
 
         if not candidates:
@@ -206,7 +207,10 @@ class ResolutionWorker:
         self._db.clear_track_candidates(track_id, platform)
         for rank, cand in enumerate(candidates):
             self._db.upsert_track_candidate(
-                track_id, cand.platform, cand.platform_track_id, cand.metadata,
+                track_id,
+                cand.platform,
+                cand.platform_track_id,
+                cand.metadata,
                 discovery_rank=rank,
             )
         # BUG-3: if the strongest candidate scores below the acceptance floor, the
@@ -246,9 +250,10 @@ class ResolutionWorker:
         if self._enricher is not None:
             try:
                 self._enricher(self._db, track)
-            except Exception:  # noqa: BLE001 - enrichment is best-effort
+            except Exception:
                 logger.warning(
-                    "enrichment failed after resolve: track=%s", track_id,
+                    "enrichment failed after resolve: track=%s",
+                    track_id,
                     exc_info=True,
                 )
         return True

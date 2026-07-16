@@ -7,7 +7,8 @@ The old ``score_version`` scorer was dead (only its own test imported it) and
 was removed during the matching overhaul; version scoring now flows through the
 shared matching engine.
 """
-from tuneshift.matching.preferences import (  # noqa: F401
+
+from tuneshift.matching.preferences import (
     Preferences,
     VersionPreferences,
     resolve_preferences,

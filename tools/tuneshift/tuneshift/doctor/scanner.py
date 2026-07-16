@@ -38,6 +38,7 @@ def detect_orphaned(db: Database) -> list:
     """
     return db.find_orphaned_tracks()
 
+
 # Duration delta (seconds) above which a mapped track is flagged as a possible
 # wrong version. 15s tolerates remaster/master differences without noise.
 DURATION_TOLERANCE_S = 15
@@ -45,9 +46,20 @@ DURATION_TOLERANCE_S = 15
 # Keywords that indicate a non-canonical edition. A mapped title containing one
 # of these when the canonical title does not is a version-mismatch signal.
 _VERSION_KEYWORDS = (
-    "remix", "live", "extended", "instrumental", "acoustic", "demo",
-    "radio edit", "single version", "edit", "reprise", "remaster",
-    "re-master", "mix)", "version)",
+    "remix",
+    "live",
+    "extended",
+    "instrumental",
+    "acoustic",
+    "demo",
+    "radio edit",
+    "single version",
+    "edit",
+    "reprise",
+    "remaster",
+    "re-master",
+    "mix)",
+    "version)",
 )
 _PAREN_RE = re.compile(r"[\(\[].*?[\)\]]")
 
@@ -68,8 +80,9 @@ def _has_extra_version_keyword(canonical_title: str, platform_title: str) -> boo
     return False
 
 
-def detect_duplicates(db: Database, tracks: list, playlist_name: str,
-                      next_id: int) -> tuple[list[PlanItem], int]:
+def detect_duplicates(
+    db: Database, tracks: list, playlist_name: str, next_id: int
+) -> tuple[list[PlanItem], int]:
     """Detect canonical tracks that collapse to the same normalized identity.
 
     Groups the given tracks by (norm_artist, norm_title); any group with more
@@ -91,26 +104,35 @@ def detect_duplicates(db: Database, tracks: list, playlist_name: str,
         ordered = sorted(group, key=lambda t: t.id)
         primary = ordered[0]
         merge_ids = [t.id for t in ordered[1:]]
-        items.append(PlanItem(
-            id=next_id,
-            track_id=primary.id,
-            playlist=playlist_name,
-            title=primary.title,
-            artist=primary.artist,
-            issue="duplicate",
-            keep_track_id=primary.id,
-            merge_track_ids=merge_ids,
-            confidence=100,
-            resolution="auto",
-            note=f"{len(group)} rows share identity; merging {len(merge_ids)}",
-        ))
+        items.append(
+            PlanItem(
+                id=next_id,
+                track_id=primary.id,
+                playlist=playlist_name,
+                title=primary.title,
+                artist=primary.artist,
+                issue="duplicate",
+                keep_track_id=primary.id,
+                merge_track_ids=merge_ids,
+                confidence=100,
+                resolution="auto",
+                note=f"{len(group)} rows share identity; merging {len(merge_ids)}",
+            )
+        )
         next_id += 1
     return items, next_id
 
 
-def _scan_one_track(db: Database, client, track, playlist_name: str,
-                    next_id: int, *, config: RetryConfig,
-                    stats: RetryStats) -> PlanItem | None:
+def _scan_one_track(
+    db: Database,
+    client,
+    track,
+    playlist_name: str,
+    next_id: int,
+    *,
+    config: RetryConfig,
+    stats: RetryStats,
+) -> PlanItem | None:
     """Validate a single mapped track; return a PlanItem if an issue is found.
 
     Read-only: fetches from Tidal but never writes to the database.
@@ -128,14 +150,18 @@ def _scan_one_track(db: Database, client, track, playlist_name: str,
         report = _retry_api_call(_fetch, config=config, stats=stats)
     except PermanentAPIError:
         return _unavailable_item(next_id, track, playlist_name, mapping)
-    except Exception as exc:  # noqa: BLE001 - classify and continue the scan
+    except Exception as exc:
         if is_permanent(exc):
             return _unavailable_item(next_id, track, playlist_name, mapping)
         # Transient error survived all retries: report as unavailable-unknown so
         # the operator sees it, rather than silently dropping the track.
         return PlanItem(
-            id=next_id, track_id=track.id, playlist=playlist_name,
-            title=track.title, artist=track.artist, issue="unavailable",
+            id=next_id,
+            track_id=track.id,
+            playlist=playlist_name,
+            title=track.title,
+            artist=track.artist,
+            issue="unavailable",
             current_platform_id=mapping.platform_track_id,
             resolution="manual",
             note=f"could not verify (transient error: {exc})",
@@ -148,16 +174,24 @@ def _scan_one_track(db: Database, client, track, playlist_name: str,
     # delisting signal, and the fix is metadata-only.
     if report.get("album_stale"):
         return PlanItem(
-            id=next_id, track_id=track.id, playlist=playlist_name,
-            title=track.title, artist=track.artist, issue="stale_album",
+            id=next_id,
+            track_id=track.id,
+            playlist=playlist_name,
+            title=track.title,
+            artist=track.artist,
+            issue="stale_album",
             current_platform_id=mapping.platform_track_id,
             note="album delisted; metadata-only fix",
         )
 
     if _is_version_mismatch(track, report, mapping):
         return PlanItem(
-            id=next_id, track_id=track.id, playlist=playlist_name,
-            title=track.title, artist=track.artist, issue="version_mismatch",
+            id=next_id,
+            track_id=track.id,
+            playlist=playlist_name,
+            title=track.title,
+            artist=track.artist,
+            issue="version_mismatch",
             current_platform_id=mapping.platform_track_id,
             note=_version_note(track, report),
         )
@@ -187,17 +221,28 @@ def _version_note(track, report: dict) -> str:
 
 def _unavailable_item(next_id: int, track, playlist_name: str, mapping) -> PlanItem:
     return PlanItem(
-        id=next_id, track_id=track.id, playlist=playlist_name,
-        title=track.title, artist=track.artist, issue="unavailable",
+        id=next_id,
+        track_id=track.id,
+        playlist=playlist_name,
+        title=track.title,
+        artist=track.artist,
+        issue="unavailable",
         current_platform_id=mapping.platform_track_id,
         note="track not found on Tidal",
     )
 
 
-def scan_tracks(db: Database, client, tracks: list, playlist_name: str, *,
-                max_retries: int = 3,
-                stats: RetryStats | None = None, quiet: bool = False,
-                start_id: int = 1) -> tuple[list[PlanItem], int]:
+def scan_tracks(
+    db: Database,
+    client,
+    tracks: list,
+    playlist_name: str,
+    *,
+    max_retries: int = 3,
+    stats: RetryStats | None = None,
+    quiet: bool = False,
+    start_id: int = 1,
+) -> tuple[list[PlanItem], int]:
     """Scan a list of tracks; return (plan_items, next_id).
 
     Runs local detectors (unmapped, duplicate) plus a per-track API validation
@@ -223,11 +268,20 @@ def scan_tracks(db: Database, client, tracks: list, playlist_name: str, *,
     total = len(remaining)
     for i, track in enumerate(remaining):
         if not quiet:
-            print(f"  [{i + 1}/{total}] {track.title} - {track.artist}...",
-                  end="\r", file=sys.stderr, flush=True)
+            print(
+                f"  [{i + 1}/{total}] {track.title} - {track.artist}...",
+                end="\r",
+                file=sys.stderr,
+                flush=True,
+            )
         found = _scan_one_track(
-            db, client, track, playlist_name, next_id,
-            config=config, stats=stats,
+            db,
+            client,
+            track,
+            playlist_name,
+            next_id,
+            config=config,
+            stats=stats,
         )
         if found is not None:
             items.append(found)
@@ -238,8 +292,9 @@ def scan_tracks(db: Database, client, tracks: list, playlist_name: str, *,
     return items, next_id
 
 
-def detect_unmapped(db: Database, tracks: list, playlist_name: str,
-                    next_id: int) -> tuple[list[PlanItem], int]:
+def detect_unmapped(
+    db: Database, tracks: list, playlist_name: str, next_id: int
+) -> tuple[list[PlanItem], int]:
     """Detect tracks with no usable Tidal mapping (local, no API cost)."""
     if not tracks:
         return [], next_id
@@ -253,10 +308,16 @@ def detect_unmapped(db: Database, tracks: list, playlist_name: str,
         mapping = mappings.get(track.id)
         if mapping and mapping.platform_track_id:
             continue
-        items.append(PlanItem(
-            id=next_id, track_id=track.id, playlist=playlist_name,
-            title=track.title, artist=track.artist, issue="unmapped",
-            note="no Tidal mapping",
-        ))
+        items.append(
+            PlanItem(
+                id=next_id,
+                track_id=track.id,
+                playlist=playlist_name,
+                title=track.title,
+                artist=track.artist,
+                issue="unmapped",
+                note="no Tidal mapping",
+            )
+        )
         next_id += 1
     return items, next_id

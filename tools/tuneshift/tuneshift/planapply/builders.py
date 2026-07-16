@@ -42,9 +42,7 @@ def build_lock_plan(
         and current["user_approved"]
     ):
         return Plan(plan_id=new_plan_id(), kind="lock")
-    row_key = row_key_for(
-        playlist_id=playlist_id, track_id=track_id, platform=platform
-    )
+    row_key = row_key_for(playlist_id=playlist_id, track_id=track_id, platform=platform)
     proposed = {
         "playlist_id": playlist_id,
         "track_id": track_id,
@@ -66,7 +64,9 @@ def build_lock_plan(
         provenance="user:map",
         locked=locked,
     )
-    return _single_change_plan("lock", f"playlist:{playlist_id} track:{track_id}", change)
+    return _single_change_plan(
+        "lock", f"playlist:{playlist_id} track:{track_id}", change
+    )
 
 
 def build_unlock_plan(
@@ -77,9 +77,7 @@ def build_unlock_plan(
     if current is None:
         # Nothing to release -> empty (no-op) plan.
         return Plan(plan_id=new_plan_id(), kind="unlock")
-    row_key = row_key_for(
-        playlist_id=playlist_id, track_id=track_id, platform=platform
-    )
+    row_key = row_key_for(playlist_id=playlist_id, track_id=track_id, platform=platform)
     change = PlanChange(
         op="delete",
         table="playlist_track_mappings",

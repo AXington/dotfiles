@@ -26,8 +26,8 @@ availability and Phase 2 reproduces today's base scoring (AC-C5 winner-parity).
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import re
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from tuneshift.matching.base_scoring import score_signals
@@ -76,7 +76,10 @@ class IdentityLock:
     def matches(
         self, candidate: object, candidate_fingerprint: TrackFingerprint | None = None
     ) -> bool:
-        if self.platform_id and getattr(candidate, "platform_id", None) == self.platform_id:
+        if (
+            self.platform_id
+            and getattr(candidate, "platform_id", None) == self.platform_id
+        ):
             return True
         cand_isrc = getattr(candidate, "isrc", None)
         if self.isrc and cand_isrc and cand_isrc.upper() == self.isrc.upper():
@@ -176,9 +179,8 @@ def _is_unplayable(candidate: object) -> bool:
     available set) rather than being allowed to win over a playable release.
     ``available is None`` (unknown) is NOT unplayable — never a guess.
     """
-    return (
-        getattr(candidate, "available", None) is False
-        or bool(getattr(candidate, "tier_restricted", False))
+    return getattr(candidate, "available", None) is False or bool(
+        getattr(candidate, "tier_restricted", False)
     )
 
 
@@ -215,7 +217,9 @@ def _phase1_filter(
                 break
         if reject is not None:
             filtered.append(
-                FilteredCandidate(cand, f"hard:{reject.ref.criterion}={reject.ref.target}")
+                FilteredCandidate(
+                    cand, f"hard:{reject.ref.criterion}={reject.ref.target}"
+                )
             )
             continue
         survivors.append(cand)
@@ -258,7 +262,11 @@ def _precedence_of(soft: list[ActivePreference]) -> list[PreferenceRef]:
     under that scope, so the ref objects are preserved by identity (the verdict
     maps key on the same objects)."""
 
-    buckets: dict[str, list[PreferenceRef]] = {"track": [], "playlist": [], "global": []}
+    buckets: dict[str, list[PreferenceRef]] = {
+        "track": [],
+        "playlist": [],
+        "global": [],
+    }
     for ap in soft:
         buckets.get(ap.ref.scope, buckets["global"]).append(ap.ref)
     return derive_precedence(
@@ -278,7 +286,7 @@ def _phase2_score(
     prefer: frozenset[str],
     avoid: frozenset[str],
     owned_residuals: frozenset[str] = frozenset(),
-    alias_resolver: "AliasResolver | None",
+    alias_resolver: AliasResolver | None,
 ) -> list[tuple[Any, Distance, dict[PreferenceRef, Verdict]]]:
     """Score each survivor by base identity distance and record soft verdicts.
 
@@ -341,7 +349,9 @@ def _release_year(cand: object) -> int | None:
 
 def _availability_rank(cand: object) -> int:
     """Higher = more available; feeds the tiebreak's second tier."""
-    if getattr(cand, "available", None) is False or getattr(cand, "tier_restricted", False):
+    if getattr(cand, "available", None) is False or getattr(
+        cand, "tier_restricted", False
+    ):
         return 0
     return 2 if getattr(cand, "available", None) is True else 1
 
@@ -408,7 +418,11 @@ def _resolve_winner(
     if not scored:
         return -1, None, False
     best_total = scored[0][1].total
-    cluster = [i for i, row in enumerate(scored) if row[1].total - best_total <= AMBIGUITY_DELTA]
+    cluster = [
+        i
+        for i, row in enumerate(scored)
+        if row[1].total - best_total <= AMBIGUITY_DELTA
+    ]
     contested = len(cluster) >= 2
     if not contested:
         return 0, None, False
@@ -440,7 +454,7 @@ def _resolve_lock(
     prefer: frozenset[str],
     avoid: frozenset[str],
     owned_residuals: frozenset[str] = frozenset(),
-    alias_resolver: "AliasResolver | None",
+    alias_resolver: AliasResolver | None,
 ) -> SelectionResult:
     """Short-circuit selection for a locked composite identity (AC-S2 / AC-L1).
 
@@ -495,11 +509,17 @@ def _resolve_lock(
     # Prefer an exact platform-id match among available locked releases, else the
     # first (composite identity should resolve to a single recording).
     winner = next(
-        (c for c in available if lock.platform_id and getattr(c, "platform_id", None) == lock.platform_id),
+        (
+            c
+            for c in available
+            if lock.platform_id and getattr(c, "platform_id", None) == lock.platform_id
+        ),
         available[0],
     )
     if all_durations is None:
-        all_durations = [d for d in (getattr(c, "duration_seconds", None) for c in matched) if d]
+        all_durations = [
+            d for d in (getattr(c, "duration_seconds", None) for c in matched) if d
+        ]
     distance = Distance(
         score_signals(
             source,
@@ -531,7 +551,7 @@ def select_version(
     all_durations: list[int] | None = None,
     prefer: frozenset[str] = frozenset(),
     avoid: frozenset[str] = frozenset(),
-    alias_resolver: "AliasResolver | None" = None,
+    alias_resolver: AliasResolver | None = None,
 ) -> SelectionResult:
     """Select the best available release of ``source`` from ``candidates``.
 
@@ -591,7 +611,11 @@ def select_version(
     if clean:
         winner_index, decided_by, ambiguous = _resolve_winner(clean, soft)
         chosen = clean[winner_index] if winner_index >= 0 else None
-        ordered = [chosen, *[r for r in clean if r is not chosen], *capped] if chosen else [*clean, *capped]
+        ordered = (
+            [chosen, *[r for r in clean if r is not chosen], *capped]
+            if chosen
+            else [*clean, *capped]
+        )
     elif capped:
         winner_index, decided_by, ambiguous = 0, None, False
         version_mismatch = True

@@ -34,6 +34,7 @@ backward compatibility)::
 where ``version.<field>`` is ``prefer`` / ``avoid`` / ``tiebreak_order``
 (comma lists), ``duration_tolerance_percent`` (float) or ``min_lead`` (int).
 """
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -73,6 +74,7 @@ def _polarity(strength: str) -> str:
 # Typed (criterion, strength, target) model — the general AC-CLI1 interface.  #
 # --------------------------------------------------------------------------- #
 
+
 def _resolve_typed_scope(args, db: Database):
     """Resolve the typed-pref scope from the flags present.
 
@@ -104,7 +106,12 @@ def _resolve_typed_scope(args, db: Database):
             print(f"Track {track} not found.")
             return None
         if pid is not None:
-            return (f'playlist "{playlist}" track {track}', "playlist-track", pid, track)
+            return (
+                f'playlist "{playlist}" track {track}',
+                "playlist-track",
+                pid,
+                track,
+            )
         return (f"track {track}", "track", None, track)
 
     if pid is not None:
@@ -130,8 +137,9 @@ def _get_typed_criteria(db: Database, scope: str, pid, tid) -> list[dict]:
     return list((db.get_global_preferences() or {}).get("criteria") or [])
 
 
-def _write_criterion(db: Database, scope: str, pid, tid,
-                     criterion: str, strength: str, target: str) -> None:
+def _write_criterion(
+    db: Database, scope: str, pid, tid, criterion: str, strength: str, target: str
+) -> None:
     """Upsert one typed criterion at ``scope``.
 
     De-duplication is by ``(criterion, canonical target)`` — NOT by criterion
@@ -148,21 +156,27 @@ def _write_criterion(db: Database, scope: str, pid, tid,
         # Drop any stored surface form of the same canonical target first so a
         # re-spelled target does not leave a duplicate row behind.
         for row in db.get_playlist_track_prefs(db_pid, tid):
-            if (row.get("criterion") == criterion
-                    and whitelist.canonical(row.get("target")) == canonical
-                    and row.get("target") != target):
+            if (
+                row.get("criterion") == criterion
+                and whitelist.canonical(row.get("target")) == canonical
+                and row.get("target") != target
+            ):
                 db.remove_playlist_track_pref(db_pid, tid, criterion, row.get("target"))
         db.set_playlist_track_pref(db_pid, tid, criterion, strength, target)
         return
 
     # JSON-backed scopes (global / playlist): replace the entry for this
     # (criterion, canonical target), keeping every other target on the axis.
-    blob = (db.get_preferences(pid) if scope == "playlist"
-            else db.get_global_preferences()) or {}
+    blob = (
+        db.get_preferences(pid) if scope == "playlist" else db.get_global_preferences()
+    ) or {}
     criteria = [
-        c for c in (blob.get("criteria") or [])
-        if not (c.get("criterion") == criterion
-                and whitelist.canonical(c.get("target")) == canonical)
+        c
+        for c in (blob.get("criteria") or [])
+        if not (
+            c.get("criterion") == criterion
+            and whitelist.canonical(c.get("target")) == canonical
+        )
     ]
     criteria.append({"criterion": criterion, "strength": strength, "target": target})
     blob["criteria"] = criteria
@@ -172,8 +186,9 @@ def _write_criterion(db: Database, scope: str, pid, tid,
         db.set_global_preferences(blob)
 
 
-def _remove_criterion(db: Database, scope: str, pid, tid, criterion: str,
-                      target: str | None = None) -> bool:
+def _remove_criterion(
+    db: Database, scope: str, pid, tid, criterion: str, target: str | None = None
+) -> bool:
     """Delete typed criterion rows at ``scope``. Returns True if any was removed.
 
     With ``target`` omitted, every target on the criterion is removed; with a
@@ -187,24 +202,30 @@ def _remove_criterion(db: Database, scope: str, pid, tid, criterion: str,
         canonical = whitelist.canonical(target)
         removed = False
         for row in db.get_playlist_track_prefs(db_pid, tid):
-            if (row.get("criterion") == criterion
-                    and whitelist.canonical(row.get("target")) == canonical):
+            if (
+                row.get("criterion") == criterion
+                and whitelist.canonical(row.get("target")) == canonical
+            ):
                 removed |= db.remove_playlist_track_pref(
                     db_pid, tid, criterion, row.get("target")
                 )
         return removed
 
-    blob = (db.get_preferences(pid) if scope == "playlist"
-            else db.get_global_preferences()) or {}
+    blob = (
+        db.get_preferences(pid) if scope == "playlist" else db.get_global_preferences()
+    ) or {}
     criteria = blob.get("criteria") or []
     if target is None:
         kept = [c for c in criteria if c.get("criterion") != criterion]
     else:
         canonical = whitelist.canonical(target)
         kept = [
-            c for c in criteria
-            if not (c.get("criterion") == criterion
-                    and whitelist.canonical(c.get("target")) == canonical)
+            c
+            for c in criteria
+            if not (
+                c.get("criterion") == criterion
+                and whitelist.canonical(c.get("target")) == canonical
+            )
         ]
     if len(kept) == len(criteria):
         return False
@@ -219,8 +240,9 @@ def _remove_criterion(db: Database, scope: str, pid, tid, criterion: str,
     return True
 
 
-def _conflicting_pref(db: Database, scope: str, pid, tid,
-                      criterion: str, strength: str, target: str) -> dict | None:
+def _conflicting_pref(
+    db: Database, scope: str, pid, tid, criterion: str, strength: str, target: str
+) -> dict | None:
     """Return an existing SAME-scope pref that contradicts this one, else None.
 
     A contradiction is the same ``(criterion, canonical target)`` set to the
@@ -232,15 +254,18 @@ def _conflicting_pref(db: Database, scope: str, pid, tid,
     canonical = whitelist.canonical(target)
     want = _polarity(strength)
     for c in _get_typed_criteria(db, scope, pid, tid):
-        if (c.get("criterion") == criterion
-                and whitelist.canonical(c.get("target")) == canonical
-                and _polarity(c.get("strength")) != want):
+        if (
+            c.get("criterion") == criterion
+            and whitelist.canonical(c.get("target")) == canonical
+            and _polarity(c.get("strength")) != want
+        ):
             return c
     return None
 
 
-def _handle_typed_set(args, db: Database, criterion: str, strength: str,
-                      target: str) -> int:
+def _handle_typed_set(
+    args, db: Database, criterion: str, strength: str, target: str
+) -> int:
     """Set a typed (criterion, strength, target) preference at the flagged scope."""
     if criterion not in KNOWN_AXES:
         print(f'Unknown criterion "{criterion}". Valid: {sorted(KNOWN_AXES)}')
@@ -252,8 +277,10 @@ def _handle_typed_set(args, db: Database, criterion: str, strength: str,
         print("A target token is required: prefs set <criterion> <strength> <target>")
         return 1
     if criterion == "duration" and not DurationCriterion.is_valid_target(target):
-        print(f'Invalid duration tolerance "{target}". '
-              'Use an absolute ("3s" / "3") or relative ("5%") tolerance.')
+        print(
+            f'Invalid duration tolerance "{target}". '
+            'Use an absolute ("3s" / "3") or relative ("5%") tolerance.'
+        )
         return 1
 
     resolved = _resolve_typed_scope(args, db)
@@ -265,11 +292,13 @@ def _handle_typed_set(args, db: Database, criterion: str, strength: str,
     # (criterion, canonical target)) loudly rather than silently overwriting.
     conflict = _conflicting_pref(db, scope, pid, tid, criterion, strength, target)
     if conflict is not None:
-        print(f'Conflict ({label}): "{criterion} {conflict.get("strength")} '
-              f'{conflict.get("target")}" is already set and contradicts '
-              f'"{criterion} {strength} {target}". '
-              f'Unset it first (prefs unset {criterion} {conflict.get("target")}) '
-              "or set the opposite polarity at a different scope.")
+        print(
+            f'Conflict ({label}): "{criterion} {conflict.get("strength")} '
+            f'{conflict.get("target")}" is already set and contradicts '
+            f'"{criterion} {strength} {target}". '
+            f"Unset it first (prefs unset {criterion} {conflict.get('target')}) "
+            "or set the opposite polarity at a different scope."
+        )
         return 1
 
     # Warn (do not fail) when a STRUCTURED-audio target is not a known token: it
@@ -277,24 +306,28 @@ def _handle_typed_set(args, db: Database, criterion: str, strength: str,
     # whitelist confidence gate demotes an unknown one to a soft signal).
     whitelist = load_token_whitelist()
     if criterion in _STRUCTURED_AXES and whitelist.axis(target) is None:
-        print(f'Warning: "{target}" is not a known {criterion} token '
-              "— it may never match a candidate.")
+        print(
+            f'Warning: "{target}" is not a known {criterion} token '
+            "— it may never match a candidate."
+        )
 
     _write_criterion(db, scope, pid, tid, criterion, strength, target)
     print(f"Set {criterion} {strength} {target} ({label}).")
     return 0
 
 
-def _handle_typed_unset(args, db: Database, criterion: str,
-                        target: str | None = None) -> int:
+def _handle_typed_unset(
+    args, db: Database, criterion: str, target: str | None = None
+) -> int:
     """Remove a typed preference for ``criterion`` at the flagged scope.
 
     With ``target`` given, only that ``(criterion, target)`` entry is removed;
     otherwise every target on the criterion at the scope is removed.
     """
     if not criterion:
-        print("Usage: prefs unset <criterion> [<target>] "
-              "[--playlist NAME] [--track ID]")
+        print(
+            "Usage: prefs unset <criterion> [<target>] [--playlist NAME] [--track ID]"
+        )
         return 1
     resolved = _resolve_typed_scope(args, db)
     if resolved is None:
@@ -304,7 +337,7 @@ def _handle_typed_unset(args, db: Database, criterion: str,
         what = f"{criterion} {target}" if target else criterion
         print(f"Unset {what} ({label}).")
     else:
-        what = f'{criterion} {target}' if target else criterion
+        what = f"{criterion} {target}" if target else criterion
         print(f'No "{what}" preference set ({label}).')
     return 0
 
@@ -340,8 +373,10 @@ def _handle_typed_list(args, db: Database) -> int:
             key = (c.get("criterion"), whitelist.canonical(c.get("target")))
             effective[key] = (layer_name, idx)
 
-    print(f"Effective version preferences ({label}), precedence "
-          "global < playlist < track < playlist-track:")
+    print(
+        f"Effective version preferences ({label}), precedence "
+        "global < playlist < track < playlist-track:"
+    )
     any_shown = False
     for layer_name, criteria in layers:
         if not criteria:
@@ -353,8 +388,10 @@ def _handle_typed_list(args, db: Database) -> int:
             active = effective.get(key) == (layer_name, idx)
             marker = "*" if active else " "
             note = "" if active else "  (overridden)"
-            print(f"    {marker} {c.get('criterion')} {c.get('strength')} "
-                  f"{c.get('target')}{note}")
+            print(
+                f"    {marker} {c.get('criterion')} {c.get('strength')} "
+                f"{c.get('target')}{note}"
+            )
     if not any_shown:
         print("    (none set)")
     return 0
@@ -363,6 +400,7 @@ def _handle_typed_list(args, db: Database) -> int:
 # --------------------------------------------------------------------------- #
 # Legacy version.<field> keyword-list model (backward compatible).            #
 # --------------------------------------------------------------------------- #
+
 
 def _parse_value(key: str, raw: str):
     """Parse a raw legacy CLI value into the stored type for ``key``."""
@@ -397,10 +435,12 @@ def _resolve_scope(
             "playlist",
         )
     if track is not None:
-        print("Per-track legacy keyword preferences have been retired. Use the "
-              "typed model instead, e.g. "
-              "prefs set <criterion> <strength> <target> --track "
-              f"{track} (add --playlist NAME for a playlist-specific override).")
+        print(
+            "Per-track legacy keyword preferences have been retired. Use the "
+            "typed model instead, e.g. "
+            "prefs set <criterion> <strength> <target> --track "
+            f"{track} (add --playlist NAME for a playlist-specific override)."
+        )
         return None
     return (
         "global",
@@ -414,7 +454,9 @@ def _print_preferences(prefs: Preferences) -> None:
     print(f"    prefer                      = {', '.join(prefs.prefer) or '(none)'}")
     print(f"    avoid                       = {', '.join(prefs.avoid) or '(none)'}")
     print(f"    duration_tolerance_percent  = {prefs.duration_tolerance_percent}")
-    print(f"    tiebreak_order              = {', '.join(prefs.tiebreak_order) or '(none)'}")
+    print(
+        f"    tiebreak_order              = {', '.join(prefs.tiebreak_order) or '(none)'}"
+    )
     print(f"    min_lead                    = {prefs.min_lead}")
 
 
@@ -462,8 +504,10 @@ def handle_prefs(args, db: Database) -> int:
 
     if args.action == "set":
         if not criterion:
-            print("Usage: prefs set <criterion> <strength> <target>  "
-                  "(or legacy prefs set version.<field> <value>)")
+            print(
+                "Usage: prefs set <criterion> <strength> <target>  "
+                "(or legacy prefs set version.<field> <value>)"
+            )
             return 1
         # Typed grammar when the 2nd token names a strength; legacy otherwise.
         if strength in _STRENGTHS:
@@ -473,9 +517,11 @@ def handle_prefs(args, db: Database) -> int:
                 print("Usage: prefs set version.<field> <value>")
                 return 1
             return _handle_legacy_set(args, db)
-        print(f'Unknown strength "{strength}". '
-              f"Use: prefs set <criterion> <{'|'.join(sorted(_STRENGTHS))}> <target>, "
-              'or the legacy "prefs set version.<field> <value>".')
+        print(
+            f'Unknown strength "{strength}". '
+            f"Use: prefs set <criterion> <{'|'.join(sorted(_STRENGTHS))}> <target>, "
+            'or the legacy "prefs set version.<field> <value>".'
+        )
         return 1
 
     if args.action == "unset":
@@ -501,8 +547,14 @@ def handle_prefs(args, db: Database) -> int:
             label, getter, setter, layer = resolved
             stored = getter()
             legacy_keys = [
-                k for k in ("prefer", "avoid", "tiebreak_order",
-                            "duration_tolerance_percent", "min_lead")
+                k
+                for k in (
+                    "prefer",
+                    "avoid",
+                    "tiebreak_order",
+                    "duration_tolerance_percent",
+                    "min_lead",
+                )
                 if stored and k in stored
             ]
             if legacy_keys:
@@ -517,9 +569,11 @@ def handle_prefs(args, db: Database) -> int:
 
     if args.action == "clear":
         if track_flag:
-            print("Per-track 'clear' is retired — use "
-                  "prefs unset <criterion> [<target>] --track ID "
-                  "(add --playlist NAME for a playlist-specific override).")
+            print(
+                "Per-track 'clear' is retired — use "
+                "prefs unset <criterion> [<target>] --track ID "
+                "(add --playlist NAME for a playlist-specific override)."
+            )
             return 1
         resolved = _resolve_scope(args, db)
         if resolved is None:
@@ -528,8 +582,13 @@ def handle_prefs(args, db: Database) -> int:
         # Clear only the legacy keyword keys; preserve typed `criteria` and the
         # `concept` blob so a legacy clear never silently drops typed prefs.
         stored = getter() or {}
-        for key in ("prefer", "avoid", "tiebreak_order",
-                    "duration_tolerance_percent", "min_lead"):
+        for key in (
+            "prefer",
+            "avoid",
+            "tiebreak_order",
+            "duration_tolerance_percent",
+            "min_lead",
+        ):
             stored.pop(key, None)
         setter(stored or None)
         print(f"Cleared legacy keyword preferences ({label}).")

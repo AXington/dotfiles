@@ -17,8 +17,8 @@ so ``explain`` (AC-CLI3) can show which preference won and over whom.
 
 from __future__ import annotations
 
+from collections.abc import Hashable
 from dataclasses import dataclass, field
-from typing import Hashable
 
 from tuneshift.matching.criteria import Strength, Verdict
 
@@ -54,11 +54,22 @@ def derive_precedence(
     """
 
     ordered: list[PreferenceRef] = []
-    for scope, refs in (("track", track_refs), ("playlist", playlist_refs), ("global", global_refs)):
+    for scope, refs in (
+        ("track", track_refs),
+        ("playlist", playlist_refs),
+        ("global", global_refs),
+    ):
         for ref in refs:
-            ordered.append(ref if ref.scope == scope else PreferenceRef(
-                criterion=ref.criterion, strength=ref.strength, target=ref.target, scope=scope
-            ))
+            ordered.append(
+                ref
+                if ref.scope == scope
+                else PreferenceRef(
+                    criterion=ref.criterion,
+                    strength=ref.strength,
+                    target=ref.target,
+                    scope=scope,
+                )
+            )
     return ordered
 
 
@@ -90,7 +101,9 @@ class ConflictDecision:
 
     @property
     def decided_by(self) -> str | None:
-        return self.trace[-1].criterion if self.winner is not None and self.trace else None
+        return (
+            self.trace[-1].criterion if self.winner is not None and self.trace else None
+        )
 
 
 def _favor(verdict: Verdict) -> int:
@@ -126,12 +139,19 @@ def resolve_conflict(
     for ref in precedence:
         if len(contenders) <= 1:
             break
-        ranks = {c: _favor(candidate_verdicts[c].get(ref, Verdict.NO_VERDICT)) for c in contenders}
+        ranks = {
+            c: _favor(candidate_verdicts[c].get(ref, Verdict.NO_VERDICT))
+            for c in contenders
+        }
         best = max(ranks.values())
         favored = [c for c in contenders if ranks[c] == best]
         if 0 < len(favored) < len(contenders):
             eliminated = [c for c in contenders if c not in favored]
-            trace.append(ConflictStep(criterion=ref.criterion, favored=favored, eliminated=eliminated))
+            trace.append(
+                ConflictStep(
+                    criterion=ref.criterion, favored=favored, eliminated=eliminated
+                )
+            )
             contenders = favored
 
     winner = contenders[0] if len(contenders) == 1 else None
@@ -140,9 +160,9 @@ def resolve_conflict(
 
 __all__ = [
     "SCOPE_RANK",
+    "ConflictDecision",
+    "ConflictStep",
     "PreferenceRef",
     "derive_precedence",
-    "ConflictStep",
-    "ConflictDecision",
     "resolve_conflict",
 ]

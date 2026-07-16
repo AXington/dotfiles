@@ -14,6 +14,7 @@ Configuration via environment variables:
   OPENAI_API_KEY            - OpenAI API key
   OLLAMA_HOST               - Ollama host (default: http://localhost:11434)
 """
+
 import json
 import logging
 import os
@@ -40,6 +41,7 @@ def store_llm_key(backend: str, key: str) -> None:
     key_file = _TOKEN_DIR / f"{backend}_key"
     key_file.write_text(key)
     key_file.chmod(0o600)
+
 
 _CLASSIFICATION_PROMPT = """Classify the following tracks. Return a JSON array with one object per track.
 
@@ -106,10 +108,15 @@ class AnthropicBackend:
     """Backend for Anthropic's Messages API."""
 
     def __init__(self, api_key: str | None = None) -> None:
-        resolved_key = api_key or os.environ.get("ANTHROPIC_API_KEY") or _load_stored_key("anthropic")
+        resolved_key = (
+            api_key
+            or os.environ.get("ANTHROPIC_API_KEY")
+            or _load_stored_key("anthropic")
+        )
         if not resolved_key:
             raise ValueError("ANTHROPIC_API_KEY is required for anthropic backend")
         from anthropic import Anthropic
+
         self._client = Anthropic(api_key=resolved_key)
         self._api_errors = self._get_api_errors()
 
@@ -118,6 +125,7 @@ class AnthropicBackend:
         """Get Anthropic error types for exception handling."""
         try:
             from anthropic import APIError
+
             return (APIError,)
         except ImportError:
             return ()
@@ -139,13 +147,16 @@ class OpenAICompatibleBackend:
         api_key: str | None = None,
         base_url: str | None = None,
     ) -> None:
-        resolved_key = api_key or os.environ.get("OPENAI_API_KEY") or _load_stored_key("openai")
+        resolved_key = (
+            api_key or os.environ.get("OPENAI_API_KEY") or _load_stored_key("openai")
+        )
         resolved_url = base_url or os.environ.get("TUNESHIFT_LLM_BASE_URL")
         if not resolved_key and not resolved_url:
             raise ValueError(
                 "OPENAI_API_KEY or TUNESHIFT_LLM_BASE_URL required for openai-compatible backend"
             )
         from openai import OpenAI
+
         kwargs: dict[str, Any] = {}
         if resolved_key:
             kwargs["api_key"] = resolved_key
@@ -178,6 +189,7 @@ class OllamaBackend:
         if model in self._validated_models:
             return
         import urllib.request
+
         try:
             with urllib.request.urlopen(f"{self._host}/api/tags", timeout=5) as resp:
                 data = json.loads(resp.read())
@@ -196,12 +208,14 @@ class OllamaBackend:
         import urllib.request
 
         self._validate_model(model)
-        payload = json.dumps({
-            "model": model,
-            "prompt": prompt,
-            "stream": False,
-            "options": {"num_predict": max_tokens},
-        }).encode()
+        payload = json.dumps(
+            {
+                "model": model,
+                "prompt": prompt,
+                "stream": False,
+                "options": {"num_predict": max_tokens},
+            }
+        ).encode()
         req = urllib.request.Request(
             f"{self._host}/api/generate",
             data=payload,
@@ -214,6 +228,7 @@ class OllamaBackend:
     def ping(self) -> bool:
         """Return True if the Ollama host answers its tags endpoint quickly."""
         import urllib.request
+
         try:
             with urllib.request.urlopen(f"{self._host}/api/tags", timeout=5) as resp:
                 json.loads(resp.read())
@@ -230,9 +245,14 @@ def detect_backend() -> tuple[str, LLMBackend] | tuple[None, None]:
     """
     explicit = os.environ.get("TUNESHIFT_LLM_BACKEND", "").lower()
 
-    if explicit == "grok" or "grok" in os.environ.get("TUNESHIFT_CLASSIFIER_MODEL", "").lower():
+    if (
+        explicit == "grok"
+        or "grok" in os.environ.get("TUNESHIFT_CLASSIFIER_MODEL", "").lower()
+    ):
         # FUCK ELON
-        raise ValueError("Grok is not and will never be a supported backend. Fuck Elon.")
+        raise ValueError(
+            "Grok is not and will never be a supported backend. Fuck Elon."
+        )
 
     if explicit == "anthropic":
         try:
@@ -279,6 +299,7 @@ def detect_backend() -> tuple[str, LLMBackend] | tuple[None, None]:
     explicit_model = os.environ.get("TUNESHIFT_CLASSIFIER_MODEL")
     try:
         import urllib.request
+
         with urllib.request.urlopen(f"{ollama_host}/api/tags", timeout=2) as resp:
             data = json.loads(resp.read())
             available_models = [m["name"] for m in data.get("models", [])]
@@ -367,7 +388,7 @@ class _TimeoutBackend:
         def _target() -> None:
             try:
                 box["value"] = self._inner.complete(prompt, model, max_tokens)
-            except BaseException as exc:  # noqa: BLE001 - re-raised on the caller thread
+            except BaseException as exc:
                 box["error"] = exc
 
         worker = threading.Thread(target=_target, daemon=True)
@@ -457,7 +478,7 @@ class TrackClassifier:
             return True
         try:
             return bool(ping())
-        except Exception:  # noqa: BLE001 - probe is best-effort
+        except Exception:
             logger.warning("Backend reachability probe failed", exc_info=True)
             return False
 

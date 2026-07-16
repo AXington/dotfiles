@@ -11,6 +11,7 @@ similarity dominates; enrichment only breaks ties and lightly corroborates.
 Like album scoring, this is new capability with no legacy byte-parity contract,
 so signals live purely in the normalized distance model.
 """
+
 from __future__ import annotations
 
 from tuneshift.matching.engine import (
@@ -23,9 +24,9 @@ from tuneshift.matching.normalize import artist_set_overlap, normalize_artist
 from tuneshift.matching.penalties import SignalPenalty
 from tuneshift.matching.similarity import ratio
 
-_W_NAME = 8          # name similarity dominates
-_W_GENRE = 2         # corroboration only
-_W_POPULARITY = 1    # tiebreak only
+_W_NAME = 8  # name similarity dominates
+_W_GENRE = 2  # corroboration only
+_W_POPULARITY = 1  # tiebreak only
 
 ARTIST_THRESHOLDS = RecommendationThresholds(
     auto_max=0.15,
@@ -53,7 +54,9 @@ def _name_signal(source_name: str, candidate_name: str) -> SignalPenalty:
     # the fuzzy ratio wins).
     similarity = max(ratio(src, cand), artist_set_overlap(source_name, candidate_name))
     penalty = 1.0 - similarity
-    return SignalPenalty("artist:name", _signed_points(penalty, _W_NAME), penalty, _W_NAME)
+    return SignalPenalty(
+        "artist:name", _signed_points(penalty, _W_NAME), penalty, _W_NAME
+    )
 
 
 def _genre_signal(
@@ -67,7 +70,9 @@ def _genre_signal(
         return SignalPenalty("artist:genre", 0, 0.0, 0)
     overlap = len(src & cand) / len(src)
     penalty = 1.0 - overlap
-    return SignalPenalty("artist:genre", _signed_points(penalty, _W_GENRE), penalty, _W_GENRE)
+    return SignalPenalty(
+        "artist:genre", _signed_points(penalty, _W_GENRE), penalty, _W_GENRE
+    )
 
 
 def _popularity_signal(popularity: int | None, followers: int | None) -> SignalPenalty:
@@ -83,9 +88,14 @@ def _popularity_signal(popularity: int | None, followers: int | None) -> SignalP
     else:
         # Log-ish bucketing of follower counts into [0, 1].
         followers = max(0, followers or 0)
-        penalty = 1.0 if followers == 0 else max(0.0, 1.0 - min(1.0, followers / 1_000_000))
+        penalty = (
+            1.0 if followers == 0 else max(0.0, 1.0 - min(1.0, followers / 1_000_000))
+        )
     return SignalPenalty(
-        "artist:popularity", _signed_points(penalty, _W_POPULARITY), penalty, _W_POPULARITY
+        "artist:popularity",
+        _signed_points(penalty, _W_POPULARITY),
+        penalty,
+        _W_POPULARITY,
     )
 
 
@@ -101,7 +111,8 @@ def score_artist_match(
     distance.add(_genre_signal(source_genres, getattr(candidate, "genres", None)))
     distance.add(
         _popularity_signal(
-            getattr(candidate, "popularity", None), getattr(candidate, "followers", None)
+            getattr(candidate, "popularity", None),
+            getattr(candidate, "followers", None),
         )
     )
     return distance
@@ -123,4 +134,4 @@ def classify_artist_results(distances: list[float]) -> str:
     }[action]
 
 
-__all__ = ["score_artist_match", "classify_artist_results", "ARTIST_THRESHOLDS"]
+__all__ = ["ARTIST_THRESHOLDS", "classify_artist_results", "score_artist_match"]

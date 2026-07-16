@@ -1,4 +1,5 @@
 """Ingest command: import a playlist from a streaming platform."""
+
 import sys
 
 from tuneshift.db import Database
@@ -13,7 +14,10 @@ def handle_ingest(args, db: Database) -> int:
         return 1
 
     if not client.load_session():
-        print(f"Not logged in to {args.platform}. Run: tuneshift login {args.platform}", file=sys.stderr)
+        print(
+            f"Not logged in to {args.platform}. Run: tuneshift login {args.platform}",
+            file=sys.stderr,
+        )
         return 1
 
     try:
@@ -22,7 +26,7 @@ def handle_ingest(args, db: Database) -> int:
         print(f"Error: {e}", file=sys.stderr)
         return 1
 
-    msg = f"Ingested \"{name}\" from {args.platform}: {total} tracks ({new} new)"
+    msg = f'Ingested "{name}" from {args.platform}: {total} tracks ({new} new)'
     if skipped:
         msg += f" ({skipped} unavailable, skipped)"
     print(msg)
@@ -33,11 +37,14 @@ def _load_client(platform_name: str):
     """Load a platform client by name."""
     if platform_name == "tidal":
         from tuneshift.platforms.tidal import TidalClient
+
         return TidalClient()
     elif platform_name == "spotify":
         from tuneshift.platforms.spotify import SpotifyClient
+
         return SpotifyClient()
     elif platform_name == "ytmusic":
         from tuneshift.platforms.ytmusic import YTMusicClient
+
         return YTMusicClient()
     return None

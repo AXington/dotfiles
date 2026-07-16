@@ -21,6 +21,7 @@ normalized equivalence key internally. ``canonical``/``same_class`` operate on
 already-normalized names (scoring); ``variants_for_query`` takes a raw name and
 returns the other raw forms (retrieval).
 """
+
 from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
@@ -129,9 +130,7 @@ class AliasResolver:
         # Map each normalized key -> the class's raw members (for expansion).
         self._key_to_raws: dict[str, frozenset[str]] = {}
         for raws in self._classes:
-            keys = sorted(
-                k for k in (normalize_artist(m) for m in raws) if k
-            )
+            keys = sorted(k for k in (normalize_artist(m) for m in raws) if k)
             if not keys:
                 continue
             canonical = keys[0]

@@ -116,9 +116,7 @@ def track_to_metadata(track: Track) -> TrackMetadata:
     key_note = _int_value(metadata.get("key_note"))
     mode = _int_value(metadata.get("mode"))
     camelot_code = (
-        track.key
-        or metadata.get("camelot_code")
-        or isrc_to_camelot(key_note, mode)
+        track.key or metadata.get("camelot_code") or isrc_to_camelot(key_note, mode)
     )
     density = metadata.get("density")
     source = metadata.get("source")
@@ -128,12 +126,20 @@ def track_to_metadata(track: Track) -> TrackMetadata:
         title=track.title,
         artist=track.artist,
         isrc=track.isrc,
-        duration_ms=track.duration_seconds * 1000 if track.duration_seconds is not None else None,
-        bpm=track.tempo if track.tempo is not None else _float_value(metadata.get("tempo") or metadata.get("bpm")),
+        duration_ms=track.duration_seconds * 1000
+        if track.duration_seconds is not None
+        else None,
+        bpm=track.tempo
+        if track.tempo is not None
+        else _float_value(metadata.get("tempo") or metadata.get("bpm")),
         key_note=key_note,
         mode=mode,
-        energy=track.energy if track.energy is not None else _float_value(metadata.get("energy")),
-        valence=track.valence if track.valence is not None else _float_value(metadata.get("valence")),
+        energy=track.energy
+        if track.energy is not None
+        else _float_value(metadata.get("energy")),
+        valence=track.valence
+        if track.valence is not None
+        else _float_value(metadata.get("valence")),
         acousticness=_float_value(metadata.get("acousticness")),
         loudness=_float_value(metadata.get("loudness")),
         danceability=_float_value(metadata.get("danceability")),
@@ -154,7 +160,9 @@ def track_to_metadata(track: Track) -> TrackMetadata:
         opens_with=metadata.get("opens_with"),
         closes_with=metadata.get("closes_with"),
         energy_arc_within=metadata.get("energy_arc_within"),
-        classification_confidence=_float_value(metadata.get("classification_confidence")),
+        classification_confidence=_float_value(
+            metadata.get("classification_confidence")
+        ),
     )
 
 

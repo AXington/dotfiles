@@ -17,8 +17,9 @@ signals.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 from tuneshift.matching.normalize import (
     base_title,
@@ -108,7 +109,7 @@ class ScoringContext:
     prefer: frozenset[str]
     avoid: frozenset[str]
     owned_residuals: frozenset[str]
-    alias_resolver: "AliasResolver | None"
+    alias_resolver: AliasResolver | None
 
 
 def build_context(
@@ -119,7 +120,7 @@ def build_context(
     prefer: frozenset[str] = frozenset(),
     avoid: frozenset[str] = frozenset(),
     owned_residuals: frozenset[str] = frozenset(),
-    alias_resolver: "AliasResolver | None" = None,
+    alias_resolver: AliasResolver | None = None,
 ) -> ScoringContext:
     """Prepare a :class:`ScoringContext` from two track-like objects."""
 
@@ -170,11 +171,22 @@ def _title_emit(ctx: ScoringContext, weights: Weights) -> list[SignalPenalty]:
 
 
 def _artist_emit(ctx: ScoringContext, weights: Weights) -> list[SignalPenalty]:
-    return [artist_signal(ctx.src_artist, ctx.cand_artist, weights, resolver=ctx.alias_resolver)]
+    return [
+        artist_signal(
+            ctx.src_artist, ctx.cand_artist, weights, resolver=ctx.alias_resolver
+        )
+    ]
 
 
 def _album_emit(ctx: ScoringContext, weights: Weights) -> list[SignalPenalty]:
-    return [album_signal(ctx.album_src_norm, ctx.album_cand_norm, weights, source_present=ctx.src_album_present)]
+    return [
+        album_signal(
+            ctx.album_src_norm,
+            ctx.album_cand_norm,
+            weights,
+            source_present=ctx.src_album_present,
+        )
+    ]
 
 
 def _isrc_emit(ctx: ScoringContext, weights: Weights) -> list[SignalPenalty]:
@@ -183,15 +195,25 @@ def _isrc_emit(ctx: ScoringContext, weights: Weights) -> list[SignalPenalty]:
 
 def _version_emit(ctx: ScoringContext, weights: Weights) -> list[SignalPenalty]:
     return source_aware_version_signals(
-        ctx.raw_src_title, ctx.raw_src_album, ctx.raw_cand_title, ctx.raw_cand_album,
-        source_version=ctx.raw_src_version, cand_version=ctx.raw_cand_version,
-        source_explicit=ctx.src_explicit, cand_explicit=ctx.cand_explicit,
-        prefer=ctx.prefer, avoid=ctx.avoid, owned=ctx.owned_residuals, weights=weights,
+        ctx.raw_src_title,
+        ctx.raw_src_album,
+        ctx.raw_cand_title,
+        ctx.raw_cand_album,
+        source_version=ctx.raw_src_version,
+        cand_version=ctx.raw_cand_version,
+        source_explicit=ctx.src_explicit,
+        cand_explicit=ctx.cand_explicit,
+        prefer=ctx.prefer,
+        avoid=ctx.avoid,
+        owned=ctx.owned_residuals,
+        weights=weights,
     )
 
 
 def _duration_emit(ctx: ScoringContext, weights: Weights) -> list[SignalPenalty]:
-    return [duration_signal(ctx.cand_duration, ctx.src_duration, ctx.all_durations, weights)]
+    return [
+        duration_signal(ctx.cand_duration, ctx.src_duration, ctx.all_durations, weights)
+    ]
 
 
 _DEFAULT_CRITERIA: tuple[ScoringCriterion, ...] = (
@@ -219,7 +241,7 @@ def score_signals(
     prefer: frozenset[str] = frozenset(),
     avoid: frozenset[str] = frozenset(),
     owned_residuals: frozenset[str] = frozenset(),
-    alias_resolver: "AliasResolver | None" = None,
+    alias_resolver: AliasResolver | None = None,
 ) -> list[SignalPenalty]:
     """Produce the full base scoring signal list for one candidate.
 
@@ -229,9 +251,13 @@ def score_signals(
     """
 
     ctx = build_context(
-        source, candidate,
-        all_durations=all_durations, prefer=prefer, avoid=avoid,
-        owned_residuals=owned_residuals, alias_resolver=alias_resolver,
+        source,
+        candidate,
+        all_durations=all_durations,
+        prefer=prefer,
+        avoid=avoid,
+        owned_residuals=owned_residuals,
+        alias_resolver=alias_resolver,
     )
     signals: list[SignalPenalty] = []
     for criterion in _DEFAULT_CRITERIA:

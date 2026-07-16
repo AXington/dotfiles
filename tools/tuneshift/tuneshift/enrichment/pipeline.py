@@ -30,8 +30,10 @@ def classify_track_grounded(
     Each source is independently failable (graceful skip on error).
     Returns the classification dict or None on failure.
     """
-    from tuneshift.enrichment.lastfm import get_track_tags, is_available as lastfm_ok
-    from tuneshift.enrichment.genius import get_lyrics, is_available as genius_ok
+    from tuneshift.enrichment.genius import get_lyrics
+    from tuneshift.enrichment.genius import is_available as genius_ok
+    from tuneshift.enrichment.lastfm import get_track_tags
+    from tuneshift.enrichment.lastfm import is_available as lastfm_ok
 
     context_parts: list[str] = []
 
@@ -72,7 +74,9 @@ def classify_track_grounded(
     prompt = _build_synthesis_prompt(title, artist, context)
 
     try:
-        response = classifier._backend.complete(prompt, classifier._model, max_tokens=400)
+        response = classifier._backend.complete(
+            prompt, classifier._model, max_tokens=400
+        )
         return _parse_response(response)
     except (OSError, RuntimeError, ValueError) as exc:
         logger.warning("Classification failed for %s - %s: %s", title, artist, exc)
@@ -92,6 +96,7 @@ def classify_batch_grounded(
     """
     import sys
     import time
+
     results: list[dict | None] = []
     genres_map = artist_genres_map or {}
 
@@ -100,10 +105,18 @@ def classify_batch_grounded(
         artist = track["artist"]
         genres = genres_map.get(artist, [])
 
-        print(f"  [{i + 1}/{len(tracks)}] {title} - {artist}...", end="", flush=True, file=sys.stderr)
+        print(
+            f"  [{i + 1}/{len(tracks)}] {title} - {artist}...",
+            end="",
+            flush=True,
+            file=sys.stderr,
+        )
 
         result = classify_track_grounded(
-            title, artist, artist_genres=genres, classifier=classifier,
+            title,
+            artist,
+            artist_genres=genres,
+            classifier=classifier,
         )
         results.append(result)
 
@@ -162,6 +175,7 @@ def _parse_response(response: str) -> dict | None:
     except json.JSONDecodeError:
         # Try to find JSON in the response
         import re
+
         match = re.search(r"\{[^{}]*\}", response, re.DOTALL)
         if match:
             try:

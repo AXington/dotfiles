@@ -26,11 +26,12 @@ from __future__ import annotations
 
 import math
 import re
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Iterator, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 import yaml
 
@@ -69,11 +70,11 @@ class Strength(str, Enum):
 class Verdict(Enum):
     """The outcome of comparing a candidate against the source for a criterion."""
 
-    NO_VERDICT = auto()   # not referenced by an active preference, or unextractable
-    NEUTRAL = auto()      # referenced, but the candidate neither helped nor hurt
-    SOFT_BONUS = auto()   # soft preference satisfied -> reward
-    SOFT_PENALTY = auto() # soft preference violated -> penalize
-    HARD_PASS = auto()    # hard filter satisfied (require met / forbid absent)
+    NO_VERDICT = auto()  # not referenced by an active preference, or unextractable
+    NEUTRAL = auto()  # referenced, but the candidate neither helped nor hurt
+    SOFT_BONUS = auto()  # soft preference satisfied -> reward
+    SOFT_PENALTY = auto()  # soft preference violated -> penalize
+    HARD_PASS = auto()  # hard filter satisfied (require met / forbid absent)
     HARD_REJECT = auto()  # hard filter failed -> eliminate the candidate
 
     @property
@@ -135,9 +136,7 @@ class Criterion(Protocol):
     def to_signal(self, verdict: Verdict) -> SignalPenalty | None: ...
 
 
-def resolve_strength_verdict(
-    strength: Strength | None, *, satisfied: bool
-) -> Verdict:
+def resolve_strength_verdict(strength: Strength | None, *, satisfied: bool) -> Verdict:
     """Map an active preference strength + candidate satisfaction to a verdict.
 
     ``satisfied`` means "the candidate has the property the preference is about"
@@ -176,9 +175,7 @@ class TokenWhitelist:
     resolve to the same whitelisted token on the ``spatial`` axis.
     """
 
-    def __init__(
-        self, axes: dict[str, list[str]], aliases: dict[str, str]
-    ) -> None:
+    def __init__(self, axes: dict[str, list[str]], aliases: dict[str, str]) -> None:
         self._axis_of: dict[str, str] = {}
         for axis, tokens in axes.items():
             for tok in tokens or ():
@@ -250,7 +247,9 @@ def apply_confidence_gate(
         return verdict
     if _is_confident(value=value, target=target, whitelist=whitelist):
         return verdict
-    return Verdict.SOFT_PENALTY if verdict is Verdict.HARD_REJECT else Verdict.SOFT_BONUS
+    return (
+        Verdict.SOFT_PENALTY if verdict is Verdict.HARD_REJECT else Verdict.SOFT_BONUS
+    )
 
 
 def _title_ngrams(title: object) -> list[str]:
@@ -427,7 +426,9 @@ class EditAxisCriterion:
         # is the album version. Represent that with an empty token set (never
         # None) so ``album_version`` satisfaction can key on the ABSENCE of a
         # competing marker rather than being treated as unextractable.
-        return CriterionValue(raw=(title, version), tokens=tokens, structured=structured)
+        return CriterionValue(
+            raw=(title, version), tokens=tokens, structured=structured
+        )
 
     def compare(
         self,
@@ -437,9 +438,8 @@ class EditAxisCriterion:
     ) -> Verdict:
         target = self.whitelist.canonical(self.target)
         if target == self._ALBUM_VERSION:
-            satisfied = (
-                self._ALBUM_VERSION in candidate.tokens
-                or not (candidate.tokens & self._COMPETING)
+            satisfied = self._ALBUM_VERSION in candidate.tokens or not (
+                candidate.tokens & self._COMPETING
             )
         else:
             satisfied = target in candidate.tokens
@@ -493,8 +493,9 @@ class DateCriterion:
             # evidence to compare years" — represent absence with an explicit
             # marker value so the comparator can distinguish it from "unknown".
             if self.target.strip().lower() == self._ORIGINAL:
-                return CriterionValue(raw=None, tokens=frozenset({self._ORIGINAL}),
-                                      structured=True)
+                return CriterionValue(
+                    raw=None, tokens=frozenset({self._ORIGINAL}), structured=True
+                )
             return None
         year = self._year_of(raw)
         if year is None:
@@ -713,8 +714,9 @@ class ComposerCriterion:
         names = split_artists(str(raw))
         if not names:
             return None
-        return CriterionValue(raw=frozenset(names), tokens=frozenset(names),
-                              structured=True)
+        return CriterionValue(
+            raw=frozenset(names), tokens=frozenset(names), structured=True
+        )
 
     def compare(
         self,

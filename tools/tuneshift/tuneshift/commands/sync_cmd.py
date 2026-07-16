@@ -15,6 +15,7 @@ receives the sequenced order without this command mutating local state at plan
 time; the durable local reorder is persisted only when ``--apply`` succeeds,
 mirroring the previous inline behaviour.
 """
+
 import sys
 
 from tuneshift.db import Database
@@ -23,11 +24,10 @@ from tuneshift.planapply.models import Plan, PlanChange
 from tuneshift.planapply.plan import write_plan
 from tuneshift.planapply.sync import build_sync_plan, make_sync_executor
 
-
 # _apply_sync_plan outcomes.
-_PUSH_APPLIED = 0   # at least one push reached the platform
-_PUSH_FAILED = 1    # a push was attempted and failed
-_PUSH_NOOP = 2      # nothing applied (all changes rejected/skipped) — no push
+_PUSH_APPLIED = 0  # at least one push reached the platform
+_PUSH_FAILED = 1  # a push was attempted and failed
+_PUSH_NOOP = 2  # nothing applied (all changes rejected/skipped) — no push
 
 
 def handle_sync(args, db: Database) -> int:
@@ -60,8 +60,10 @@ def handle_sync(args, db: Database) -> int:
     else:
         platforms = db.get_linked_platforms(playlist.id)
         if not platforms:
-            print("No platforms linked. Specify: tuneshift sync <playlist> <platform>",
-                  file=sys.stderr)
+            print(
+                "No platforms linked. Specify: tuneshift sync <playlist> <platform>",
+                file=sys.stderr,
+            )
             return 1
 
     return _sync_one(db, playlist, platforms, args)
@@ -87,12 +89,17 @@ def _sync_one(db: Database, playlist, platforms, args) -> int:
             print(f"Unknown platform: {platform_name}", file=sys.stderr)
             continue
         if not client.load_session():
-            print(f"Not logged in to {platform_name}. "
-                  f"Run: tuneshift login {platform_name}", file=sys.stderr)
+            print(
+                f"Not logged in to {platform_name}. "
+                f"Run: tuneshift login {platform_name}",
+                file=sys.stderr,
+            )
             continue
 
         plan = build_sync_plan(
-            db, playlist.id, client,
+            db,
+            playlist.id,
+            client,
             platform=platform_name,
             force=getattr(args, "reconcile", False),
             ordered_track_ids=ordered_ids,
@@ -142,8 +149,9 @@ def _arc_order(db: Database, playlist) -> list[int]:
     return sequence_playlist(db, playlist.id, arc=playlist.reorder_arc)
 
 
-def _write_and_report(db: Database, plan: Plan, label: str,
-                      playlist_name: str, platform_name: str) -> None:
+def _write_and_report(
+    db: Database, plan: Plan, label: str, playlist_name: str, platform_name: str
+) -> None:
     """Write the plan and print review/apply guidance (AC-P1, applies nothing)."""
     path = write_plan(db.path, plan)
     n = len(plan.actionable_changes())
@@ -154,8 +162,9 @@ def _write_and_report(db: Database, plan: Plan, label: str,
     print(f'          (or: tuneshift sync "{playlist_name}" {platform_name} --apply)')
 
 
-def _apply_sync_plan(db: Database, client, plan: Plan, platform_name: str,
-                     label: str, args) -> int:
+def _apply_sync_plan(
+    db: Database, client, plan: Plan, platform_name: str, label: str, args
+) -> int:
     """Apply a sync plan's remote push in one step (``--apply``).
 
     Returns one of ``_PUSH_APPLIED`` (a push reached the platform),
@@ -177,8 +186,10 @@ def _apply_sync_plan(db: Database, client, plan: Plan, platform_name: str,
     if report.failed:
         for err in report.errors:
             print(f"  error: {err}", file=sys.stderr)
-        print(f"{label}: push failed "
-              f"(applied {report.applied}, failed {report.failed}).", file=sys.stderr)
+        print(
+            f"{label}: push failed (applied {report.applied}, failed {report.failed}).",
+            file=sys.stderr,
+        )
         return _PUSH_FAILED
     if report.applied:
         print(f"{label}: applied ({report.applied} push).")

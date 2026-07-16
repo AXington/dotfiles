@@ -106,4 +106,4 @@ def all_tie_on_meaningful_tiers(candidates: list[TieCandidate]) -> bool:
     return len(keys) == 1
 
 
-__all__ = ["TieCandidate", "TieBreakResult", "tie_break", "all_tie_on_meaningful_tiers"]
+__all__ = ["TieBreakResult", "TieCandidate", "all_tie_on_meaningful_tiers", "tie_break"]

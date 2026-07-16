@@ -1,4 +1,5 @@
 """Context-aware scoring modifiers for the sequence optimizer."""
+
 from collections import Counter
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
@@ -148,9 +149,9 @@ def energy_monotony_penalty(
         return 1.0
 
     mean = sum(context.recent_energies) / len(context.recent_energies)
-    variance = sum(
-        (energy - mean) ** 2 for energy in context.recent_energies
-    ) / len(context.recent_energies)
+    variance = sum((energy - mean) ** 2 for energy in context.recent_energies) / len(
+        context.recent_energies
+    )
 
     if variance > 0.02:
         return 1.0
@@ -287,7 +288,9 @@ def score_candidate(
         effective_base = min(base_score, 0.55)
 
     modifiers = [
-        artist_recency_penalty(candidate, context, strengths.get("artist_recency", 1.0)),
+        artist_recency_penalty(
+            candidate, context, strengths.get("artist_recency", 1.0)
+        ),
         artist_variety_bonus(candidate, context, strengths.get("artist_variety", 1.0)),
         subgenre_staleness_penalty(
             candidate,
@@ -302,8 +305,12 @@ def score_candidate(
         ),
         narrative_arc_modifier(candidate, context, strengths.get("narrative_arc", 1.0)),
         intensity_arc_modifier(candidate, context, strengths.get("intensity_arc", 1.0)),
-        chapter_break_modifier(candidate, context, intent, strengths.get("chapter_break", 1.0)),
-        duration_pacing_modifier(candidate, context, strengths.get("duration_pacing", 1.0)),
+        chapter_break_modifier(
+            candidate, context, intent, strengths.get("chapter_break", 1.0)
+        ),
+        duration_pacing_modifier(
+            candidate, context, strengths.get("duration_pacing", 1.0)
+        ),
     ]
 
     product = 1.0
@@ -356,8 +363,12 @@ def chapter_break_modifier(
     if intent is None or context.position not in intent.chapter_boundaries:
         return 1.0
 
-    recent_textures = {t.sonic_texture for t in context.recent_tracks if t.sonic_texture}
-    recent_stances = {t.narrator_stance for t in context.recent_tracks if t.narrator_stance}
+    recent_textures = {
+        t.sonic_texture for t in context.recent_tracks if t.sonic_texture
+    }
+    recent_stances = {
+        t.narrator_stance for t in context.recent_tracks if t.narrator_stance
+    }
 
     novelty_bonus = 0.0
     if candidate.sonic_texture and candidate.sonic_texture not in recent_textures:

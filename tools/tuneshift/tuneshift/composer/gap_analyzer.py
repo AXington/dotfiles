@@ -163,7 +163,11 @@ def _build_fill_spec(section: EnhancedSection) -> GapSpec:
         _clamp(center - 0.15),
         _clamp(center + 0.15),
     )
-    keywords = [section.name.lower(), section.transition_in.value, section.transition_out.value]
+    keywords = [
+        section.name.lower(),
+        section.transition_in.value,
+        section.transition_out.value,
+    ]
     if section.implied_stance:
         keywords.append(section.implied_stance)
     for mood in section.mood:

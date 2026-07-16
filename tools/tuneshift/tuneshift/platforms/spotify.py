@@ -41,7 +41,9 @@ def _get_spotify_client_id() -> str:
     try:
         result = subprocess.run(
             ["op", "item", "get", _OP_ITEM_TITLE, "--fields", "credential", "--reveal"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip()
@@ -57,7 +59,9 @@ def _get_spotify_client_id() -> str:
 class SpotifyClient:
     """Spotify streaming platform client."""
 
-    def __init__(self, token_path: Path | None = None, client_id: str | None = None) -> None:
+    def __init__(
+        self, token_path: Path | None = None, client_id: str | None = None
+    ) -> None:
         self._token_path = token_path or _TOKEN_FILE
         self._client_id = client_id or _get_spotify_client_id()
         self._sp: spotipy.Spotify | None = None
@@ -106,7 +110,9 @@ class SpotifyClient:
         """
         spotify = self._ensure_session()
         response = self._call_api(
-            lambda: spotify.search(q=query, type="track", limit=limit, market="from_token")
+            lambda: spotify.search(
+                q=query, type="track", limit=limit, market="from_token"
+            )
         )
         items = response.get("tracks", {}).get("items", [])
         return [self._track_to_result(item) for item in items if item.get("id")]
@@ -115,7 +121,9 @@ class SpotifyClient:
         """Search Spotify by ISRC."""
         spotify = self._ensure_session()
         response = self._call_api(
-            lambda: spotify.search(q=f"isrc:{isrc}", type="track", limit=1, market="from_token")
+            lambda: spotify.search(
+                q=f"isrc:{isrc}", type="track", limit=1, market="from_token"
+            )
         )
         items = response.get("tracks", {}).get("items", [])
         if not items:
@@ -141,7 +149,9 @@ class SpotifyClient:
     def search_album(self, query: str, limit: int = 5) -> list[AlbumResult]:
         """Search Spotify albums by free text."""
         spotify = self._ensure_session()
-        response = self._call_api(lambda: spotify.search(q=query, type="album", limit=limit))
+        response = self._call_api(
+            lambda: spotify.search(q=query, type="album", limit=limit)
+        )
         items = response.get("albums", {}).get("items", [])
         return [self._album_to_result(a) for a in items if a.get("id")]
 
@@ -158,16 +168,20 @@ class SpotifyClient:
                     continue
                 artists = item.get("artists", []) or []
                 duration_ms = item.get("duration_ms")
-                results.append(TrackResult(
-                    platform_id=str(item.get("id", "")),
-                    title=item.get("name", ""),
-                    artist=artists[0].get("name", "") if artists else "",
-                    album=album_name,
-                    duration_seconds=(
-                        int(duration_ms // 1000) if isinstance(duration_ms, int) else None
-                    ),
-                    isrc=None,
-                ))
+                results.append(
+                    TrackResult(
+                        platform_id=str(item.get("id", "")),
+                        title=item.get("name", ""),
+                        artist=artists[0].get("name", "") if artists else "",
+                        album=album_name,
+                        duration_seconds=(
+                            int(duration_ms // 1000)
+                            if isinstance(duration_ms, int)
+                            else None
+                        ),
+                        isrc=None,
+                    )
+                )
             if not page.get("next"):
                 break
             page = self._call_api(lambda p=page: spotify.next(p))
@@ -176,27 +190,35 @@ class SpotifyClient:
     def search_artist(self, query: str, limit: int = 3) -> list[ArtistResult]:
         """Search Spotify artists, returning enriched results."""
         spotify = self._ensure_session()
-        response = self._call_api(lambda: spotify.search(q=query, type="artist", limit=limit))
+        response = self._call_api(
+            lambda: spotify.search(q=query, type="artist", limit=limit)
+        )
         items = response.get("artists", {}).get("items", [])
         results: list[ArtistResult] = []
         for a in items:
             if not a.get("id"):
                 continue
             followers = a.get("followers") or {}
-            results.append(ArtistResult(
-                platform_id=str(a.get("id", "")),
-                name=a.get("name", ""),
-                popularity=a.get("popularity"),
-                genres=list(a.get("genres") or []),
-                followers=followers.get("total") if isinstance(followers, dict) else None,
-            ))
+            results.append(
+                ArtistResult(
+                    platform_id=str(a.get("id", "")),
+                    name=a.get("name", ""),
+                    popularity=a.get("popularity"),
+                    genres=list(a.get("genres") or []),
+                    followers=followers.get("total")
+                    if isinstance(followers, dict)
+                    else None,
+                )
+            )
         return results
 
     def get_artist_albums(self, artist_id: str, limit: int = 20) -> list[AlbumResult]:
         """Return an artist's albums (album + single release types)."""
         spotify = self._ensure_session()
         response = self._call_api(
-            lambda: spotify.artist_albums(artist_id, album_type="album,single", limit=limit)
+            lambda: spotify.artist_albums(
+                artist_id, album_type="album,single", limit=limit
+            )
         )
         items = response.get("items", [])
         return [self._album_to_result(a) for a in items if a.get("id")]
@@ -205,7 +227,9 @@ class SpotifyClient:
         """Return playlist metadata or None if it is not accessible."""
         spotify = self._ensure_session()
         try:
-            playlist = self._call_api(lambda: spotify.playlist(playlist_id, fields="id,name,tracks.total"))
+            playlist = self._call_api(
+                lambda: spotify.playlist(playlist_id, fields="id,name,tracks.total")
+            )
         except SpotifyException as exc:
             if exc.http_status == 404:
                 return None
@@ -264,7 +288,9 @@ class SpotifyClient:
         uris = [self._to_track_uri(track_id) for track_id in track_ids]
         for start in range(0, len(uris), 100):
             batch = uris[start : start + 100]
-            self._call_api(lambda batch=batch: spotify.playlist_add_items(playlist_id, batch))
+            self._call_api(
+                lambda batch=batch: spotify.playlist_add_items(playlist_id, batch)
+            )
         return len(track_ids)
 
     def remove_tracks_by_positions(self, playlist_id: str, positions: list[int]) -> int:
@@ -296,14 +322,18 @@ class SpotifyClient:
         self._call_api(lambda: spotify.playlist_replace_items(playlist_id, uris[:100]))
         for start in range(100, len(uris), 100):
             batch = uris[start : start + 100]
-            self._call_api(lambda batch=batch: spotify.playlist_add_items(playlist_id, batch))
+            self._call_api(
+                lambda batch=batch: spotify.playlist_add_items(playlist_id, batch)
+            )
 
     def find_playlist_by_name(self, name: str) -> PlaylistInfo | None:
         """Find the first current-user playlist with the provided name."""
         spotify = self._ensure_session()
         offset = 0
         while True:
-            page = self._call_api(lambda: spotify.current_user_playlists(limit=50, offset=offset))
+            page = self._call_api(
+                lambda: spotify.current_user_playlists(limit=50, offset=offset)
+            )
             items = page.get("items", [])
             for playlist in items:
                 if playlist.get("name") == name:
@@ -361,7 +391,9 @@ class SpotifyClient:
             title=track.get("name", ""),
             artist=artist_name,
             album=album.get("name", "") if isinstance(album, dict) else "",
-            duration_seconds=int(duration_ms // 1000) if isinstance(duration_ms, int) else None,
+            duration_seconds=int(duration_ms // 1000)
+            if isinstance(duration_ms, int)
+            else None,
             isrc=external_ids.get("isrc") if isinstance(external_ids, dict) else None,
             available=SpotifyClient._extract_availability(track),
         )

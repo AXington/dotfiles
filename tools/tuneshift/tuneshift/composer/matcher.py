@@ -165,7 +165,9 @@ def match_tracks_to_sections(
     if not sections:
         return SectionAssignments(assignments={}, misfits=[], unassigned=list(tracks))
 
-    assignments: dict[str, list[TrackMetadata]] = {section.name: [] for section in sections}
+    assignments: dict[str, list[TrackMetadata]] = {
+        section.name: [] for section in sections
+    }
     used_ids: set[int] = set()
     fitness_by_assignment: dict[tuple[str, int], float] = {}
 

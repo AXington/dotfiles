@@ -1,7 +1,8 @@
 """Curate command: trim, analyze, or fill playlists."""
-from tuneshift.db import Database
+
 from tuneshift.curation.context import PlaylistContext
-from tuneshift.curation.curator import curate_trim, curate_analyze
+from tuneshift.curation.curator import curate_analyze, curate_trim
+from tuneshift.db import Database
 from tuneshift.sequencer.metadata import get_track_metadata_map
 
 
@@ -34,10 +35,14 @@ def handle_curate(args, db: Database) -> int:
         print(f'Analysis for "{args.playlist}" ({len(tracks)} tracks):\n')
         print("Strongest tracks:")
         for entry in report.get("strongest", [])[:5]:
-            print(f"  {entry['title']} - {entry['artist']} (score: {entry['average']:.2f})")
+            print(
+                f"  {entry['title']} - {entry['artist']} (score: {entry['average']:.2f})"
+            )
         print("\nWeakest tracks:")
         for entry in report.get("weakest", [])[:5]:
-            print(f"  {entry['title']} - {entry['artist']} (score: {entry['average']:.2f})")
+            print(
+                f"  {entry['title']} - {entry['artist']} (score: {entry['average']:.2f})"
+            )
         return 0
 
     if args.mode == "trim":
@@ -46,7 +51,8 @@ def handle_curate(args, db: Database) -> int:
             constraints["track_count"] = {
                 "target": args.target_tracks,
                 "tolerance": 2,
-                "hard_limit": getattr(args, "hard_limit", None) or args.target_tracks + 2,
+                "hard_limit": getattr(args, "hard_limit", None)
+                or args.target_tracks + 2,
             }
         stored_constraints = db.get_constraints(pid)
         if stored_constraints:
@@ -55,14 +61,18 @@ def handle_curate(args, db: Database) -> int:
         result = curate_trim(tracks, ctx, constraints)
 
         if args.dry_run:
-            print(f"Dry run: would keep {len(result.keep)}, cut {len(result.cut)} tracks:")
+            print(
+                f"Dry run: would keep {len(result.keep)}, cut {len(result.cut)} tracks:"
+            )
             for track in result.cut:
                 print(f"  CUT: {track.title} - {track.artist}")
         else:
             # Apply the trim
             new_order = [t.track_id for t in result.keep]
             db.set_playlist_tracks(pid, new_order)
-            print(f'Trimmed "{args.playlist}": kept {len(result.keep)}, removed {len(result.cut)} tracks.')
+            print(
+                f'Trimmed "{args.playlist}": kept {len(result.keep)}, removed {len(result.cut)} tracks.'
+            )
         return 0
 
     print(f"Unknown mode: {args.mode}")

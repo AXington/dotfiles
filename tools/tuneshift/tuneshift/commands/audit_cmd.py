@@ -18,17 +18,20 @@ def handle_audit(args, db: Database) -> int:
     else:
         playlists = db.list_playlists()
 
-    run_all = not any([
-        getattr(args, "matching_only", False),
-        getattr(args, "vibes_only", False),
-        getattr(args, "concept_only", False),
-    ])
+    run_all = not any(
+        [
+            getattr(args, "matching_only", False),
+            getattr(args, "vibes_only", False),
+            getattr(args, "concept_only", False),
+        ]
+    )
 
     total_findings = 0
 
     concept_judge = None
     if run_all or getattr(args, "concept_only", False):
         from tuneshift.composer.concept_llm import make_concept_judge
+
         concept_judge = make_concept_judge()
 
     for playlist in playlists:
@@ -47,9 +50,9 @@ def handle_audit(args, db: Database) -> int:
             findings.extend(_audit_banned(db, playlist))
 
         if findings:
-            print(f'\n{"=" * 60}')
-            print(f'  {playlist.name} ({len(findings)} finding(s))')
-            print(f'{"=" * 60}')
+            print(f"\n{'=' * 60}")
+            print(f"  {playlist.name} ({len(findings)} finding(s))")
+            print(f"{'=' * 60}")
             for f in findings:
                 print(f"  {f}")
             total_findings += len(findings)
@@ -57,12 +60,19 @@ def handle_audit(args, db: Database) -> int:
     if total_findings == 0:
         print("All playlists clean.")
     else:
-        print(f"\n{total_findings} total finding(s) across {len(playlists)} playlist(s).")
+        print(
+            f"\n{total_findings} total finding(s) across {len(playlists)} playlist(s)."
+        )
         if getattr(args, "fix", False):
             print("\nGenerating fix plan...")
             # Delegate to batch --review-findings for the specified playlist
             if args.playlist:
-                from tuneshift.commands.batch_cmd import BatchPlan, plan_review_fixes, render_plan
+                from tuneshift.commands.batch_cmd import (
+                    BatchPlan,
+                    plan_review_fixes,
+                    render_plan,
+                )
+
                 ops = plan_review_fixes(db, playlists[0].id, llm_judge=concept_judge)
                 if ops:
                     plan = BatchPlan(
@@ -79,15 +89,19 @@ def handle_audit(args, db: Database) -> int:
 
 def _audit_mappings(db: Database, playlist) -> list[str]:
     """Check platform mapping quality for all tracks in a playlist."""
-    from tuneshift.matching import score_match_with_version, normalize_artist
     from difflib import SequenceMatcher
+
+    from tuneshift.matching import normalize_artist, score_match_with_version
 
     findings: list[str] = []
     tracks = db.get_playlist_tracks(playlist.id)
 
     for track in tracks:
         # Check each platform mapping
-        cols = [r[1] for r in db.conn.execute("PRAGMA table_info(platform_tracks)").fetchall()]
+        cols = [
+            r[1]
+            for r in db.conn.execute("PRAGMA table_info(platform_tracks)").fetchall()
+        ]
         rows = db.conn.execute(
             "SELECT * FROM platform_tracks WHERE track_id = ?", (track.id,)
         ).fetchall()
@@ -105,24 +119,32 @@ def _audit_mappings(db: Database, playlist) -> list[str]:
 
             # Re-score with current algorithm
             score = score_match_with_version(
-                track.title, track.artist, track.album,
-                p_title, p_artist, p_album,
+                track.title,
+                track.artist,
+                track.album,
+                p_title,
+                p_artist,
+                p_album,
             )
 
             # Artist mismatch check
             src_norm = normalize_artist(track.artist)
             res_norm = normalize_artist(p_artist)
-            artist_ratio = SequenceMatcher(None, src_norm, res_norm).ratio() if src_norm and res_norm else 1.0
+            artist_ratio = (
+                SequenceMatcher(None, src_norm, res_norm).ratio()
+                if src_norm and res_norm
+                else 1.0
+            )
 
             if score < 50:
                 findings.append(
-                    f"[MAPPING] {platform}: \"{track.title}\" by {track.artist} -> "
-                    f"matched to \"{p_title}\" by {p_artist} (score: {score}, REJECT)"
+                    f'[MAPPING] {platform}: "{track.title}" by {track.artist} -> '
+                    f'matched to "{p_title}" by {p_artist} (score: {score}, REJECT)'
                 )
             elif artist_ratio < 0.5:
                 findings.append(
-                    f"[MAPPING] {platform}: \"{track.title}\" -> artist mismatch: "
-                    f"expected \"{track.artist}\", got \"{p_artist}\" (ratio: {artist_ratio:.2f})"
+                    f'[MAPPING] {platform}: "{track.title}" -> artist mismatch: '
+                    f'expected "{track.artist}", got "{p_artist}" (ratio: {artist_ratio:.2f})'
                 )
 
     return findings
@@ -148,7 +170,9 @@ def _audit_concept(db: Database, playlist, llm_judge=None) -> list[str]:
     artist_lookup = _build_artist_lookup(db, playlist.id)
 
     review_findings = review_playlist(
-        tracks, concept=concept, artist_lookup=artist_lookup,
+        tracks,
+        concept=concept,
+        artist_lookup=artist_lookup,
         year_lookup=db.get_release_years_for_playlist(playlist.id),
         llm_judge=llm_judge,
         accepted=db.get_concept_acceptances(playlist.id),
@@ -167,7 +191,7 @@ def _audit_concept(db: Database, playlist, llm_judge=None) -> list[str]:
     if unverifiable:
         findings.append(
             f"[UNVERIFIED] {unverifiable} track(s) cannot be verified against concept rules "
-            f"(artists not enriched). Run: tuneshift enrich \"{playlist.name}\" --classify"
+            f'(artists not enriched). Run: tuneshift enrich "{playlist.name}" --classify'
         )
 
     return findings
@@ -195,8 +219,7 @@ def _audit_banned(db: Database, playlist) -> list[str]:
         banned = check_track_against_bans(db, track.title, track.artist)
         if banned:
             findings.append(
-                f"[BANNED] \"{track.title}\" by {track.artist} "
-                f"(banned: {banned})"
+                f'[BANNED] "{track.title}" by {track.artist} (banned: {banned})'
             )
 
     return findings

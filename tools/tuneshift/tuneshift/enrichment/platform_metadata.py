@@ -23,11 +23,13 @@ from tuneshift.platforms.rate_limiter import RateLimiter
 try:
     from tidalapi.exceptions import ObjectNotFound as _TidalObjectNotFound
     from tidalapi.exceptions import TidalAPIError as _TidalAPIError
+
     try:
         from tidalapi.exceptions import AssetNotAvailable as _TidalAssetNotAvailable
     except Exception:  # pragma: no cover - older tidalapi lacks this class
         _TidalAssetNotAvailable = _TidalObjectNotFound
 except Exception:  # pragma: no cover - tidalapi is always present in prod
+
     class _TidalAPIError(Exception):
         pass
 
@@ -36,6 +38,7 @@ except Exception:  # pragma: no cover - tidalapi is always present in prod
 
     class _TidalAssetNotAvailable(_TidalAPIError):
         pass
+
 
 # A delisted album surfaces as either ObjectNotFound or AssetNotAvailable; both
 # are the "stale_album" signal and must be caught before the best-effort swallow.
@@ -81,8 +84,11 @@ def enrich_playlist_from_tidal(
 
     for i, track in enumerate(tracks):
         if not quiet:
-            print(f"  [{i + 1}/{len(tracks)}] {track.title} - {track.artist}...",
-                  end="", flush=True)
+            print(
+                f"  [{i + 1}/{len(tracks)}] {track.title} - {track.artist}...",
+                end="",
+                flush=True,
+            )
 
         # Get platform mapping
         mapping = db.get_platform_mapping(track.id, "tidal")
@@ -120,8 +126,12 @@ def enrich_playlist_from_tidal(
                 derive_tags(db, track.id)
                 enriched += 1
                 qualities = meta.get("audio_qualities", [])
-                atmos = "ATMOS" if "DOLBY_ATMOS" in (
-                    qualities if isinstance(qualities, list) else []) else ""
+                atmos = (
+                    "ATMOS"
+                    if "DOLBY_ATMOS"
+                    in (qualities if isinstance(qualities, list) else [])
+                    else ""
+                )
                 if not quiet:
                     print(f" ok ({meta.get('release_year', '?')}) {atmos}")
             else:
@@ -132,7 +142,7 @@ def enrich_playlist_from_tidal(
             if not quiet:
                 print(f" skip (not found: {exc})")
             skipped += 1
-        except Exception as exc:  # noqa: BLE001 - report and continue the run
+        except Exception as exc:
             if is_permanent(exc):
                 if not quiet:
                     print(" skip (not found)")
@@ -178,8 +188,9 @@ def enrich_all_playlists(
                     continue
                 to_fetch += 1
         print(f"Dry run: {len(playlists)} playlists, {total_tracks} tracks total.")
-        print(f"Would fetch metadata for {to_fetch} tracks "
-              f"(~{to_fetch} Tidal API calls).")
+        print(
+            f"Would fetch metadata for {to_fetch} tracks (~{to_fetch} Tidal API calls)."
+        )
         return 0
 
     client = TidalClient()
@@ -195,17 +206,24 @@ def enrich_all_playlists(
     for playlist in playlists:
         print(f"\n{playlist.name}:")
         enriched, skipped, failed = enrich_playlist_from_tidal(
-            db, playlist.id, refresh=refresh, stale_days=stale_days,
-            max_retries=max_retries, stats=stats, client=client,
+            db,
+            playlist.id,
+            refresh=refresh,
+            stale_days=stale_days,
+            max_retries=max_retries,
+            stats=stats,
+            client=client,
         )
         total_enriched += enriched
         total_skipped += skipped
         total_failed += failed
 
     print("\n" + "=" * 50)
-    print(f"Enriched {total_enriched} tracks, "
-          f"skipped {total_skipped} (cached/no mapping), "
-          f"failed {total_failed} (retries exhausted)")
+    print(
+        f"Enriched {total_enriched} tracks, "
+        f"skipped {total_skipped} (cached/no mapping), "
+        f"failed {total_failed} (retries exhausted)"
+    )
     print(f"Rate limit handling: {stats.summary()}")
     return 0
 
@@ -281,7 +299,9 @@ def fetch_track_report(client, platform_track_id: str) -> dict:
         try:
             artist_obj = client._session.artist(track.artist.id)
             if hasattr(artist_obj, "roles") and artist_obj.roles:
-                genres = [r.category for r in artist_obj.roles if hasattr(r, "category")]
+                genres = [
+                    r.category for r in artist_obj.roles if hasattr(r, "category")
+                ]
         except _BEST_EFFORT_ERRORS:
             pass
 
@@ -296,11 +316,13 @@ def fetch_track_report(client, platform_track_id: str) -> dict:
         "explicit": getattr(track, "explicit", None),
         "duration_ms": duration_s * 1000 if duration_s else None,
         "popularity": getattr(track, "popularity", None),
-        "raw_metadata": json.dumps({
-            "id": platform_track_id,
-            "audio_quality": getattr(track, "audio_quality", None),
-            "audio_modes": getattr(track, "audio_modes", None),
-        }),
+        "raw_metadata": json.dumps(
+            {
+                "id": platform_track_id,
+                "audio_quality": getattr(track, "audio_quality", None),
+                "audio_modes": getattr(track, "audio_modes", None),
+            }
+        ),
     }
 
     return {
@@ -410,7 +432,9 @@ def analyze_playlist(db: Database, playlist_id: int) -> dict:
             if isinstance(qualities, list):
                 if "DOLBY_ATMOS" in qualities:
                     atmos_count += 1
-                if any(q in qualities for q in ("LOSSLESS", "HI_RES_LOSSLESS", "HI_RES")):
+                if any(
+                    q in qualities for q in ("LOSSLESS", "HI_RES_LOSSLESS", "HI_RES")
+                ):
                     lossless_count += 1
             genres = meta.get("genres", [])
             if isinstance(genres, list):
@@ -430,8 +454,11 @@ def analyze_playlist(db: Database, playlist_id: int) -> dict:
             era = f"{min_year}-{max_year}"
         else:
             from collections import Counter
+
             decade_counts = Counter((y // 10) * 10 for y in years)
-            era = ", ".join(f"{d}s ({c}/{len(years)})" for d, c in decade_counts.most_common(3))
+            era = ", ".join(
+                f"{d}s ({c}/{len(years)})" for d, c in decade_counts.most_common(3)
+            )
 
     # Top genres
     top_genres = sorted(genres_counter.items(), key=lambda x: -x[1])[:5]

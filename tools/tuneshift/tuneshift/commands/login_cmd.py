@@ -1,4 +1,5 @@
 """Login command: authenticate with a streaming platform."""
+
 import sys
 
 

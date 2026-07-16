@@ -26,11 +26,23 @@ _ARTIST_MUST_BE_RE = re.compile(r"artist must be (\w+)", re.IGNORECASE)
 _NO_GENRE_RE = re.compile(r"no (\w+)", re.IGNORECASE)
 
 # "queer" is an umbrella: any of these tags satisfies "artist must be queer"
-_QUEER_UMBRELLA = frozenset({
-    "queer", "gay", "lesbian", "bisexual", "trans", "nonbinary",
-    "pansexual", "genderqueer", "genderfluid", "intersex", "asexual",
-    "two-spirit", "questioning",
-})
+_QUEER_UMBRELLA = frozenset(
+    {
+        "queer",
+        "gay",
+        "lesbian",
+        "bisexual",
+        "trans",
+        "nonbinary",
+        "pansexual",
+        "genderqueer",
+        "genderfluid",
+        "intersex",
+        "asexual",
+        "two-spirit",
+        "questioning",
+    }
+)
 
 
 def _energy_value(track: TrackMetadata) -> float:
@@ -80,12 +92,17 @@ def _review_section_integrity(
     sections: list[EnhancedSection],
 ) -> list[ReviewFinding]:
     findings: list[ReviewFinding] = []
-    positions = {track.track_id: index + 1 for index, track in enumerate(ordered_tracks)}
+    positions = {
+        track.track_id: index + 1 for index, track in enumerate(ordered_tracks)
+    }
 
     for section in sections:
         for required_title in section.required_tracks:
             assigned_tracks = assignments.assignments.get(section.name, [])
-            if not any(track.title.casefold() == required_title.casefold() for track in assigned_tracks):
+            if not any(
+                track.title.casefold() == required_title.casefold()
+                for track in assigned_tracks
+            ):
                 findings.append(
                     ReviewFinding(
                         category="section_integrity",
@@ -183,7 +200,9 @@ def _check_rule_against_artist(rule: str, artist: Artist) -> bool | None:
                     return True
             # Check identity dict for sexuality/gender_identity
             if artist.identity:
-                identity_values = " ".join(str(v) for v in artist.identity.values()).casefold()
+                identity_values = " ".join(
+                    str(v) for v in artist.identity.values()
+                ).casefold()
                 if any(term in identity_values for term in _QUEER_UMBRELLA):
                     return True
                 if artist.identity_confidence == "confirmed":
@@ -195,7 +214,9 @@ def _check_rule_against_artist(rule: str, artist: Artist) -> bool | None:
         # Specific tag check (e.g., "artist must be trans")
         if not artist.tags:
             if artist.identity:
-                identity_values = " ".join(str(v) for v in artist.identity.values()).casefold()
+                identity_values = " ".join(
+                    str(v) for v in artist.identity.values()
+                ).casefold()
                 if required_tag in identity_values:
                     return True
                 if artist.identity_confidence == "confirmed":
@@ -219,38 +240,44 @@ def _enforce_artist_tag(
         artist_key = track.artist.casefold() if track.artist else ""
         artist = artist_lookup.get(artist_key)
         if artist is None:
-            findings.append(ReviewFinding(
-                category="concept_violation",
-                description=(
-                    f'HARD: "{track.title}" by {track.artist} - '
-                    f'Rule: "{rule}" - artist not in library, cannot verify'
-                ),
-                severity=0.5,
-                section_name=None,
-            ))
+            findings.append(
+                ReviewFinding(
+                    category="concept_violation",
+                    description=(
+                        f'HARD: "{track.title}" by {track.artist} - '
+                        f'Rule: "{rule}" - artist not in library, cannot verify'
+                    ),
+                    severity=0.5,
+                    section_name=None,
+                )
+            )
             continue
         result = _check_rule_against_artist(rule, artist)
         if result is False:
-            findings.append(ReviewFinding(
-                category="concept_violation",
-                description=(
-                    f'HARD: "{track.title}" by {track.artist} - '
-                    f'Rule: "{rule}" - FAILS '
-                    f'(tags: {artist.tags}, confidence: {artist.identity_confidence})'
-                ),
-                severity=1.0,
-                section_name=None,
-            ))
+            findings.append(
+                ReviewFinding(
+                    category="concept_violation",
+                    description=(
+                        f'HARD: "{track.title}" by {track.artist} - '
+                        f'Rule: "{rule}" - FAILS '
+                        f"(tags: {artist.tags}, confidence: {artist.identity_confidence})"
+                    ),
+                    severity=1.0,
+                    section_name=None,
+                )
+            )
         elif result is None:
-            findings.append(ReviewFinding(
-                category="concept_violation",
-                description=(
-                    f'UNKNOWN: "{track.title}" by {track.artist} - '
-                    f'Rule: "{rule}" - artist not enriched, cannot verify'
-                ),
-                severity=0.3,
-                section_name=None,
-            ))
+            findings.append(
+                ReviewFinding(
+                    category="concept_violation",
+                    description=(
+                        f'UNKNOWN: "{track.title}" by {track.artist} - '
+                        f'Rule: "{rule}" - artist not enriched, cannot verify'
+                    ),
+                    severity=0.3,
+                    section_name=None,
+                )
+            )
     return findings
 
 
@@ -271,25 +298,29 @@ def _enforce_era(
             continue
         year = year_lookup.get(track.track_id)
         if year is None:
-            findings.append(ReviewFinding(
-                category="concept_violation",
-                description=(
-                    f'UNKNOWN: "{track.title}" by {track.artist} - '
-                    f'Rule: "{rule}" - release year unavailable, cannot verify'
-                ),
-                severity=0.3,
-                section_name=None,
-            ))
+            findings.append(
+                ReviewFinding(
+                    category="concept_violation",
+                    description=(
+                        f'UNKNOWN: "{track.title}" by {track.artist} - '
+                        f'Rule: "{rule}" - release year unavailable, cannot verify'
+                    ),
+                    severity=0.3,
+                    section_name=None,
+                )
+            )
         elif not (lo <= year <= hi):
-            findings.append(ReviewFinding(
-                category="concept_violation",
-                description=(
-                    f'HARD: "{track.title}" by {track.artist} - '
-                    f'Rule: "{rule}" - FAILS (released {year}, outside {lo}-{hi})'
-                ),
-                severity=1.0,
-                section_name=None,
-            ))
+            findings.append(
+                ReviewFinding(
+                    category="concept_violation",
+                    description=(
+                        f'HARD: "{track.title}" by {track.artist} - '
+                        f'Rule: "{rule}" - FAILS (released {year}, outside {lo}-{hi})'
+                    ),
+                    severity=1.0,
+                    section_name=None,
+                )
+            )
     return findings
 
 
@@ -302,15 +333,17 @@ def _enforce_thematic_unavailable(
     Emitted ONCE per rule (not per track), so it never claims "artist not in
     library" for a rule that has nothing to do with artist identity.
     """
-    return [ReviewFinding(
-        category="concept_violation",
-        description=(
-            f'UNKNOWN: Rule "{rule}" is a thematic rule - requires an LLM backend '
-            f'to evaluate; none supplied.'
-        ),
-        severity=0.3,
-        section_name=None,
-    )]
+    return [
+        ReviewFinding(
+            category="concept_violation",
+            description=(
+                f'UNKNOWN: Rule "{rule}" is a thematic rule - requires an LLM backend '
+                f"to evaluate; none supplied."
+            ),
+            severity=0.3,
+            section_name=None,
+        )
+    ]
 
 
 def _enforce_thematic_llm(
@@ -344,25 +377,29 @@ def _enforce_thematic_llm(
     for track in judged:
         verdict = verdicts.get(track.track_id, "unsure")
         if verdict == "violates":
-            findings.append(ReviewFinding(
-                category="concept_violation",
-                description=(
-                    f'HARD: "{track.title}" by {track.artist} - '
-                    f'Rule: "{rule}" - FAILS (LLM judged the track violates it)'
-                ),
-                severity=1.0,
-                section_name=None,
-            ))
+            findings.append(
+                ReviewFinding(
+                    category="concept_violation",
+                    description=(
+                        f'HARD: "{track.title}" by {track.artist} - '
+                        f'Rule: "{rule}" - FAILS (LLM judged the track violates it)'
+                    ),
+                    severity=1.0,
+                    section_name=None,
+                )
+            )
         elif verdict != "complies":
-            findings.append(ReviewFinding(
-                category="concept_violation",
-                description=(
-                    f'UNKNOWN: "{track.title}" by {track.artist} - '
-                    f'Rule: "{rule}" - LLM was unsure, cannot verify'
-                ),
-                severity=0.3,
-                section_name=None,
-            ))
+            findings.append(
+                ReviewFinding(
+                    category="concept_violation",
+                    description=(
+                        f'UNKNOWN: "{track.title}" by {track.artist} - '
+                        f'Rule: "{rule}" - LLM was unsure, cannot verify'
+                    ),
+                    severity=0.3,
+                    section_name=None,
+                )
+            )
     return findings
 
 
@@ -373,8 +410,13 @@ def _review_soft_rules(
     """Soft-rule mood-contradiction check against track vibes/themes."""
     findings: list[ReviewFinding] = []
     contradictions = {
-        ("celebration", "joy", "pride", "happy", "upbeat"):
-            {"sad", "depressing", "heartbreak", "grief", "mourning"},
+        ("celebration", "joy", "pride", "happy", "upbeat"): {
+            "sad",
+            "depressing",
+            "heartbreak",
+            "grief",
+            "mourning",
+        },
     }
     for rule in concept.soft_rules:
         rule_words = set(re.findall(r"[a-z]+", rule.casefold()))
@@ -384,19 +426,23 @@ def _review_soft_rules(
                 for item in group:
                     track_words.update(re.findall(r"[a-z]+", item.casefold()))
             if track.lyrical_subject:
-                track_words.update(re.findall(r"[a-z]+", track.lyrical_subject.casefold()))
+                track_words.update(
+                    re.findall(r"[a-z]+", track.lyrical_subject.casefold())
+                )
             for positive_set, negative_set in contradictions.items():
                 if rule_words & set(positive_set) and track_words & negative_set:
-                    findings.append(ReviewFinding(
-                        category="soft_rule_mismatch",
-                        description=(
-                            f'"{track.title}" by {track.artist} - '
-                            f'vibes [{", ".join(track.vibes)}] may not fit '
-                            f'playlist mood: "{rule}"'
-                        ),
-                        severity=0.5,
-                        section_name=None,
-                    ))
+                    findings.append(
+                        ReviewFinding(
+                            category="soft_rule_mismatch",
+                            description=(
+                                f'"{track.title}" by {track.artist} - '
+                                f"vibes [{', '.join(track.vibes)}] may not fit "
+                                f'playlist mood: "{rule}"'
+                            ),
+                            severity=0.5,
+                            section_name=None,
+                        )
+                    )
     return findings
 
 
@@ -425,9 +471,7 @@ def _review_concept_compliance(
     findings: list[ReviewFinding] = []
     for rule in concept.hard_rules:
         rule_key = normalize_rule_key(rule)
-        accepted_ids = frozenset(
-            tid for (tid, rk) in accepted_pairs if rk == rule_key
-        )
+        accepted_ids = frozenset(tid for (tid, rk) in accepted_pairs if rk == rule_key)
         kind = classify_rule(rule)
         if kind is RuleKind.ARTIST_TAG:
             findings.extend(
@@ -461,7 +505,10 @@ def _review_section_fitness(
             # Stance alignment
             if section.implied_stance and track.narrator_stance:
                 checks += 1
-                if track.narrator_stance.casefold() == section.implied_stance.casefold():
+                if (
+                    track.narrator_stance.casefold()
+                    == section.implied_stance.casefold()
+                ):
                     score += 1.0
                 else:
                     score += 0.2
@@ -470,7 +517,9 @@ def _review_section_fitness(
             if section.implied_intensity is not None:
                 track_intensity = track.emotional_intensity or track.energy or 0.5
                 checks += 1
-                score += max(0.0, 1.0 - abs(track_intensity - section.implied_intensity))
+                score += max(
+                    0.0, 1.0 - abs(track_intensity - section.implied_intensity)
+                )
 
             # Mood overlap
             if section.mood and track.vibes:
@@ -485,17 +534,19 @@ def _review_section_fitness(
 
             fitness = score / checks
             if fitness < 0.25:
-                findings.append(ReviewFinding(
-                    category="section_misfit",
-                    description=(
-                        f'"{track.title}" by {track.artist} - '
-                        f'fitness {fitness:.2f} in {section.name} '
-                        f'(section wants: {section.implied_stance or "any"} / '
-                        f'{", ".join(section.mood) if section.mood else "any mood"})'
-                    ),
-                    severity=0.7,
-                    section_name=section.name,
-                ))
+                findings.append(
+                    ReviewFinding(
+                        category="section_misfit",
+                        description=(
+                            f'"{track.title}" by {track.artist} - '
+                            f"fitness {fitness:.2f} in {section.name} "
+                            f"(section wants: {section.implied_stance or 'any'} / "
+                            f"{', '.join(section.mood) if section.mood else 'any mood'})"
+                        ),
+                        severity=0.7,
+                        section_name=section.name,
+                    )
+                )
 
     return findings
 
@@ -519,15 +570,27 @@ def review_composition(
         findings.extend(_review_section_fitness(assignments, sections))
 
     if concept and concept.has_hard_rules:
-        findings.extend(_review_concept_compliance(
-            ordered_tracks, concept, artist_lookup or {},
-            year_lookup=year_lookup, llm_judge=llm_judge, accepted=accepted,
-        ))
+        findings.extend(
+            _review_concept_compliance(
+                ordered_tracks,
+                concept,
+                artist_lookup or {},
+                year_lookup=year_lookup,
+                llm_judge=llm_judge,
+                accepted=accepted,
+            )
+        )
     elif concept and concept.soft_rules:
-        findings.extend(_review_concept_compliance(
-            ordered_tracks, concept, artist_lookup or {},
-            year_lookup=year_lookup, llm_judge=llm_judge, accepted=accepted,
-        ))
+        findings.extend(
+            _review_concept_compliance(
+                ordered_tracks,
+                concept,
+                artist_lookup or {},
+                year_lookup=year_lookup,
+                llm_judge=llm_judge,
+                accepted=accepted,
+            )
+        )
 
     return findings
 
@@ -549,10 +612,16 @@ def review_playlist(
     """
     findings: list[ReviewFinding] = []
     if concept:
-        findings.extend(_review_concept_compliance(
-            tracks, concept, artist_lookup or {},
-            year_lookup=year_lookup, llm_judge=llm_judge, accepted=accepted,
-        ))
+        findings.extend(
+            _review_concept_compliance(
+                tracks,
+                concept,
+                artist_lookup or {},
+                year_lookup=year_lookup,
+                llm_judge=llm_judge,
+                accepted=accepted,
+            )
+        )
     findings.extend(_review_vibe_outliers(tracks))
     return findings
 
@@ -569,24 +638,111 @@ def _review_vibe_outliers(tracks: list[TrackMetadata]) -> list[ReviewFinding]:
 
     # Map vibes to broad categories for fuzzy comparison
     _VIBE_CATEGORIES: dict[str, set[str]] = {
-        "upbeat": {"upbeat", "energetic", "playful", "joyful", "fun", "lively",
-                   "bouncy", "danceable", "celebratory", "exuberant", "groovy"},
-        "dark": {"dark", "haunting", "eerie", "sinister", "ominous", "gothic",
-                 "brooding", "foreboding", "menacing", "gloomy"},
-        "melancholic": {"melancholic", "sad", "sorrowful", "longing", "wistful",
-                        "bittersweet", "nostalgic", "yearning", "mournful", "heartbreak"},
-        "intense": {"intense", "passionate", "powerful", "anthemic", "dramatic",
-                    "emotive", "fierce", "urgent", "explosive", "raw"},
-        "confident": {"confident", "assertive", "sassy", "empowering", "bold",
-                      "defiant", "swagger", "fierce", "proud", "independent"},
-        "romantic": {"romantic", "sensual", "tender", "intimate", "loving",
-                     "flirtatious", "arousing", "seductive", "warm", "affectionate"},
-        "chill": {"chill", "mellow", "relaxed", "laid-back", "dreamy", "smooth",
-                  "atmospheric", "ambient", "peaceful", "serene"},
-        "country": {"country", "folk", "acoustic", "nashville", "twangy",
-                    "americana", "bluegrass", "honky-tonk"},
-        "rock": {"rock", "gritty", "distorted", "heavy", "punk", "grunge",
-                 "alternative", "garage"},
+        "upbeat": {
+            "upbeat",
+            "energetic",
+            "playful",
+            "joyful",
+            "fun",
+            "lively",
+            "bouncy",
+            "danceable",
+            "celebratory",
+            "exuberant",
+            "groovy",
+        },
+        "dark": {
+            "dark",
+            "haunting",
+            "eerie",
+            "sinister",
+            "ominous",
+            "gothic",
+            "brooding",
+            "foreboding",
+            "menacing",
+            "gloomy",
+        },
+        "melancholic": {
+            "melancholic",
+            "sad",
+            "sorrowful",
+            "longing",
+            "wistful",
+            "bittersweet",
+            "nostalgic",
+            "yearning",
+            "mournful",
+            "heartbreak",
+        },
+        "intense": {
+            "intense",
+            "passionate",
+            "powerful",
+            "anthemic",
+            "dramatic",
+            "emotive",
+            "fierce",
+            "urgent",
+            "explosive",
+            "raw",
+        },
+        "confident": {
+            "confident",
+            "assertive",
+            "sassy",
+            "empowering",
+            "bold",
+            "defiant",
+            "swagger",
+            "fierce",
+            "proud",
+            "independent",
+        },
+        "romantic": {
+            "romantic",
+            "sensual",
+            "tender",
+            "intimate",
+            "loving",
+            "flirtatious",
+            "arousing",
+            "seductive",
+            "warm",
+            "affectionate",
+        },
+        "chill": {
+            "chill",
+            "mellow",
+            "relaxed",
+            "laid-back",
+            "dreamy",
+            "smooth",
+            "atmospheric",
+            "ambient",
+            "peaceful",
+            "serene",
+        },
+        "country": {
+            "country",
+            "folk",
+            "acoustic",
+            "nashville",
+            "twangy",
+            "americana",
+            "bluegrass",
+            "honky-tonk",
+        },
+        "rock": {
+            "rock",
+            "gritty",
+            "distorted",
+            "heavy",
+            "punk",
+            "grunge",
+            "alternative",
+            "garage",
+        },
     }
 
     def categorize_vibes(vibes: list[str]) -> set[str]:
@@ -620,7 +776,9 @@ def _review_vibe_outliers(tracks: list[TrackMetadata]) -> list[ReviewFinding]:
         return []
 
     # Dominant categories for display (appearing in >25% of tracks)
-    dominant_cats = {c for c, count in cat_counts.items() if count >= tracks_with_vibes * 0.25}
+    dominant_cats = {
+        c for c, count in cat_counts.items() if count >= tracks_with_vibes * 0.25
+    }
 
     findings: list[ReviewFinding] = []
 
@@ -638,30 +796,34 @@ def _review_vibe_outliers(tracks: list[TrackMetadata]) -> list[ReviewFinding]:
 
         # Pure outlier: NO overlap at all with anything on the playlist
         if not overlap:
-            findings.append(ReviewFinding(
-                category="vibe_outlier",
-                description=(
-                    f'"{track.title}" by {track.artist} - '
-                    f'vibes [{", ".join(sorted(track.vibes)[:4])}] '
-                    f'(categories: {", ".join(sorted(track_cats))}) '
-                    f'do not match playlist profile '
-                    f'(dominant: {", ".join(sorted(dominant_cats or present_cats))})'
-                ),
-                severity=0.7,
-                section_name=None,
-            ))
+            findings.append(
+                ReviewFinding(
+                    category="vibe_outlier",
+                    description=(
+                        f'"{track.title}" by {track.artist} - '
+                        f"vibes [{', '.join(sorted(track.vibes)[:4])}] "
+                        f"(categories: {', '.join(sorted(track_cats))}) "
+                        f"do not match playlist profile "
+                        f"(dominant: {', '.join(sorted(dominant_cats or present_cats))})"
+                    ),
+                    severity=0.7,
+                    section_name=None,
+                )
+            )
         # Partial outlier: has foreign categories that appear nowhere else
         # AND those foreign categories are genre-defining (country, rock)
         elif foreign_cats & {"country", "rock"}:
-            findings.append(ReviewFinding(
-                category="vibe_outlier",
-                description=(
-                    f'"{track.title}" by {track.artist} - '
-                    f'includes [{", ".join(sorted(foreign_cats))}] vibes '
-                    f'not found elsewhere on this playlist'
-                ),
-                severity=0.5,
-                section_name=None,
-            ))
+            findings.append(
+                ReviewFinding(
+                    category="vibe_outlier",
+                    description=(
+                        f'"{track.title}" by {track.artist} - '
+                        f"includes [{', '.join(sorted(foreign_cats))}] vibes "
+                        f"not found elsewhere on this playlist"
+                    ),
+                    severity=0.5,
+                    section_name=None,
+                )
+            )
 
     return findings

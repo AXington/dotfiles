@@ -62,7 +62,9 @@ class RateLimiter:
         if not self._adaptive:
             return
 
-        remaining = headers.get("X-RateLimit-Remaining") or headers.get("x-ratelimit-remaining")
+        remaining = headers.get("X-RateLimit-Remaining") or headers.get(
+            "x-ratelimit-remaining"
+        )
         reset = headers.get("X-RateLimit-Reset") or headers.get("x-ratelimit-reset")
 
         if remaining is not None:

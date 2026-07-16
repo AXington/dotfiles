@@ -1,4 +1,5 @@
 """Narrative command: set or display the intended narrative arc for a playlist."""
+
 import sys
 from pathlib import Path
 

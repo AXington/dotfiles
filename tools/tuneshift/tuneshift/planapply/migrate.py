@@ -27,8 +27,13 @@ from tuneshift.reconcile import reconcile_track
 _CONFIDENT = "high"
 
 
-def _mapping_row(track_id: int, platform: str, platform_track_id: str, status: str,
-                 user_approved: int) -> dict:
+def _mapping_row(
+    track_id: int,
+    platform: str,
+    platform_track_id: str,
+    status: str,
+    user_approved: int,
+) -> dict:
     return {
         "track_id": track_id,
         "platform": platform,
@@ -62,7 +67,9 @@ def build_migration_plan(
     ``unchanged``; anything the engine cannot confidently improve is
     ``needs-human-judgment`` and left as-is.
     """
-    candidates = track_ids if track_ids is not None else _candidate_track_ids(db, platform)
+    candidates = (
+        track_ids if track_ids is not None else _candidate_track_ids(db, platform)
+    )
 
     changes: list[PlanChange] = []
     change_id = 0

@@ -14,6 +14,7 @@ a platform cannot tell the two apart (YouTube Music, per the availability
 spike), the honest verdict is :data:`Availability.AMBIGUOUS`, never a confident
 "not found".
 """
+
 from __future__ import annotations
 
 import json
@@ -42,9 +43,15 @@ class Availability:
     #: Genuinely no acceptable candidate on a platform we *can* trust.
     NOT_FOUND = "not_found"
 
-    ALL = frozenset({
-        EXACT_AVAILABLE, EXACT_UNAVAILABLE, SUBSTITUTE_AVAILABLE, AMBIGUOUS, NOT_FOUND,
-    })
+    ALL = frozenset(
+        {
+            EXACT_AVAILABLE,
+            EXACT_UNAVAILABLE,
+            SUBSTITUTE_AVAILABLE,
+            AMBIGUOUS,
+            NOT_FOUND,
+        }
+    )
 
 
 class ReasonCode:
@@ -242,7 +249,8 @@ class MatchAudit:
             note=data.get("note"),
             criteria=[CriterionOutcome.from_dict(c) for c in data.get("criteria", [])],
             signal_breakdown=[
-                SignalContribution.from_dict(s) for s in data.get("signal_breakdown", [])
+                SignalContribution.from_dict(s)
+                for s in data.get("signal_breakdown", [])
             ],
             tie_break=data.get("tie_break"),
         )
@@ -288,9 +296,9 @@ def describe_availability(state: str) -> str:
 
 __all__ = [
     "Availability",
+    "MatchAudit",
     "ReasonCode",
     "RejectedCandidate",
-    "MatchAudit",
-    "describe_reason",
     "describe_availability",
+    "describe_reason",
 ]

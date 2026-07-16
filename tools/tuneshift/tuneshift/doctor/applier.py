@@ -39,8 +39,9 @@ class ApplyResult:
     affected_playlists: set[str] = field(default_factory=set)
 
 
-def preview_apply(items: list[PlanItem],
-                  overrides: dict[int, str] | None = None) -> list[tuple[PlanItem, str, str]]:
+def preview_apply(
+    items: list[PlanItem], overrides: dict[int, str] | None = None
+) -> list[tuple[PlanItem, str, str]]:
     """Classify what an apply run would do, without touching the database.
 
     Returns a list of ``(item, action, detail)`` where action is one of
@@ -60,8 +61,11 @@ def preview_apply(items: list[PlanItem],
                 detail = f"-> {item.proposed_platform_id} (conf {item.confidence})"
             preview.append((item, "auto", detail))
         else:
-            reason = ("no candidate found" if not item.proposed_platform_id
-                      else f"low confidence ({item.confidence}); needs --override")
+            reason = (
+                "no candidate found"
+                if not item.proposed_platform_id
+                else f"low confidence ({item.confidence}); needs --override"
+            )
             preview.append((item, "skip", reason))
     return preview
 
@@ -69,14 +73,18 @@ def preview_apply(items: list[PlanItem],
 def _apply_override(item: PlanItem, override: str) -> None:
     """Apply an operator override string to an item before it is applied."""
     if item.issue == "stale_album":
-        print(f"  ! Override for stale_album item {item.id} ignored "
-              "(metadata-only fix).", file=sys.stderr)
+        print(
+            f"  ! Override for stale_album item {item.id} ignored (metadata-only fix).",
+            file=sys.stderr,
+        )
         return
     if item.issue == "duplicate":
         try:
             new_keep = int(override)
         except (TypeError, ValueError) as exc:
-            raise ApplyError(f"duplicate override must be a track id, got {override!r}") from exc
+            raise ApplyError(
+                f"duplicate override must be a track id, got {override!r}"
+            ) from exc
         group = [item.keep_track_id, *item.merge_track_ids]
         if new_keep not in group:
             raise ApplyError(
@@ -93,17 +101,19 @@ def _apply_override(item: PlanItem, override: str) -> None:
 def _apply_remap(db: Database, item: PlanItem) -> None:
     if not item.proposed_platform_id:
         raise ApplyError("no proposed platform id (item is manual; provide --override)")
-    db.upsert_platform_mapping(PlatformMapping(
-        track_id=item.track_id,
-        platform=PLATFORM,
-        platform_track_id=item.proposed_platform_id,
-        platform_title=item.proposed_title or item.title,
-        platform_artist=item.artist,
-        platform_album=item.proposed_album or "",
-        match_score=item.confidence or 100,
-        status="matched",
-        user_approved=True,
-    ))
+    db.upsert_platform_mapping(
+        PlatformMapping(
+            track_id=item.track_id,
+            platform=PLATFORM,
+            platform_track_id=item.proposed_platform_id,
+            platform_title=item.proposed_title or item.title,
+            platform_artist=item.artist,
+            platform_album=item.proposed_album or "",
+            match_score=item.confidence or 100,
+            status="matched",
+            user_approved=True,
+        )
+    )
 
 
 def _apply_merge(db: Database, item: PlanItem) -> None:
@@ -128,7 +138,7 @@ def _apply_stale_album(db: Database, client, item: PlanItem) -> None:
     query = f"{track.artist} {track.album}"
     try:
         results = client.search_album(query, limit=5)
-    except Exception as exc:  # noqa: BLE001 - surface as an apply failure
+    except Exception as exc:
         raise ApplyError(f"album search failed: {exc}") from exc
 
     from tuneshift.matching import classify_album_results, score_album_match
@@ -149,7 +159,9 @@ def _apply_stale_album(db: Database, client, item: PlanItem) -> None:
         raise ApplyError("could not recover release year from album search")
 
     db.upsert_track_platform_metadata(
-        item.track_id, PLATFORM, item.current_platform_id or "",
+        item.track_id,
+        PLATFORM,
+        item.current_platform_id or "",
         release_year=match.release_year,
         release_date=f"{match.release_year}-01-01",
         album_name=track.album,
@@ -187,7 +199,7 @@ def _reenrich_track(db: Database, client, item: PlanItem, stats: RetryStats) -> 
             # metadata (the upsert alone never wrote tags -- that gap is why an
             # Atmos-mapped track stayed untagged after doctor --apply).
             platform_metadata.derive_tags(db, item.track_id)
-    except Exception:  # noqa: BLE001 - enrichment is non-critical
+    except Exception:
         pass
 
 
@@ -196,18 +208,29 @@ def _sync_playlist(db: Database, name: str) -> bool:
     from tuneshift.commands.sync_cmd import handle_sync
 
     args = SimpleNamespace(
-        playlist=name, platform=PLATFORM, all=False, auto=True, reconcile=False,
+        playlist=name,
+        platform=PLATFORM,
+        all=False,
+        auto=True,
+        reconcile=False,
     )
     try:
         return handle_sync(args, db) == 0
-    except Exception as exc:  # noqa: BLE001 - sync failure must not roll back DB
-        print(f"  ! Sync of \"{name}\" failed: {exc}", file=sys.stderr)
+    except Exception as exc:
+        print(f'  ! Sync of "{name}" failed: {exc}', file=sys.stderr)
         return False
 
 
-def apply_plan(db: Database, plan: DoctorPlan, items: list[PlanItem], *,
-               overrides: dict[int, str] | None = None, client=None,
-               do_sync: bool = True, quiet: bool = False) -> ApplyResult:
+def apply_plan(
+    db: Database,
+    plan: DoctorPlan,
+    items: list[PlanItem],
+    *,
+    overrides: dict[int, str] | None = None,
+    client=None,
+    do_sync: bool = True,
+    quiet: bool = False,
+) -> ApplyResult:
     """Apply the given items. Mutates each item's status and returns a summary.
 
     Items whose resolution is ``manual`` with no override are skipped. DB
@@ -218,6 +241,7 @@ def apply_plan(db: Database, plan: DoctorPlan, items: list[PlanItem], *,
 
     if client is None:
         from tuneshift.commands.ingest_cmd import _load_client
+
         client = _load_client(PLATFORM)
         if client and not client.load_session():
             client = None
@@ -239,9 +263,12 @@ def apply_plan(db: Database, plan: DoctorPlan, items: list[PlanItem], *,
         # duplicate/stale_album fixes (always resolved "auto"), apply directly.
         if item.resolution == "manual":
             item.status = "skipped"
-            reason = ("manual: no candidate found" if not item.proposed_platform_id
-                      else f"manual: low confidence ({item.confidence}), "
-                           "provide --override to apply")
+            reason = (
+                "manual: no candidate found"
+                if not item.proposed_platform_id
+                else f"manual: low confidence ({item.confidence}), "
+                "provide --override to apply"
+            )
             item.note = (item.note + "; " if item.note else "") + reason
             result.skipped += 1
             continue
@@ -251,7 +278,7 @@ def apply_plan(db: Database, plan: DoctorPlan, items: list[PlanItem], *,
             item.status = "applied"
             result.applied += 1
             result.affected_playlists.add(item.playlist)
-        except Exception as exc:  # noqa: BLE001 - record and continue
+        except Exception as exc:
             item.status = "failed"
             item.note = str(exc)
             result.failed += 1
@@ -277,7 +304,7 @@ def apply_plan(db: Database, plan: DoctorPlan, items: list[PlanItem], *,
     if do_sync and result.affected_playlists:
         for name in sorted(result.affected_playlists):
             if not quiet:
-                print(f"\nSyncing \"{name}\" to Tidal...")
+                print(f'\nSyncing "{name}" to Tidal...')
             ok = _sync_playlist(db, name)
             if not ok:
                 for item in items:

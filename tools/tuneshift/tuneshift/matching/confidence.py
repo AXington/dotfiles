@@ -5,6 +5,7 @@ confidence label. ``classify_scores`` reproduces the historical
 ``classify_results`` boundaries exactly; the legacy function in ``track.py``
 delegates here so there is one implementation, not two.
 """
+
 from __future__ import annotations
 
 # Confidence labels.
@@ -13,10 +14,10 @@ AMBIGUOUS = "ambiguous"
 NOT_FOUND = "not_found"
 
 # Boundaries (match the historical classify_results). Configurable if needed.
-NOT_FOUND_FLOOR = 50   # top < this -> not_found
-HIGH_TOP_MIN = 80      # top >= this AND ...
-HIGH_SECOND_MAX = 70   # ... second-best < this -> high; else ambiguous
-MIN_LEAD = 0           # additionally require (top - second) >= this for high
+NOT_FOUND_FLOOR = 50  # top < this -> not_found
+HIGH_TOP_MIN = 80  # top >= this AND ...
+HIGH_SECOND_MAX = 70  # ... second-best < this -> high; else ambiguous
+MIN_LEAD = 0  # additionally require (top - second) >= this for high
 
 
 def classify_scores(

@@ -12,9 +12,10 @@ transient-retry path takes over.
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeout
-from typing import Callable, TypeVar
+from typing import TypeVar
 
 T = TypeVar("T")
 

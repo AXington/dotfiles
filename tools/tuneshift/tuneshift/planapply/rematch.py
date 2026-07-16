@@ -91,12 +91,8 @@ def _change_for_track(
     locked_id = effective_lock.platform_track_id if effective_lock is not None else None
 
     op = "update" if playlist_mapping is not None else "insert"
-    row_key = row_key_for(
-        playlist_id=playlist_id, track_id=track_id, platform=platform
-    )
-    current_state = (
-        {"platform_track_id": current_id} if current_id else None
-    )
+    row_key = row_key_for(playlist_id=playlist_id, track_id=track_id, platform=platform)
+    current_state = {"platform_track_id": current_id} if current_id else None
 
     # A locked row is never proposed for change (AC-L2): short-circuit to an
     # explicit "locked, skipped" change without running the engine. It carries
@@ -122,8 +118,12 @@ def _change_for_track(
         # silently accepted-as-degraded.
         downgrades = (
             check_lock_downgrade(
-                db, track_id, client,
-                platform=platform, playlist_id=playlist_id, locked_id=locked_id,
+                db,
+                track_id,
+                client,
+                platform=platform,
+                playlist_id=playlist_id,
+                locked_id=locked_id,
             )
             if locked_id
             else []
@@ -153,9 +153,7 @@ def _change_for_track(
             locked=True,
         )
 
-    result = reconcile_track(
-        db, track_id, client, force=force, playlist_id=playlist_id
-    )
+    result = reconcile_track(db, track_id, client, force=force, playlist_id=playlist_id)
 
     # Not confidently matched -> never write; surface for human judgement.
     if result.confidence not in _CONFIDENT or not result.platform_track_id:
@@ -218,6 +216,5 @@ def _improve_reason(current_id: str, result) -> str:
     if not current_id:
         return f"first confident match -> {result.platform_track_id}"
     return (
-        f"re-matched {current_id} -> {result.platform_track_id} "
-        f"(score {result.score})"
+        f"re-matched {current_id} -> {result.platform_track_id} (score {result.score})"
     )

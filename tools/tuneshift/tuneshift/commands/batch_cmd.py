@@ -21,6 +21,7 @@ def _get_feat_re():
     global _FEAT_EXTRACT_RE
     if _FEAT_EXTRACT_RE is None:
         import re
+
         _FEAT_EXTRACT_RE = re.compile(
             r"[\(\[]\s*(?:feat\.?|ft\.?|featuring|with)\s+([^\)\]]+)[\)\]]",
             re.IGNORECASE,
@@ -36,6 +37,7 @@ def extract_featured_artists(title: str) -> list[str]:
     raw = match.group(1)
     # Split on common delimiters: ", ", " & ", " and "
     import re
+
     parts = re.split(r"\s*(?:,|&|and)\s*", raw, flags=re.IGNORECASE)
     return [p.strip() for p in parts if p.strip()]
 
@@ -46,6 +48,7 @@ def split_artist_credits(artist: str) -> list[str]:
     Handles: "Drake, 21 Savage", "Jack & Diane", "A and B", "X x Y"
     """
     import re
+
     parts = re.split(r"\s*(?:,\s+|&|\band\b|\bx\b)\s*", artist, flags=re.IGNORECASE)
     return [p.strip() for p in parts if p.strip()]
 
@@ -143,13 +146,15 @@ class BatchPlan:
             created_at=data["created"],
         )
         for op in data["operations"]:
-            plan.operations.append(PlanOperation(
-                action=op["action"],
-                track_title=op["track"],
-                track_artist=op["artist"],
-                track_id=op.get("track_id"),
-                reason=op.get("reason", ""),
-            ))
+            plan.operations.append(
+                PlanOperation(
+                    action=op["action"],
+                    track_title=op["track"],
+                    track_artist=op["artist"],
+                    track_id=op.get("track_id"),
+                    reason=op.get("reason", ""),
+                )
+            )
         return plan
 
     @staticmethod
@@ -162,9 +167,7 @@ class BatchPlan:
         return False
 
 
-def plan_dedupe(
-    db: Database, playlist_id: int, cap: int
-) -> list[PlanOperation]:
+def plan_dedupe(db: Database, playlist_id: int, cap: int) -> list[PlanOperation]:
     """Plan deduplication: flag artists with more than cap tracks."""
     tracks = db.get_playlist_tracks(playlist_id)
     by_artist: dict[str, list] = {}
@@ -179,23 +182,27 @@ def plan_dedupe(
         entries.sort(key=lambda e: e[0])
         for idx, (pos, track) in enumerate(entries):
             if idx < cap:
-                ops.append(PlanOperation(
-                    action="keep",
-                    track_title=track.title,
-                    track_artist=track.artist,
-                    track_id=track.id,
-                    reason=f"dedupe cap={cap}, keeping #{idx + 1} of {len(entries)}",
-                    position=pos,
-                ))
+                ops.append(
+                    PlanOperation(
+                        action="keep",
+                        track_title=track.title,
+                        track_artist=track.artist,
+                        track_id=track.id,
+                        reason=f"dedupe cap={cap}, keeping #{idx + 1} of {len(entries)}",
+                        position=pos,
+                    )
+                )
             else:
-                ops.append(PlanOperation(
-                    action="rm",
-                    track_title=track.title,
-                    track_artist=track.artist,
-                    track_id=track.id,
-                    reason=f"dedupe cap={cap}, {artist} has {len(entries)} tracks",
-                    position=pos,
-                ))
+                ops.append(
+                    PlanOperation(
+                        action="rm",
+                        track_title=track.title,
+                        track_artist=track.artist,
+                        track_id=track.id,
+                        reason=f"dedupe cap={cap}, {artist} has {len(entries)} tracks",
+                        position=pos,
+                    )
+                )
     return ops
 
 
@@ -214,14 +221,16 @@ def plan_rm_artist(
 
         if is_primary or is_featured:
             credit = "primary artist" if is_primary else "featured in title"
-            ops.append(PlanOperation(
-                action="rm",
-                track_title=t.title,
-                track_artist=t.artist,
-                track_id=t.id,
-                reason=f"artist removal: {artist_name} ({credit})",
-                position=i,
-            ))
+            ops.append(
+                PlanOperation(
+                    action="rm",
+                    track_title=t.title,
+                    track_artist=t.artist,
+                    track_id=t.id,
+                    reason=f"artist removal: {artist_name} ({credit})",
+                    position=i,
+                )
+            )
     return ops
 
 
@@ -248,7 +257,9 @@ def plan_review_fixes(
     artist_lookup = _build_artist_lookup(db, playlist_id)
 
     findings = review_playlist(
-        tracks, concept=concept, artist_lookup=artist_lookup,
+        tracks,
+        concept=concept,
+        artist_lookup=artist_lookup,
         year_lookup=db.get_release_years_for_playlist(playlist_id),
         llm_judge=llm_judge,
         accepted=db.get_concept_acceptances(playlist_id),
@@ -262,6 +273,7 @@ def plan_review_fixes(
             continue
         # Extract track info from finding description
         import re
+
         match = re.search(r'"([^"]+)" by (.+?) - Rule:', finding.description)
         if not match:
             continue
@@ -270,14 +282,16 @@ def plan_review_fixes(
         # Find the track
         for i, t in enumerate(tracks_raw):
             if t.title == title and t.artist == artist and t.id not in seen_track_ids:
-                ops.append(PlanOperation(
-                    action="rm",
-                    track_title=t.title,
-                    track_artist=t.artist,
-                    track_id=t.id,
-                    reason=finding.description,
-                    position=i,
-                ))
+                ops.append(
+                    PlanOperation(
+                        action="rm",
+                        track_title=t.title,
+                        track_artist=t.artist,
+                        track_id=t.id,
+                        reason=finding.description,
+                        position=i,
+                    )
+                )
                 seen_track_ids.add(t.id)
                 break
 
@@ -304,15 +318,17 @@ def plan_sweep_banned(
         for i, t in enumerate(tracks):
             banned_name = check_track_against_bans(db, t.title, t.artist)
             if banned_name:
-                ops.append(PlanOperation(
-                    action="rm",
-                    track_title=t.title,
-                    track_artist=t.artist,
-                    track_id=t.id,
-                    reason=f"banned artist: {banned_name}",
-                    position=i,
-                    previous_position=i,
-                ))
+                ops.append(
+                    PlanOperation(
+                        action="rm",
+                        track_title=t.title,
+                        track_artist=t.artist,
+                        track_id=t.id,
+                        reason=f"banned artist: {banned_name}",
+                        position=i,
+                        previous_position=i,
+                    )
+                )
         if ops:
             results[pid] = ops
     return results
@@ -329,6 +345,7 @@ def match_filter(track, filter_str: str, db: Database | None = None) -> bool:
       plain text - substring match on title
     """
     import re as _re
+
     from tuneshift.sequencer.metadata import track_to_metadata
 
     meta = track_to_metadata(track)
@@ -395,25 +412,29 @@ def plan_split(
         return ops
 
     # Create playlist operation
-    ops.append(PlanOperation(
-        action="create_playlist",
-        target_name=new_name,
-        reason=f"split target for filter: {', '.join(filters)}",
-    ))
+    ops.append(
+        PlanOperation(
+            action="create_playlist",
+            target_name=new_name,
+            reason=f"split target for filter: {', '.join(filters)}",
+        )
+    )
 
     # Move matching tracks
     for track in matching:
         pos = next((i for i, t in enumerate(tracks) if t.id == track.id), 0)
-        ops.append(PlanOperation(
-            action="move_to_playlist",
-            track_title=track.title,
-            track_artist=track.artist,
-            track_id=track.id,
-            target_name=new_name,
-            position=pos,
-            previous_position=pos,
-            reason=f"matches filter: {', '.join(filters)}",
-        ))
+        ops.append(
+            PlanOperation(
+                action="move_to_playlist",
+                track_title=track.title,
+                track_artist=track.artist,
+                track_id=track.id,
+                target_name=new_name,
+                position=pos,
+                previous_position=pos,
+                reason=f"matches filter: {', '.join(filters)}",
+            )
+        )
 
     return ops
 
@@ -433,19 +454,21 @@ def plan_merge(
         source_tracks = db.get_playlist_tracks(source_id)
         for track in source_tracks:
             if track.id not in target_track_ids:
-                ops.append(PlanOperation(
-                    action="add",
-                    track_title=track.title,
-                    track_artist=track.artist,
-                    track_id=track.id,
-                    reason="merge: unique track from source",
-                ))
+                ops.append(
+                    PlanOperation(
+                        action="add",
+                        track_title=track.title,
+                        track_artist=track.artist,
+                        track_id=track.id,
+                        reason="merge: unique track from source",
+                    )
+                )
                 target_track_ids.add(track.id)
 
     return ops
 
 
-def apply_split(db: Database, plan: "BatchPlan") -> tuple[int, int]:
+def apply_split(db: Database, plan: BatchPlan) -> tuple[int, int]:
     """Apply a split plan: create new playlist, move tracks."""
     moved = 0
     new_playlist_id = None
@@ -488,13 +511,25 @@ def parse_plan_file(content: str) -> list[PlanOperation]:
         if line.startswith("- "):
             parts = line[2:].rsplit(" - ", 1)
             if len(parts) == 2:
-                ops.append(PlanOperation(action="rm", track_title=parts[0].strip(), track_artist=parts[1].strip()))
+                ops.append(
+                    PlanOperation(
+                        action="rm",
+                        track_title=parts[0].strip(),
+                        track_artist=parts[1].strip(),
+                    )
+                )
             else:
                 ops.append(PlanOperation(action="rm", track_title=line[2:].strip()))
         elif line.startswith("+ "):
             parts = line[2:].rsplit(" - ", 1)
             if len(parts) == 2:
-                ops.append(PlanOperation(action="add", track_title=parts[0].strip(), track_artist=parts[1].strip()))
+                ops.append(
+                    PlanOperation(
+                        action="add",
+                        track_title=parts[0].strip(),
+                        track_artist=parts[1].strip(),
+                    )
+                )
             else:
                 ops.append(PlanOperation(action="add", track_title=line[2:].strip()))
         elif line.startswith("= "):
@@ -509,19 +544,30 @@ def parse_plan_file(content: str) -> list[PlanOperation]:
 
             if target.startswith("pos:"):
                 pos = int(target[4:])
-                ops.append(PlanOperation(
-                    action="assign_section", track_title=title, track_artist=artist,
-                    position=pos, reason=f"move to position {pos}",
-                ))
+                ops.append(
+                    PlanOperation(
+                        action="assign_section",
+                        track_title=title,
+                        track_artist=artist,
+                        position=pos,
+                        reason=f"move to position {pos}",
+                    )
+                )
             elif target.startswith("sec:"):
                 sec_parts = target[4:].split(":", 1)
                 section = sec_parts[0]
                 sec_pos = int(sec_parts[1]) if len(sec_parts) > 1 else None
-                ops.append(PlanOperation(
-                    action="assign_section", track_title=title, track_artist=artist,
-                    section_name=section, position=sec_pos,
-                    reason=f"move to section {section}" + (f" position {sec_pos}" if sec_pos else ""),
-                ))
+                ops.append(
+                    PlanOperation(
+                        action="assign_section",
+                        track_title=title,
+                        track_artist=artist,
+                        section_name=section,
+                        position=sec_pos,
+                        reason=f"move to section {section}"
+                        + (f" position {sec_pos}" if sec_pos else ""),
+                    )
+                )
     return ops
 
 
@@ -546,17 +592,21 @@ def apply_plan(db: Database, plan: BatchPlan) -> tuple[int, int]:
         track = next((t for t in tracks if t.id == op.track_id), None)
         if track is None:
             continue
-        position = next(
-            (i for i, t in enumerate(tracks) if t.id == op.track_id), 0
-        )
+        position = next((i for i, t in enumerate(tracks) if t.id == op.track_id), 0)
         db.remove_track_from_playlist(plan.playlist_id, track.id)
         removed += 1
-        executed_ops.append({
-            "action": "rm", "track": op.track_title, "artist": op.track_artist,
-            "track_id": op.track_id, "reason": op.reason,
-            "position": position, "previous_position": position,
-            "previous_section": op.previous_section,
-        })
+        executed_ops.append(
+            {
+                "action": "rm",
+                "track": op.track_title,
+                "artist": op.track_artist,
+                "track_id": op.track_id,
+                "reason": op.reason,
+                "position": position,
+                "previous_position": position,
+                "previous_section": op.previous_section,
+            }
+        )
 
     failed_additions: list[str] = []
     for op in plan.additions:
@@ -567,7 +617,9 @@ def apply_plan(db: Database, plan: BatchPlan) -> tuple[int, int]:
             track = tracks_found[0]
             existing = db.get_playlist_tracks(plan.playlist_id)
             if any(t.id == track.id for t in existing):
-                failed_additions.append(f'"{op.track_title}" by {op.track_artist} (already in playlist)')
+                failed_additions.append(
+                    f'"{op.track_title}" by {op.track_artist} (already in playlist)'
+                )
                 continue
             next_pos = len(existing)
             db.conn.execute(
@@ -576,14 +628,22 @@ def apply_plan(db: Database, plan: BatchPlan) -> tuple[int, int]:
             )
             db.conn.commit()
             added += 1
-            executed_ops.append({
-                "action": "add", "track": op.track_title, "artist": op.track_artist,
-                "track_id": track.id, "reason": op.reason,
-                "position": next_pos, "previous_position": None,
-                "previous_section": None,
-            })
+            executed_ops.append(
+                {
+                    "action": "add",
+                    "track": op.track_title,
+                    "artist": op.track_artist,
+                    "track_id": track.id,
+                    "reason": op.reason,
+                    "position": next_pos,
+                    "previous_position": None,
+                    "previous_section": None,
+                }
+            )
         else:
-            failed_additions.append(f'"{op.track_title}" by {op.track_artist} (not found in library)')
+            failed_additions.append(
+                f'"{op.track_title}" by {op.track_artist} (not found in library)'
+            )
 
     if failed_additions:
         print(f"  Failed additions ({len(failed_additions)}):")
@@ -600,25 +660,38 @@ def apply_plan(db: Database, plan: BatchPlan) -> tuple[int, int]:
                 new_playlist_id = existing.id
             else:
                 new_playlist_id = db.create_playlist(op.target_name)
-            executed_ops.append({
-                "action": "create_playlist", "track": "", "artist": "",
-                "track_id": None, "reason": op.reason,
-                "position": None, "previous_position": None,
-                "previous_section": None, "target_name": op.target_name,
-            })
+            executed_ops.append(
+                {
+                    "action": "create_playlist",
+                    "track": "",
+                    "artist": "",
+                    "track_id": None,
+                    "reason": op.reason,
+                    "position": None,
+                    "previous_position": None,
+                    "previous_section": None,
+                    "target_name": op.target_name,
+                }
+            )
         elif op.action == "move_to_playlist" and op.track_id and new_playlist_id:
             new_tracks = db.get_playlist_tracks(new_playlist_id)
             next_pos = len(new_tracks)
             db.add_track_to_playlist(new_playlist_id, op.track_id, next_pos)
             db.remove_track_from_playlist(plan.playlist_id, op.track_id)
             moved += 1
-            executed_ops.append({
-                "action": "move_to_playlist", "track": op.track_title,
-                "artist": op.track_artist, "track_id": op.track_id,
-                "reason": op.reason, "position": op.position,
-                "previous_position": op.previous_position,
-                "previous_section": None, "target_name": op.target_name,
-            })
+            executed_ops.append(
+                {
+                    "action": "move_to_playlist",
+                    "track": op.track_title,
+                    "artist": op.track_artist,
+                    "track_id": op.track_id,
+                    "reason": op.reason,
+                    "position": op.position,
+                    "previous_position": op.previous_position,
+                    "previous_section": None,
+                    "target_name": op.target_name,
+                }
+            )
 
     # Handle set_narrative (for --structure)
     for op in plan.operations:
@@ -626,20 +699,32 @@ def apply_plan(db: Database, plan: BatchPlan) -> tuple[int, int]:
             # target_name holds the narrative text for set_narrative ops
             old_narrative = db.get_narrative(plan.playlist_id)
             db.set_narrative(plan.playlist_id, op.target_name)
-            executed_ops.append({
-                "action": "set_narrative", "track": "", "artist": "",
-                "track_id": None, "reason": op.reason,
-                "position": None, "previous_position": None,
-                "previous_section": old_narrative, "target_name": op.target_name,
-            })
+            executed_ops.append(
+                {
+                    "action": "set_narrative",
+                    "track": "",
+                    "artist": "",
+                    "track_id": None,
+                    "reason": op.reason,
+                    "position": None,
+                    "previous_position": None,
+                    "previous_section": old_narrative,
+                    "target_name": op.target_name,
+                }
+            )
 
     # Phase 2: Record ONLY what actually executed in history
     if executed_ops:
-        db.record_batch(plan.playlist_id, json.dumps({
-            "playlist": plan.playlist_name,
-            "created": plan.created_at,
-            "operations": executed_ops,
-        }))
+        db.record_batch(
+            plan.playlist_id,
+            json.dumps(
+                {
+                    "playlist": plan.playlist_name,
+                    "created": plan.created_at,
+                    "operations": executed_ops,
+                }
+            ),
+        )
 
     # Phase 3: Auto-reorder if enabled
     playlist_row = db.conn.execute(
@@ -648,12 +733,15 @@ def apply_plan(db: Database, plan: BatchPlan) -> tuple[int, int]:
     ).fetchone()
     if playlist_row and playlist_row[0]:
         from tuneshift.sequencer.optimizer import sequence_playlist
+
         arc = playlist_row[1] or "wave"
         sequence_playlist(db, plan.playlist_id, arc=arc)
 
     # Phase 4: Report sync instructions
     if removed or added:
-        print(f"  Run `tuneshift sync \"{plan.playlist_name}\" <platform>` to push changes.")
+        print(
+            f'  Run `tuneshift sync "{plan.playlist_name}" <platform>` to push changes.'
+        )
 
     return removed, added
 
@@ -674,7 +762,7 @@ def render_plan(plan: BatchPlan) -> str:
     moves = [op for op in plan.operations if op.action == "move_to_playlist"]
     if moves:
         target = moves[0].target_name or "?"
-        lines.append(f"MOVE TO \"{target}\" ({len(moves)}):")
+        lines.append(f'MOVE TO "{target}" ({len(moves)}):')
         for op in moves:
             lines.append(f'  - "{op.track_title}" by {op.track_artist}')
         lines.append("")
@@ -742,7 +830,9 @@ def _interactive_dedupe(
         for idx, (pos, track) in enumerate(entries):
             print(f"  {idx + 1}. {track.title}")
 
-        choices_raw = input(f"Keep (1-{len(entries)}, comma-separated, or 'all'/'none'): ").strip()
+        choices_raw = input(
+            f"Keep (1-{len(entries)}, comma-separated, or 'all'/'none'): "
+        ).strip()
         if choices_raw.lower() == "all":
             continue
         if choices_raw.lower() == "none":
@@ -756,23 +846,27 @@ def _interactive_dedupe(
 
         for idx, (pos, track) in enumerate(entries):
             if idx in keep_indices:
-                ops.append(PlanOperation(
-                    action="keep",
-                    track_title=track.title,
-                    track_artist=track.artist,
-                    track_id=track.id,
-                    reason=f"dedupe cap={cap}, curator choice",
-                    position=pos,
-                ))
+                ops.append(
+                    PlanOperation(
+                        action="keep",
+                        track_title=track.title,
+                        track_artist=track.artist,
+                        track_id=track.id,
+                        reason=f"dedupe cap={cap}, curator choice",
+                        position=pos,
+                    )
+                )
             else:
-                ops.append(PlanOperation(
-                    action="rm",
-                    track_title=track.title,
-                    track_artist=track.artist,
-                    track_id=track.id,
-                    reason=f"dedupe cap={cap}, {artist} has {len(entries)} tracks",
-                    position=pos,
-                ))
+                ops.append(
+                    PlanOperation(
+                        action="rm",
+                        track_title=track.title,
+                        track_artist=track.artist,
+                        track_id=track.id,
+                        reason=f"dedupe cap={cap}, {artist} has {len(entries)} tracks",
+                        position=pos,
+                    )
+                )
     return ops
 
 
@@ -807,10 +901,13 @@ def undo_batch(db: Database, history_id: int | None = None) -> bool:
             existing = db.get_playlist_tracks(playlist_id)
             insert_pos = min(pos, len(existing)) if pos is not None else len(existing)
             # Shift positions down to make room (from end to avoid PK conflicts)
-            max_pos = db.conn.execute(
-                "SELECT MAX(position) FROM playlist_tracks WHERE playlist_id = ?",
-                (playlist_id,),
-            ).fetchone()[0] or 0
+            max_pos = (
+                db.conn.execute(
+                    "SELECT MAX(position) FROM playlist_tracks WHERE playlist_id = ?",
+                    (playlist_id,),
+                ).fetchone()[0]
+                or 0
+            )
             for shift_pos in range(max_pos, insert_pos - 1, -1):
                 db.conn.execute(
                     "UPDATE playlist_tracks SET position = ? "
@@ -850,7 +947,9 @@ def handle_batch(args, db: Database) -> int:
     if getattr(args, "show_plan", False):
         plan = BatchPlan.load()
         if plan is None:
-            print("No plan exists. Create one with: tuneshift batch <playlist> --<operation> --plan")
+            print(
+                "No plan exists. Create one with: tuneshift batch <playlist> --<operation> --plan"
+            )
             return 1
         print(render_plan(plan))
         return 0
@@ -866,7 +965,11 @@ def handle_batch(args, db: Database) -> int:
     # History
     if getattr(args, "history", False):
         playlist_name = args.playlist or args.history
-        playlist = db.find_playlist_by_name(playlist_name) if isinstance(playlist_name, str) else None
+        playlist = (
+            db.find_playlist_by_name(playlist_name)
+            if isinstance(playlist_name, str)
+            else None
+        )
         if playlist is None:
             # Show all history
             rows = db.conn.execute(
@@ -888,9 +991,13 @@ def handle_batch(args, db: Database) -> int:
             plan_data = json.loads(row[4])
             status = "REVERTED" if row[3] else "active"
             op_count = len(plan_data.get("operations", []))
-            rm_count = sum(1 for o in plan_data.get("operations", []) if o["action"] == "rm")
-            print(f"  #{row[0]} [{status}] {row[2]} - {plan_data.get('playlist', '?')} "
-                  f"({op_count} ops, {rm_count} removals)")
+            rm_count = sum(
+                1 for o in plan_data.get("operations", []) if o["action"] == "rm"
+            )
+            print(
+                f"  #{row[0]} [{status}] {row[2]} - {plan_data.get('playlist', '?')} "
+                f"({op_count} ops, {rm_count} removals)"
+            )
         return 0
 
     # Undo
@@ -931,7 +1038,9 @@ def handle_batch(args, db: Database) -> int:
         # For single playlist, create one plan
         if playlist:
             ops = results.get(playlist.id, [])
-            plan = BatchPlan(playlist_name=playlist.name, playlist_id=playlist.id, operations=ops)
+            plan = BatchPlan(
+                playlist_name=playlist.name, playlist_id=playlist.id, operations=ops
+            )
             print(render_plan(plan))
             if getattr(args, "plan", False):
                 plan.save()
@@ -940,19 +1049,31 @@ def handle_batch(args, db: Database) -> int:
 
         # Multi-playlist: show summary
         total_ops = sum(len(ops) for ops in results.values())
-        print(f"Banned artist sweep: {total_ops} tracks across {len(results)} playlists")
+        print(
+            f"Banned artist sweep: {total_ops} tracks across {len(results)} playlists"
+        )
         for pid, ops in results.items():
-            pl_name = db.conn.execute("SELECT name FROM playlists WHERE id = ?", (pid,)).fetchone()[0]
+            pl_name = db.conn.execute(
+                "SELECT name FROM playlists WHERE id = ?", (pid,)
+            ).fetchone()[0]
             print(f"  {pl_name}: {len(ops)} tracks")
             for op in ops:
-                print(f"    - \"{op.track_title}\" by {op.track_artist} ({op.reason})")
+                print(f'    - "{op.track_title}" by {op.track_artist} ({op.reason})')
         if getattr(args, "plan", False):
             # Save the first playlist's plan (multi-playlist sweep applies sequentially)
             first_pid = next(iter(results))
-            first_name = db.conn.execute("SELECT name FROM playlists WHERE id = ?", (first_pid,)).fetchone()[0]
-            plan = BatchPlan(playlist_name=first_name, playlist_id=first_pid, operations=results[first_pid])
+            first_name = db.conn.execute(
+                "SELECT name FROM playlists WHERE id = ?", (first_pid,)
+            ).fetchone()[0]
+            plan = BatchPlan(
+                playlist_name=first_name,
+                playlist_id=first_pid,
+                operations=results[first_pid],
+            )
             plan.save()
-            print(f"\nSaved plan for \"{first_name}\". Apply sequentially with: tuneshift batch --apply")
+            print(
+                f'\nSaved plan for "{first_name}". Apply sequentially with: tuneshift batch --apply'
+            )
         return 0
 
     # Generate a plan (requires playlist name for most operations)
@@ -973,27 +1094,40 @@ def handle_batch(args, db: Database) -> int:
     ops: list[PlanOperation] = []
 
     # Multi-rm/add from CLI flags
-    for rm_title in (getattr(args, "rm", None) or []):
+    for rm_title in getattr(args, "rm", None) or []:
         parts = rm_title.rsplit(" - ", 1)
         title = parts[0].strip()
         artist = parts[1].strip() if len(parts) == 2 else ""
         # Find matching track
         tracks = db.get_playlist_tracks(playlist.id)
         for i, t in enumerate(tracks):
-            if t.title.casefold() == title.casefold() or title.casefold() in t.title.casefold():
+            if (
+                t.title.casefold() == title.casefold()
+                or title.casefold() in t.title.casefold()
+            ):
                 if not artist or t.artist.casefold() == artist.casefold():
-                    ops.append(PlanOperation(
-                        action="rm", track_title=t.title, track_artist=t.artist,
-                        track_id=t.id, position=i, previous_position=i,
-                        reason="CLI --rm",
-                    ))
+                    ops.append(
+                        PlanOperation(
+                            action="rm",
+                            track_title=t.title,
+                            track_artist=t.artist,
+                            track_id=t.id,
+                            position=i,
+                            previous_position=i,
+                            reason="CLI --rm",
+                        )
+                    )
                     break
 
-    for add_spec in (getattr(args, "add", None) or []):
+    for add_spec in getattr(args, "add", None) or []:
         parts = add_spec.rsplit(" - ", 1)
         title = parts[0].strip()
         artist = parts[1].strip() if len(parts) == 2 else ""
-        ops.append(PlanOperation(action="add", track_title=title, track_artist=artist, reason="CLI --add"))
+        ops.append(
+            PlanOperation(
+                action="add", track_title=title, track_artist=artist, reason="CLI --add"
+            )
+        )
 
     # Plan file input
     plan_file = getattr(args, "plan_file", None)
@@ -1004,6 +1138,7 @@ def handle_batch(args, db: Database) -> int:
     # Stdin input
     if getattr(args, "from_stdin", False):
         import sys as _sys
+
         if not _sys.stdin.isatty():
             content = _sys.stdin.read()
             ops.extend(parse_plan_file(content))
@@ -1027,6 +1162,7 @@ def handle_batch(args, db: Database) -> int:
     )
     if needs_judge:
         from tuneshift.composer.concept_llm import make_concept_judge
+
         concept_judge = make_concept_judge()
 
     if getattr(args, "review_findings", False):
@@ -1037,7 +1173,10 @@ def handle_batch(args, db: Database) -> int:
     if split_name:
         filters = getattr(args, "filter", None) or []
         if not filters:
-            print("--split requires --filter to specify which tracks to move.", file=sys.stderr)
+            print(
+                "--split requires --filter to specify which tracks to move.",
+                file=sys.stderr,
+            )
             return 1
         ops.extend(plan_split(db, playlist.id, split_name, filters))
 
@@ -1045,10 +1184,15 @@ def handle_batch(args, db: Database) -> int:
     if getattr(args, "rebuild", False):
         count = getattr(args, "count", 50)
         fresh = getattr(args, "fresh", False)
-        ops.extend(plan_rebuild(
-            db, playlist.id, count, fresh=fresh,
-            llm_judge=None if fresh else concept_judge,
-        ))
+        ops.extend(
+            plan_rebuild(
+                db,
+                playlist.id,
+                count,
+                fresh=fresh,
+                llm_judge=None if fresh else concept_judge,
+            )
+        )
 
     # Retroactive narrative structuring
     if getattr(args, "structure", False):
@@ -1058,11 +1202,21 @@ def handle_batch(args, db: Database) -> int:
         else:
             # LLM mode: propose sections
             from tuneshift.sequencer.classifier import TrackClassifier
+
             classifier = TrackClassifier()
             if not classifier.available:
-                print("--structure without --narrative-file requires an LLM backend.", file=sys.stderr)
-                print("Configure with: tuneshift config anthropic-key <key>", file=sys.stderr)
-                print("Or provide sections: --structure --narrative-file arc.txt", file=sys.stderr)
+                print(
+                    "--structure without --narrative-file requires an LLM backend.",
+                    file=sys.stderr,
+                )
+                print(
+                    "Configure with: tuneshift config anthropic-key <key>",
+                    file=sys.stderr,
+                )
+                print(
+                    "Or provide sections: --structure --narrative-file arc.txt",
+                    file=sys.stderr,
+                )
                 return 1
             structure_ops = plan_structure_llm(db, playlist.id, classifier)
             if structure_ops is None:
@@ -1080,7 +1234,10 @@ def handle_batch(args, db: Database) -> int:
             title_lower = op.track_title.casefold()
             for i, t in enumerate(tracks):
                 if title_lower in t.title.casefold():
-                    if not op.track_artist or op.track_artist.casefold() in t.artist.casefold():
+                    if (
+                        not op.track_artist
+                        or op.track_artist.casefold() in t.artist.casefold()
+                    ):
                         op.track_id = t.id
                         op.position = i
                         op.previous_position = i
@@ -1157,7 +1314,7 @@ def handle_merge(args, db: Database) -> int:
         return 0
 
     removed, added = apply_plan(db, plan)
-    print(f"\nMerged: {added} tracks added to \"{into_name}\"")
+    print(f'\nMerged: {added} tracks added to "{into_name}"')
 
     if getattr(args, "delete_sources", False):
         for p in source_playlists:
@@ -1196,35 +1353,54 @@ def plan_rebuild(
     if fresh:
         # Remove everything
         for i, t in enumerate(tracks_raw):
-            ops.append(PlanOperation(
-                action="rm", track_title=t.title, track_artist=t.artist,
-                track_id=t.id, position=i, previous_position=i,
-                reason="rebuild --fresh: clearing playlist",
-            ))
+            ops.append(
+                PlanOperation(
+                    action="rm",
+                    track_title=t.title,
+                    track_artist=t.artist,
+                    track_id=t.id,
+                    position=i,
+                    previous_position=i,
+                    reason="rebuild --fresh: clearing playlist",
+                )
+            )
         keep_ids: set[int] = set()
     else:
         # Review and keep/remove based on concept
-        findings = review_playlist(
-            tracks, concept=concept, artist_lookup=artist_lookup,
-            year_lookup=db.get_release_years_for_playlist(playlist_id),
-            llm_judge=llm_judge,
-            accepted=db.get_concept_acceptances(playlist_id),
-        ) if concept else []
+        findings = (
+            review_playlist(
+                tracks,
+                concept=concept,
+                artist_lookup=artist_lookup,
+                year_lookup=db.get_release_years_for_playlist(playlist_id),
+                llm_judge=llm_judge,
+                accepted=db.get_concept_acceptances(playlist_id),
+            )
+            if concept
+            else []
+        )
         violation_ids: set[int] = set()
 
         for finding in findings:
             if finding.severity >= 0.8:
                 import re as _re
+
                 match = _re.search(r'"([^"]+)" by (.+?) - Rule:', finding.description)
                 if match:
                     title, artist = match.group(1), match.group(2)
                     for i, t in enumerate(tracks_raw):
                         if t.title == title and t.artist == artist:
-                            ops.append(PlanOperation(
-                                action="rm", track_title=t.title, track_artist=t.artist,
-                                track_id=t.id, position=i, previous_position=i,
-                                reason=finding.description,
-                            ))
+                            ops.append(
+                                PlanOperation(
+                                    action="rm",
+                                    track_title=t.title,
+                                    track_artist=t.artist,
+                                    track_id=t.id,
+                                    position=i,
+                                    previous_position=i,
+                                    reason=finding.description,
+                                )
+                            )
                             violation_ids.add(t.id)
                             break
 
@@ -1258,6 +1434,7 @@ def plan_rebuild(
                 artist = db.get_artist_by_name(candidate.artist)
                 if artist:
                     from tuneshift.composer.reviewer import _check_rule_against_artist
+
                     passes = all(
                         _check_rule_against_artist(rule, artist) is not False
                         for rule in concept.hard_rules
@@ -1265,19 +1442,25 @@ def plan_rebuild(
                     if not passes:
                         continue
 
-            ops.append(PlanOperation(
-                action="add", track_title=candidate.title,
-                track_artist=candidate.artist, track_id=candidate.id,
-                reason=f"rebuild fill: library match (concept: {concept.theme})",
-            ))
+            ops.append(
+                PlanOperation(
+                    action="add",
+                    track_title=candidate.title,
+                    track_artist=candidate.artist,
+                    track_id=candidate.id,
+                    reason=f"rebuild fill: library match (concept: {concept.theme})",
+                )
+            )
             added_count += 1
             if added_count >= needed:
                 break
 
         if added_count < needed:
             shortfall = needed - added_count
-            print(f"  Note: filled {current_count + added_count}/{count} "
-                  f"({shortfall} unfilled: insufficient matching tracks in library)")
+            print(
+                f"  Note: filled {current_count + added_count}/{count} "
+                f"({shortfall} unfilled: insufficient matching tracks in library)"
+            )
 
     return ops
 
@@ -1289,8 +1472,8 @@ def plan_structure_from_file(
 
     Assigns tracks by fitness (energy/mood/stance alignment).
     """
-    from tuneshift.composer.parser import parse_enhanced_narrative
     from tuneshift.composer.matcher import match_tracks_to_sections
+    from tuneshift.composer.parser import parse_enhanced_narrative
     from tuneshift.sequencer.metadata import track_to_metadata
 
     content = Path(narrative_file).read_text()
@@ -1308,24 +1491,28 @@ def plan_structure_from_file(
     ops: list[PlanOperation] = []
 
     # Set narrative operation
-    ops.append(PlanOperation(
-        action="set_narrative",
-        reason="retroactive structuring from file",
-        target_name=content.strip(),
-    ))
+    ops.append(
+        PlanOperation(
+            action="set_narrative",
+            reason="retroactive structuring from file",
+            target_name=content.strip(),
+        )
+    )
 
     # Assign section operations (for rendering)
     for section in sections:
         section_tracks = assignments.assignments.get(section.name, [])
         for track in section_tracks:
-            ops.append(PlanOperation(
-                action="assign_section",
-                track_title=track.title,
-                track_artist=track.artist,
-                track_id=track.track_id,
-                section_name=section.name,
-                reason=f"assigned to {section.name} by fitness",
-            ))
+            ops.append(
+                PlanOperation(
+                    action="assign_section",
+                    track_title=track.title,
+                    track_artist=track.artist,
+                    track_id=track.track_id,
+                    section_name=section.name,
+                    reason=f"assigned to {section.name} by fitness",
+                )
+            )
 
     return ops
 
@@ -1360,8 +1547,8 @@ Respond with ONLY the section definitions, nothing else."""
 def plan_structure_llm(db, playlist_id: int, classifier) -> list[PlanOperation] | None:
     """Use LLM to propose narrative sections for a playlist."""
     from tuneshift.commands.compose_cmd import _get_concept
-    from tuneshift.composer.parser import parse_enhanced_narrative
     from tuneshift.composer.matcher import match_tracks_to_sections
+    from tuneshift.composer.parser import parse_enhanced_narrative
     from tuneshift.sequencer.metadata import track_to_metadata
 
     tracks_raw = db.get_playlist_tracks(playlist_id)
@@ -1371,7 +1558,7 @@ def plan_structure_llm(db, playlist_id: int, classifier) -> list[PlanOperation] 
     # Build tracklist string
     tracklist_lines = []
     for i, t in enumerate(tracks_raw):
-        tracklist_lines.append(f"  {i+1}. {t.title} - {t.artist}")
+        tracklist_lines.append(f"  {i + 1}. {t.title} - {t.artist}")
     tracklist_str = "\n".join(tracklist_lines)
 
     # Concept context
@@ -1390,7 +1577,9 @@ def plan_structure_llm(db, playlist_id: int, classifier) -> list[PlanOperation] 
 
     print(f"  Generating narrative structure via {classifier.backend_info}...")
     try:
-        response = classifier._backend.complete(prompt, classifier._model, max_tokens=2000)
+        response = classifier._backend.complete(
+            prompt, classifier._model, max_tokens=2000
+        )
     except (OSError, RuntimeError, ValueError) as exc:
         print(f"  LLM error: {exc}", file=sys.stderr)
         return None
@@ -1408,7 +1597,9 @@ def plan_structure_llm(db, playlist_id: int, classifier) -> list[PlanOperation] 
 
     print(f"  Proposed {len(sections)} sections:")
     for s in sections:
-        print(f"    {s.name} ({s.start_position}-{s.end_position}): {s.description[:60]}...")
+        print(
+            f"    {s.name} ({s.start_position}-{s.end_position}): {s.description[:60]}..."
+        )
 
     # Assign tracks to sections by fitness
     assignments = match_tracks_to_sections(tracks, sections, concept=concept)
@@ -1416,23 +1607,27 @@ def plan_structure_llm(db, playlist_id: int, classifier) -> list[PlanOperation] 
     ops: list[PlanOperation] = []
 
     # Set narrative
-    ops.append(PlanOperation(
-        action="set_narrative",
-        reason="LLM-proposed narrative structure",
-        target_name=response.strip(),
-    ))
+    ops.append(
+        PlanOperation(
+            action="set_narrative",
+            reason="LLM-proposed narrative structure",
+            target_name=response.strip(),
+        )
+    )
 
     # Section assignments
     for section in sections:
         section_tracks = assignments.assignments.get(section.name, [])
         for track in section_tracks:
-            ops.append(PlanOperation(
-                action="assign_section",
-                track_title=track.title,
-                track_artist=track.artist,
-                track_id=track.track_id,
-                section_name=section.name,
-                reason=f"LLM assigned to {section.name}",
-            ))
+            ops.append(
+                PlanOperation(
+                    action="assign_section",
+                    track_title=track.title,
+                    track_artist=track.artist,
+                    track_id=track.track_id,
+                    section_name=section.name,
+                    reason=f"LLM assigned to {section.name}",
+                )
+            )
 
     return ops

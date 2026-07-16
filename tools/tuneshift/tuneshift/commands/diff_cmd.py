@@ -1,4 +1,5 @@
 """Diff command: show canonical vs platform state without syncing."""
+
 import sys
 
 from tuneshift.db import Database
@@ -23,7 +24,7 @@ def handle_diff(args, db: Database) -> int:
 
     tracks = db.get_playlist_tracks(playlist.id)
     if not tracks:
-        print(f"Playlist \"{playlist.name}\" is empty.")
+        print(f'Playlist "{playlist.name}" is empty.')
         return 0
 
     for platform_name in platforms:
@@ -35,7 +36,7 @@ def handle_diff(args, db: Database) -> int:
             print(f"Not logged in to {platform_name}.", file=sys.stderr)
             continue
 
-        print(f"\n--- Diff: \"{playlist.name}\" vs {platform_name} ---")
+        print(f'\n--- Diff: "{playlist.name}" vs {platform_name} ---')
 
         cached_mappings = db.get_platform_mappings_for_tracks(
             [t.id for t in tracks], platform_name
@@ -53,7 +54,7 @@ def handle_diff(args, db: Database) -> int:
                     pt.platform_id
                     for pt in client.get_playlist_tracks(platform_playlist_id)
                 }
-            except Exception as exc:  # noqa: BLE001 - report, fall back to "would push"
+            except Exception as exc:
                 print(f"  (could not fetch live {platform_name} state: {exc})")
 
         to_add: list[str] = []
@@ -76,7 +77,9 @@ def handle_diff(args, db: Database) -> int:
             elif mapping and mapping.platform_track_id:
                 to_add.append(f"  + {track.title} - {track.artist}")
             else:
-                to_add.append(f"  * {track.title} - {track.artist} (needs reconciliation)")
+                to_add.append(
+                    f"  * {track.title} - {track.artist} (needs reconciliation)"
+                )
 
         if in_sync:
             print(f"\n  In sync ({in_sync} already on {platform_name}).")

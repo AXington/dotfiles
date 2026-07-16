@@ -9,8 +9,9 @@ from __future__ import annotations
 
 import random
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, TypeVar
+from typing import TypeVar
 from urllib.error import HTTPError, URLError
 
 T = TypeVar("T")
@@ -25,8 +26,13 @@ _PERMANENT_CODES: set[int] = {401, 403, 404}
 class TransientAPIError(Exception):
     """Raised for retryable API errors (429, 5xx, timeouts)."""
 
-    def __init__(self, message: str, *, status_code: int | None = None,
-                 headers: dict | None = None):
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int | None = None,
+        headers: dict | None = None,
+    ):
         super().__init__(message)
         self.status_code = status_code
         self.headers = headers or {}
@@ -123,7 +129,7 @@ def is_permanent(exc: Exception) -> bool:
 
 def _compute_delay(attempt: int, config: RetryConfig) -> float:
     """Compute backoff delay with jitter for a given attempt number."""
-    delay = min(config.base_delay * (2 ** attempt), config.max_delay)
+    delay = min(config.base_delay * (2**attempt), config.max_delay)
     jitter = delay * config.jitter_factor
     return delay + random.uniform(-jitter, jitter)
 

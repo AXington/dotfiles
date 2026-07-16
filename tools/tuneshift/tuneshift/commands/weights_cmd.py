@@ -1,11 +1,19 @@
 """Weights command: manage sequencing weight vectors."""
+
 from tuneshift.db import Database
 from tuneshift.sequencer.weights import PRESETS
 
 VALID_DIMENSIONS = {
-    "narrative_arc", "energy_flow", "mood_continuity", "sonic_texture",
-    "lyrical_thread", "emotional_arc", "groove_coherence", "era_mood",
-    "variety", "artist_separation",
+    "narrative_arc",
+    "energy_flow",
+    "mood_continuity",
+    "sonic_texture",
+    "lyrical_thread",
+    "emotional_arc",
+    "groove_coherence",
+    "era_mood",
+    "variety",
+    "artist_separation",
 }
 
 

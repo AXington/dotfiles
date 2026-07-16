@@ -40,11 +40,17 @@ _TIER_ORDER = {
 class IdentityStore(Protocol):
     """Adapter between the resolver and TuneShift's database."""
 
-    def get_resolution_state(self, track_id: int) -> tuple[str | None, float | None, str | None]: ...
+    def get_resolution_state(
+        self, track_id: int
+    ) -> tuple[str | None, float | None, str | None]: ...
     def store_resolution(
-        self, track_id: int, mb_recording_id: str | None,
-        mb_release_group_id: str | None, confidence_tier: str,
-        confidence_score: float, evidence: list[dict],
+        self,
+        track_id: int,
+        mb_recording_id: str | None,
+        mb_release_group_id: str | None,
+        confidence_tier: str,
+        confidence_score: float,
+        evidence: list[dict],
         isrc: str | None = None,
     ) -> None: ...
     def store_failed_evidence(self, track_id: int, evidence: list[dict]) -> None: ...
@@ -102,14 +108,18 @@ class TrackResolver:
         # Step 3: Text search
         if self._mb:
             self._wait_for_rate_limit("musicbrainz")
-            result = self._mb.search(track.artist, track.title, duration_ms=track.duration_ms)
+            result = self._mb.search(
+                track.artist, track.title, duration_ms=track.duration_ms
+            )
             if result.recordings:
                 best_candidates.extend(result.recordings)
                 if result.evidence:
                     all_evidence.append(result.evidence)
                 score, _ = compute_confidence(all_evidence)
                 if score >= CONFIRMED_THRESHOLD:
-                    top = sorted(result.recordings, key=lambda c: c.score, reverse=True)[0]
+                    top = sorted(
+                        result.recordings, key=lambda c: c.score, reverse=True
+                    )[0]
                     return self._finalize(track_id, top, all_evidence)
 
         # Step 4: Discogs confirmation
@@ -120,7 +130,9 @@ class TrackResolver:
                 all_evidence.append(result.evidence)
                 score, _ = compute_confidence(all_evidence)
                 if score >= CONFIRMED_THRESHOLD and best_candidates:
-                    top = sorted(best_candidates, key=lambda c: c.score, reverse=True)[0]
+                    top = sorted(best_candidates, key=lambda c: c.score, reverse=True)[
+                        0
+                    ]
                     return self._finalize(track_id, top, all_evidence)
 
         # Final evaluation with all collected evidence
@@ -136,7 +148,14 @@ class TrackResolver:
         if all_evidence:
             self._store.store_failed_evidence(
                 track_id=track_id,
-                evidence=[{"source": e.source, "evidence_type": e.evidence_type, "confidence": e.confidence} for e in all_evidence],
+                evidence=[
+                    {
+                        "source": e.source,
+                        "evidence_type": e.evidence_type,
+                        "confidence": e.confidence,
+                    }
+                    for e in all_evidence
+                ],
             )
         else:
             self._store.store_failed_evidence(track_id=track_id, evidence=[])
@@ -174,7 +193,9 @@ class TrackResolver:
                 return None
 
         required_tier = "VERIFIED" if self._config.upgrade_mode else "CONFIRMED"
-        required_score = VERIFIED_THRESHOLD if self._config.upgrade_mode else CONFIRMED_THRESHOLD
+        required_score = (
+            VERIFIED_THRESHOLD if self._config.upgrade_mode else CONFIRMED_THRESHOLD
+        )
 
         if score is not None:
             if score < required_score:
@@ -197,7 +218,11 @@ class TrackResolver:
         if old_tier is not None:
             old_order = _TIER_ORDER.get(old_tier, 0)
             new_order = _TIER_ORDER.get(tier.value, 0)
-            status = ResolutionStatus.UPGRADED if new_order > old_order else ResolutionStatus.UNCHANGED
+            status = (
+                ResolutionStatus.UPGRADED
+                if new_order > old_order
+                else ResolutionStatus.UNCHANGED
+            )
         else:
             status = ResolutionStatus.RESOLVED
 
@@ -206,7 +231,12 @@ class TrackResolver:
             rg_id = candidate.release_groups[0].get("id")
 
         evidence_dicts = [
-            {"source": e.source, "evidence_type": e.evidence_type, "confidence": e.confidence, "raw_data": e.raw_data}
+            {
+                "source": e.source,
+                "evidence_type": e.evidence_type,
+                "confidence": e.confidence,
+                "raw_data": e.raw_data,
+            }
             for e in evidence
         ]
 

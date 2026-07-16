@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import json
 import re
-import urllib.request
 import urllib.parse
+import urllib.request
 from pathlib import Path
 
 from tuneshift.enrichment.retry import RetryConfig, RetryStats, retry_api_call
@@ -22,6 +22,7 @@ _genius_limiter = RateLimiter(max_per_second=1.0, adaptive=True)
 def _load_access_token() -> str | None:
     """Load Genius access token from config."""
     import os
+
     token = os.environ.get("GENIUS_ACCESS_TOKEN")
     if token:
         return token
@@ -43,9 +44,13 @@ def _raw_get(req: urllib.request.Request, *, decode_json: bool = True):
     return body.decode("utf-8", errors="replace")
 
 
-def _request(path: str, params: dict | None = None, *,
-             stats: RetryStats | None = None,
-             config: RetryConfig | None = None) -> dict:
+def _request(
+    path: str,
+    params: dict | None = None,
+    *,
+    stats: RetryStats | None = None,
+    config: RetryConfig | None = None,
+) -> dict:
     """Make a rate-limited, retrying Genius API request."""
     token = _load_access_token()
     if not token:
@@ -55,15 +60,20 @@ def _request(path: str, params: dict | None = None, *,
     if params:
         url += "?" + urllib.parse.urlencode(params)
 
-    req = urllib.request.Request(url, headers={
-        "Authorization": f"Bearer {token}",
-        "User-Agent": "tuneshift/1.0",
-    })
+    req = urllib.request.Request(
+        url,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "User-Agent": "tuneshift/1.0",
+        },
+    )
     _genius_limiter.wait()
     return retry_api_call(_raw_get, req, config=config, stats=stats)
 
 
-def search_song(title: str, artist: str, *, stats: RetryStats | None = None) -> str | None:
+def search_song(
+    title: str, artist: str, *, stats: RetryStats | None = None
+) -> str | None:
     """Search for a song and return its Genius URL (for lyrics scraping)."""
     try:
         data = _request("/search", {"q": f"{title} {artist}"}, stats=stats)
@@ -83,7 +93,9 @@ def search_song(title: str, artist: str, *, stats: RetryStats | None = None) -> 
         return None
 
 
-def get_lyrics(title: str, artist: str, *, stats: RetryStats | None = None) -> str | None:
+def get_lyrics(
+    title: str, artist: str, *, stats: RetryStats | None = None
+) -> str | None:
     """Get lyrics for a track by searching Genius and scraping the page.
 
     Returns the full lyrics text."""
@@ -101,7 +113,8 @@ def get_lyrics(title: str, artist: str, *, stats: RetryStats | None = None) -> s
         # Genius stores lyrics in <div data-lyrics-container="true"> elements
         containers = re.findall(
             r'<div[^>]*data-lyrics-container="true"[^>]*>(.*?)</div>',
-            html, re.DOTALL,
+            html,
+            re.DOTALL,
         )
         if not containers:
             return None

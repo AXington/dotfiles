@@ -8,7 +8,8 @@ Public API:
 from __future__ import annotations
 
 import signal
-from typing import TYPE_CHECKING, Callable
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from tuneshift.identity.models import ResolutionResult, ResolutionStatus, TrackInput
 from tuneshift.identity.resolver import IdentityStore, ResolverConfig, TrackResolver

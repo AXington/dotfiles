@@ -114,7 +114,9 @@ def _heal_change(
     is_playlist = eff.scope == "playlist"
     table = "playlist_track_mappings" if is_playlist else "platform_tracks"
     if is_playlist:
-        row_key = row_key_for(playlist_id=playlist_id, track_id=track_id, platform=platform)
+        row_key = row_key_for(
+            playlist_id=playlist_id, track_id=track_id, platform=platform
+        )
         current = {"platform_track_id": eff.platform_track_id}
     else:
         row_key = row_key_for(track_id=track_id, platform=platform)

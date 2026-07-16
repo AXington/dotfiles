@@ -46,7 +46,9 @@ class PlatformResolver:
     reconcile/selection's job.
     """
 
-    def __init__(self, db: Database, client: object, *, max_candidates: int = 10) -> None:
+    def __init__(
+        self, db: Database, client: object, *, max_candidates: int = 10
+    ) -> None:
         self._db = db
         self._client = client
         self._max_candidates = max_candidates
@@ -61,13 +63,15 @@ class PlatformResolver:
     def __call__(self, track: Track) -> Sequence[ResolvedCandidate]:
         try:
             candidates, _strategies = gather_candidates(
-                track, self._client, self._alias_resolver,
+                track,
+                self._client,
+                self._alias_resolver,
             )
         except PlatformTimeout as exc:
             # A stalled platform call is transient, not a hard failure: re-queue
             # with backoff so it never erodes the quarantine budget (BUG-4).
             raise ResolutionRateLimited(str(exc)) from exc
-        except Exception as exc:  # noqa: BLE001 - classify throttling vs hard error
+        except Exception as exc:
             if _is_rate_limit(exc):
                 raise ResolutionRateLimited(str(exc)) from exc
             raise
@@ -79,8 +83,12 @@ class PlatformResolver:
 
         def _score(candidate: TrackResult) -> int:
             return score_match_with_version(
-                track.title, track.artist, track.album,
-                candidate.title, candidate.artist, candidate.album,
+                track.title,
+                track.artist,
+                track.album,
+                candidate.title,
+                candidate.artist,
+                candidate.album,
                 result_duration=candidate.duration_seconds,
                 reference_duration=track.duration_seconds,
                 all_durations=all_durations,

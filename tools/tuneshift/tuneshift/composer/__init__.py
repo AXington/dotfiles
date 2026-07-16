@@ -45,9 +45,14 @@ def compose_playlist(
     gaps = analyze_composition_gaps(assignments, sections)
     ordered = sequence_sections(assignments, sections, pins=pins)
     findings = review_composition(
-        ordered, assignments, sections, concept=concept,
-        artist_lookup=artist_lookup, year_lookup=year_lookup,
-        llm_judge=llm_judge, accepted=accepted,
+        ordered,
+        assignments,
+        sections,
+        concept=concept,
+        artist_lookup=artist_lookup,
+        year_lookup=year_lookup,
+        llm_judge=llm_judge,
+        accepted=accepted,
     )
     return ComposeResult(
         ordered_tracks=ordered,
@@ -55,6 +60,7 @@ def compose_playlist(
         gaps=gaps,
         review_findings=findings,
     )
+
 
 __all__ = [
     "Candidate",

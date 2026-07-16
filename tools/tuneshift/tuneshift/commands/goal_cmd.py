@@ -1,4 +1,5 @@
 """Goal command: set/show/clear playlist goal."""
+
 from tuneshift.db import Database
 
 
@@ -27,5 +28,7 @@ def handle_goal(args, db: Database) -> int:
     if goal:
         print(f'Goal for "{args.playlist}":\n\n{goal}')
     else:
-        print(f'No goal set for "{args.playlist}". Set one with: tuneshift goal "{args.playlist}" "<text>"')
+        print(
+            f'No goal set for "{args.playlist}". Set one with: tuneshift goal "{args.playlist}" "<text>"'
+        )
     return 0

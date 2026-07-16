@@ -66,7 +66,9 @@ _REQUIRED_ARTIST_RE = re.compile(r"required artist:\s*([^.;]+)", re.IGNORECASE)
 # Matches text inside parentheses that looks like a track mention:
 # at least 2 chars, not purely numeric, not a common non-track pattern
 _PAREN_MENTION_RE = re.compile(r"\(([^)]{2,})\)")
-_NON_TRACK_PARENS = frozenset({"intro", "outro", "cont", "cont'd", "continued", "reprise"})
+_NON_TRACK_PARENS = frozenset(
+    {"intro", "outro", "cont", "cont'd", "continued", "reprise"}
+)
 
 _MATCH_THRESHOLD = 0.72
 
@@ -109,9 +111,7 @@ def _fuzzy_match_track(mention: str, tracklist: list[str]) -> str | None:
     return None
 
 
-def _extract_track_mentions(
-    description: str, tracklist: list[str] | None
-) -> list[str]:
+def _extract_track_mentions(description: str, tracklist: list[str] | None) -> list[str]:
     """Extract track mentions from parenthetical references in prose.
 
     Scans for (Track Title) patterns and fuzzy-matches each against the
@@ -182,7 +182,7 @@ def _extract_prose_track_mentions(
             found.append(title)
             continue
 
-        prefix = text[max(0, idx - 2):idx]
+        prefix = text[max(0, idx - 2) : idx]
         if prefix.endswith(". ") or prefix.endswith(".\n") or prefix.endswith(": "):
             found.append(title)
             continue
@@ -214,11 +214,25 @@ def _estimate_intensity(name: str, description: str) -> float:
 
 def _estimate_stance(name: str, description: str) -> str | None:
     text = f"{name} {description}".lower()
-    if any(word in text for word in ("defiant", "defiance", "rebel", "fight", "claiming")):
+    if any(
+        word in text for word in ("defiant", "defiance", "rebel", "fight", "claiming")
+    ):
         return "defiant"
-    if any(word in text for word in ("triumphant", "victory", "anthem", "empowerment", "self-possession")):
+    if any(
+        word in text
+        for word in (
+            "triumphant",
+            "victory",
+            "anthem",
+            "empowerment",
+            "self-possession",
+        )
+    ):
         return "triumphant"
-    if any(word in text for word in ("vulnerable", "introspection", "gentle", "quiet realization")):
+    if any(
+        word in text
+        for word in ("vulnerable", "introspection", "gentle", "quiet realization")
+    ):
         return "vulnerable"
     if any(word in text for word in ("peaceful", "still", "calm", "drone")):
         return "peaceful"
@@ -240,7 +254,12 @@ def _infer_transition_out(description: str) -> TransitionType:
     text = description.lower()
     if "sharp cut" in text:
         return TransitionType.SHARP_CUT
-    if "builds" in text or "build back up" in text or "build up" in text or "rising tension" in text:
+    if (
+        "builds" in text
+        or "build back up" in text
+        or "build up" in text
+        or "rising tension" in text
+    ):
         return TransitionType.BUILD
     if "sustain" in text or "holds" in text:
         return TransitionType.SUSTAIN
@@ -276,7 +295,9 @@ def parse_enhanced_narrative(
         description = match.group(4).strip()
 
         # Explicit Required: annotations (always honored)
-        explicit_tracks = [item.strip() for item in _REQUIRED_TRACK_RE.findall(description)]
+        explicit_tracks = [
+            item.strip() for item in _REQUIRED_TRACK_RE.findall(description)
+        ]
 
         # Parenthetical track mentions (fuzzy-matched against tracklist)
         prose_tracks = _extract_track_mentions(description, tracklist)
@@ -309,7 +330,9 @@ def parse_enhanced_narrative(
                 transition_in=_infer_transition_in(description),
                 transition_out=_infer_transition_out(description),
                 required_tracks=all_tracks,
-                required_artists=[item.strip() for item in _REQUIRED_ARTIST_RE.findall(description)],
+                required_artists=[
+                    item.strip() for item in _REQUIRED_ARTIST_RE.findall(description)
+                ],
                 section_concept=_section_concept(description),
             )
         )

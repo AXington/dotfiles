@@ -21,6 +21,7 @@ playlist (``prefer:[live]``) elevates a live candidate to MATCH even against a
 studio source, and ``avoid:[live]`` hard-rejects live candidates regardless of
 the source.
 """
+
 from __future__ import annotations
 
 import re
@@ -62,7 +63,9 @@ _CLEAN_RE = re.compile(r"\b(clean(?:\s+version)?|censored|radio safe)\b", re.IGN
 
 # Non-studio recording classes are DISTINCT recordings; a studio source must
 # never silently accept one, and vice-versa.
-_DISTINCT: frozenset[RecordingClass] = frozenset(RecordingClass) - {RecordingClass.STUDIO}
+_DISTINCT: frozenset[RecordingClass] = frozenset(RecordingClass) - {
+    RecordingClass.STUDIO
+}
 
 
 @dataclass(frozen=True)
@@ -129,10 +132,10 @@ def infer_version(
 class VersionVerdict(str, Enum):
     """The outcome of comparing a source profile against a candidate profile."""
 
-    MATCH = "match"            # compatible recording; no version penalty
-    SOFT = "soft"              # same recording, cosmetic variant (remaster)
+    MATCH = "match"  # compatible recording; no version penalty
+    SOFT = "soft"  # same recording, cosmetic variant (remaster)
     SUBSTITUTE = "substitute"  # requested class unavailable; fallback recording
-    REJECT = "reject"          # wrong recording / censored; must not auto-match
+    REJECT = "reject"  # wrong recording / censored; must not auto-match
 
 
 def compare_version(
@@ -197,7 +200,11 @@ def compare_version(
             verdict = VersionVerdict.SUBSTITUTE
 
     # --- Remaster is cosmetic (same recording) ---
-    if verdict is VersionVerdict.MATCH and candidate.is_remaster and not source.is_remaster:
+    if (
+        verdict is VersionVerdict.MATCH
+        and candidate.is_remaster
+        and not source.is_remaster
+    ):
         verdict = VersionVerdict.SOFT
 
     return verdict
@@ -207,6 +214,6 @@ __all__ = [
     "RecordingClass",
     "VersionProfile",
     "VersionVerdict",
-    "infer_version",
     "compare_version",
+    "infer_version",
 ]

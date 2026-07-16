@@ -1,4 +1,5 @@
 """Enrich command: fetch audio metadata from platform for existing tracks."""
+
 import logging
 import sys
 
@@ -18,8 +19,10 @@ def handle_enrich(args, db: Database) -> int:
 
         platform_name = getattr(args, "platform", None) or "tidal"
         if platform_name != "tidal":
-            print(f"--all only supports Tidal metadata enrichment (got {platform_name})",
-                  file=sys.stderr)
+            print(
+                f"--all only supports Tidal metadata enrichment (got {platform_name})",
+                file=sys.stderr,
+            )
             return 1
         return enrich_all_playlists(
             db,
@@ -36,7 +39,7 @@ def handle_enrich(args, db: Database) -> int:
     platform_name = getattr(args, "platform", None)
     tracks = db.get_playlist_tracks(playlist.id)
     if not tracks:
-        print(f"Playlist \"{playlist.name}\" is empty.")
+        print(f'Playlist "{playlist.name}" is empty.')
         return 0
 
     enriched = 0
@@ -51,19 +54,27 @@ def handle_enrich(args, db: Database) -> int:
             return 1
 
         if not client.load_session():
-            print(f"Not logged in to {platform_name}. Run: tuneshift login {platform_name}", file=sys.stderr)
+            print(
+                f"Not logged in to {platform_name}. Run: tuneshift login {platform_name}",
+                file=sys.stderr,
+            )
             return 1
 
         platform_client = client
         if not hasattr(client, "get_track_metadata"):
-            print(f"{platform_name} does not support metadata enrichment.", file=sys.stderr)
+            print(
+                f"{platform_name} does not support metadata enrichment.",
+                file=sys.stderr,
+            )
         else:
             for track in tracks:
                 if track.tempo and track.key:
                     skipped += 1
                     continue
 
-                mappings = db.get_platform_mappings_for_tracks([track.id], platform_name)
+                mappings = db.get_platform_mappings_for_tracks(
+                    [track.id], platform_name
+                )
                 mapping = mappings.get(track.id)
                 if not mapping or not mapping.platform_track_id:
                     continue
@@ -78,7 +89,9 @@ def handle_enrich(args, db: Database) -> int:
                 except (OSError, RuntimeError, ValueError, KeyError, AttributeError):
                     continue
 
-            print(f"Enriched \"{playlist.name}\": {enriched} tracks updated, {skipped} already had metadata")
+            print(
+                f'Enriched "{playlist.name}": {enriched} tracks updated, {skipped} already had metadata'
+            )
 
     # Catalog metadata (Atmos, release year, genres, quality tiers) from Tidal,
     # retry-aware. AC11: this now runs on ANY Tidal enrichment update -- not only
@@ -89,13 +102,16 @@ def handle_enrich(args, db: Database) -> int:
         from tuneshift.enrichment.platform_metadata import enrich_playlist_from_tidal
 
         meta_enriched, meta_skipped, meta_failed = enrich_playlist_from_tidal(
-            db, playlist.id,
+            db,
+            playlist.id,
             refresh=getattr(args, "refresh", False),
             max_retries=getattr(args, "max_retries", 3),
             client=platform_client if platform_name == "tidal" else None,
         )
-        msg = (f"Catalog metadata for \"{playlist.name}\": "
-               f"{meta_enriched} updated, {meta_skipped} skipped")
+        msg = (
+            f'Catalog metadata for "{playlist.name}": '
+            f"{meta_enriched} updated, {meta_skipped} skipped"
+        )
         if meta_failed:
             msg += f", {meta_failed} failed (retries exhausted)"
         print(msg)
@@ -105,7 +121,11 @@ def handle_enrich(args, db: Database) -> int:
         model = getattr(args, "model", None)
         reclassify = getattr(args, "reclassify", False)
         classified = _run_classification(
-            db, tracks, playlist.name, model=model, playlist_id=playlist.id,
+            db,
+            tracks,
+            playlist.name,
+            model=model,
+            playlist_id=playlist.id,
             force=reclassify,
         )
         if classified < 0:
@@ -114,7 +134,14 @@ def handle_enrich(args, db: Database) -> int:
     return 0
 
 
-def _run_classification(db: Database, tracks: list, playlist_name: str, model: str | None = None, playlist_id: int | None = None, force: bool = False) -> int:
+def _run_classification(
+    db: Database,
+    tracks: list,
+    playlist_name: str,
+    model: str | None = None,
+    playlist_id: int | None = None,
+    force: bool = False,
+) -> int:
     """Run LLM classification on tracks missing narrative metadata.
 
     If force=True, re-classifies all tracks regardless of existing metadata.
@@ -143,8 +170,14 @@ def _run_classification(db: Database, tracks: list, playlist_name: str, model: s
     to_classify = []
     for track in tracks:
         meta = track.metadata or {}
-        if force or meta.get("narrator_stance") is None or meta.get("emotional_intensity") is None:
-            to_classify.append({"title": track.title, "artist": track.artist, "id": track.id})
+        if (
+            force
+            or meta.get("narrator_stance") is None
+            or meta.get("emotional_intensity") is None
+        ):
+            to_classify.append(
+                {"title": track.title, "artist": track.artist, "id": track.id}
+            )
 
     if not to_classify:
         print("  All tracks already classified. Use --reclassify to force.")
@@ -186,7 +219,8 @@ def _run_classification(db: Database, tracks: list, playlist_name: str, model: s
             # If LLM omitted identifying fields, skip (no silent miswrite)
             logger.warning(
                 "Skipping unmatched LLM result: title='%s' artist='%s'",
-                result.get("title"), result.get("artist"),
+                result.get("title"),
+                result.get("artist"),
             )
             continue
 

@@ -8,6 +8,7 @@ plan by default (§7.1 mutation routing, AC-L1/AC-P1). ``map``/``unmap`` remain
 the immediate manual path (``map`` additionally captures platform metadata via
 ``--verify``).
 """
+
 import logging
 import sys
 
@@ -20,9 +21,11 @@ def _load_client(platform: str):
     """Load a platform client by name."""
     if platform == "tidal":
         from tuneshift.platforms.tidal import TidalClient
+
         return TidalClient()
     if platform == "ytmusic":
         from tuneshift.platforms.ytmusic import YTMusicClient
+
         return YTMusicClient()
     return None
 
@@ -53,7 +56,10 @@ def handle_map(args, db: Database) -> int:
     if args.verify:
         client = _load_client(platform)
         if not client or not client.load_session():
-            print(f"Not logged in to {platform}. Run: tuneshift login {platform}", file=sys.stderr)
+            print(
+                f"Not logged in to {platform}. Run: tuneshift login {platform}",
+                file=sys.stderr,
+            )
             return 1
 
         result = client.get_track(platform_id)
@@ -113,12 +119,16 @@ def handle_map(args, db: Database) -> int:
             catalog_client = client if args.verify else _load_client(platform)
             if catalog_client is not None and catalog_client.load_session():
                 tags = capture_tidal_catalog(
-                    db, track.id, platform, platform_id, client=catalog_client,
+                    db,
+                    track.id,
+                    platform,
+                    platform_id,
+                    client=catalog_client,
                     refresh=True,
                 )
                 if "atmos-available" in tags:
                     print("  Captured catalog metadata (Atmos available)")
-        except Exception:  # noqa: BLE001 - capture is best-effort; mapping already succeeded
+        except Exception:
             logger.warning("catalog capture after mapping failed", exc_info=True)
     return 0
 

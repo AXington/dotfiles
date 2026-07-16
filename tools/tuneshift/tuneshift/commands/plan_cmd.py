@@ -17,8 +17,8 @@ import sys
 
 from tuneshift.db import Database
 from tuneshift.planapply.apply import apply_plan, rollback_plan
-from tuneshift.planapply.migrate import build_migration_plan, migration_summary
 from tuneshift.planapply.heal import build_heal_plan
+from tuneshift.planapply.migrate import build_migration_plan, migration_summary
 from tuneshift.planapply.models import Plan, PlanChange
 from tuneshift.planapply.plan import (
     PlanError,
@@ -51,8 +51,10 @@ def handle_plan(args, db: Database) -> int:
     }
     handler = dispatch.get(action)
     if handler is None:
-        print("Usage: tuneshift plan {sync|rematch|migrate|heal|list|show|reject|apply|rollback}",
-              file=sys.stderr)
+        print(
+            "Usage: tuneshift plan {sync|rematch|migrate|heal|list|show|reject|apply|rollback}",
+            file=sys.stderr,
+        )
         return 1
     return handler(args, db)
 
@@ -89,8 +91,10 @@ def _finish_generation(db: Database, plan: Plan, label: str) -> int:
         print(f"{label}: nothing to do (plan is empty).")
         return 0
     path = write_plan(db.path, plan)
-    print(f"{label}: wrote plan {plan.plan_id} ({len(plan.actionable_changes())} "
-          f"actionable change(s)).")
+    print(
+        f"{label}: wrote plan {plan.plan_id} ({len(plan.actionable_changes())} "
+        f"actionable change(s))."
+    )
     print(f"  file: {path}")
     print(f"  review: tuneshift plan show {plan.plan_id}")
     print(f"  apply:  tuneshift plan apply {plan.plan_id}")
@@ -104,8 +108,13 @@ def _generate_sync(args, db: Database) -> int:
     client = _require_client(args.platform)
     if client is None:
         return 1
-    plan = build_sync_plan(db, playlist_id, client, platform=args.platform,
-                           force=getattr(args, "reconcile", False))
+    plan = build_sync_plan(
+        db,
+        playlist_id,
+        client,
+        platform=args.platform,
+        force=getattr(args, "reconcile", False),
+    )
     return _finish_generation(db, plan, f'sync "{args.playlist}"')
 
 
@@ -116,8 +125,13 @@ def _generate_rematch(args, db: Database) -> int:
     client = _require_client(args.platform)
     if client is None:
         return 1
-    plan = build_rematch_plan(db, playlist_id, client, platform=args.platform,
-                              force=getattr(args, "reconcile", False))
+    plan = build_rematch_plan(
+        db,
+        playlist_id,
+        client,
+        platform=args.platform,
+        force=getattr(args, "reconcile", False),
+    )
     return _finish_generation(db, plan, f'rematch "{args.playlist}"')
 
 
@@ -127,9 +141,11 @@ def _generate_migrate(args, db: Database) -> int:
         return 1
     plan = build_migration_plan(db, client, platform=args.platform)
     summary = migration_summary(plan)
-    print(f"migrate {args.platform}: {summary['improved']} improved, "
-          f"{summary['unchanged']} unchanged, "
-          f"{summary['needs-human-judgment']} need human judgment.")
+    print(
+        f"migrate {args.platform}: {summary['improved']} improved, "
+        f"{summary['unchanged']} unchanged, "
+        f"{summary['needs-human-judgment']} need human judgment."
+    )
     return _finish_generation(db, plan, f"migrate {args.platform}")
 
 
@@ -272,10 +288,14 @@ def _apply(args, db: Database) -> int:
     # Persist status changes (applied/skipped/rejected) back to the plan file.
     write_plan(db.path, plan)
 
-    print(f"Applied {report.applied}, skipped {report.skipped}, "
-          f"locked-skipped {report.skipped_locked}, failed {report.failed}.")
+    print(
+        f"Applied {report.applied}, skipped {report.skipped}, "
+        f"locked-skipped {report.skipped_locked}, failed {report.failed}."
+    )
     if report.skipped_locked:
-        print("  Locked changes were skipped. Re-run with --include-locked to apply them.")
+        print(
+            "  Locked changes were skipped. Re-run with --include-locked to apply them."
+        )
     for err in report.errors:
         print(f"  error: {err}", file=sys.stderr)
     return 1 if report.failed else 0
@@ -287,8 +307,10 @@ def _rollback(args, db: Database) -> int:
     if report.remote_skipped:
         comp = build_compensating_plan(report)
         write_plan(db.path, comp)
-        print(f"  {report.remote_skipped} remote push(es) are forward-only and were "
-              f"NOT un-pushed.")
+        print(
+            f"  {report.remote_skipped} remote push(es) are forward-only and were "
+            f"NOT un-pushed."
+        )
         print(f"  Wrote compensating plan {comp.plan_id} to undo them:")
         print(f"    review: tuneshift plan show {comp.plan_id}")
         print(f"    apply:  tuneshift plan apply {comp.plan_id}")

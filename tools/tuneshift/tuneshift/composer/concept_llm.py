@@ -16,8 +16,8 @@ from dataclasses import dataclass, field
 
 from tuneshift.sequencer.classifier import (
     _DEFAULT_MODELS,
-    _TimeoutBackend,
     _resolve_llm_timeout,
+    _TimeoutBackend,
     detect_backend,
 )
 from tuneshift.sequencer.classifier import (
@@ -49,7 +49,7 @@ def _build_prompt(rule: str, tracks: list[TrackCtx]) -> str:
         subject = track.lyrical_subject or "unknown"
         lines.append(
             f'- id {track.track_id}: "{track.title}" by {track.artist} '
-            f'(themes: {themes}; lyrical subject: {subject})'
+            f"(themes: {themes}; lyrical subject: {subject})"
         )
     track_block = "\n".join(lines)
     return (
@@ -59,10 +59,10 @@ def _build_prompt(rule: str, tracks: list[TrackCtx]) -> str:
         "VIOLATES it, or you are UNSURE. Judge only the rule; do not consider "
         "audio quality or popularity.\n\n"
         f"TRACKS:\n{track_block}\n\n"
-        'Return ONLY a JSON object mapping each track id (as a string) to an '
+        "Return ONLY a JSON object mapping each track id (as a string) to an "
         'object with a "verdict" (one of "complies", "violates", "unsure") and '
         'a "confidence" from 0.0 to 1.0 for that verdict. Use a low confidence '
-        'when the lyrics/themes are ambiguous or you are guessing. Example: '
+        "when the lyrics/themes are ambiguous or you are guessing. Example: "
         '{"12": {"verdict": "complies", "confidence": 0.9}, '
         '"13": {"verdict": "violates", "confidence": 0.55}}. No other text.'
     )
@@ -176,7 +176,7 @@ def build_concept_judge(
         try:
             raw = backend.complete(_build_prompt(rule, tracks), model)
             parsed = _extract_json_object(raw)
-        except Exception:  # noqa: BLE001 - best-effort; degrade to unsure
+        except Exception:
             return verdicts
         for track in tracks:
             value = parsed.get(str(track.track_id))

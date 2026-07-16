@@ -31,7 +31,9 @@ logger = logging.getLogger(__name__)
 EnergyValence = tuple[float, float]
 
 
-def spotify_audio_features_via_isrc(isrc: str | None, *, client=None) -> EnergyValence | None:
+def spotify_audio_features_via_isrc(
+    isrc: str | None, *, client=None
+) -> EnergyValence | None:
     """Return (energy, valence) from Spotify audio-features, or None.
 
     Spotify deprecated ``/audio-features`` for new apps on 2024-11-27; without an
@@ -45,8 +47,10 @@ def spotify_audio_features_via_isrc(isrc: str | None, *, client=None) -> EnergyV
         return None
     try:
         features = getter(isrc)
-    except Exception:  # noqa: BLE001 - external API, best-effort
-        logger.warning("spotify audio-features lookup failed for isrc=%s", isrc, exc_info=True)
+    except Exception:
+        logger.warning(
+            "spotify audio-features lookup failed for isrc=%s", isrc, exc_info=True
+        )
         return None
     if not features:
         return None
@@ -91,9 +95,13 @@ def estimate_energy_valence(
     prompt = _ESTIMATE_PROMPT.format(title=title, artist=artist, context=context)
 
     try:
-        response = classifier._backend.complete(prompt, classifier._model, max_tokens=60)
-    except Exception:  # noqa: BLE001 - external API, best-effort
-        logger.warning("energy/valence estimate failed for %s - %s", title, artist, exc_info=True)
+        response = classifier._backend.complete(
+            prompt, classifier._model, max_tokens=60
+        )
+    except Exception:
+        logger.warning(
+            "energy/valence estimate failed for %s - %s", title, artist, exc_info=True
+        )
         return None
 
     parsed = _parse_energy_valence(response)

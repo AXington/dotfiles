@@ -130,7 +130,9 @@ def _select_closer(
 
     closer_index = len(tracks) - 1
     if transition_type in {TransitionType.SHARP_CUT, TransitionType.BUILD}:
-        closer_index = max(range(len(tracks)), key=lambda index: _energy_value(tracks[index]))
+        closer_index = max(
+            range(len(tracks)), key=lambda index: _energy_value(tracks[index])
+        )
     elif transition_type is TransitionType.COLLAPSE:
         closer_index = max(
             range(len(tracks)),
@@ -156,7 +158,9 @@ def _select_opener(
             key=lambda index: _contrast_score(previous_closer, tracks[index], weights),
         )
     elif transition_type is TransitionType.COLLAPSE:
-        opener_index = min(range(len(tracks)), key=lambda index: _energy_value(tracks[index]))
+        opener_index = min(
+            range(len(tracks)), key=lambda index: _energy_value(tracks[index])
+        )
     else:
         opener_index = min(
             range(len(tracks)),
@@ -232,7 +236,9 @@ def _apply_pins(
     opener_ids: list[int] = []
     closer_ids: list[int] = []
     position_pins: list[tuple[int, int]] = []  # (target_index, track_id)
-    adjacent_groups: dict[str, list[tuple[int, int]]] = {}  # group_id -> [(order, track_id)]
+    adjacent_groups: dict[
+        str, list[tuple[int, int]]
+    ] = {}  # group_id -> [(order, track_id)]
 
     for pin in pins:
         if pin.track_id not in track_by_id:
@@ -303,7 +309,9 @@ def _apply_pins(
         # Check if opener is in this group
         group_has_opener = any(tid in opener_ids for tid in member_ids)
         if group_has_opener:
-            member_tracks = [track_by_id[tid] for tid in member_ids if tid in track_by_id]
+            member_tracks = [
+                track_by_id[tid] for tid in member_ids if tid in track_by_id
+            ]
             result = [t for t in result if t.track_id not in set(member_ids)]
             for offset, track in enumerate(member_tracks):
                 result.insert(offset, track)

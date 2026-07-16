@@ -15,6 +15,7 @@ Grammar::
     tuneshift alias add MEMBER MEMBER [MEMBER ...]
     tuneshift alias remove MEMBER
 """
+
 from __future__ import annotations
 
 from tuneshift.db import Database
@@ -27,8 +28,7 @@ def _seed_classes() -> list[frozenset[str]]:
     return default_resolver().raw_classes()
 
 
-def _tag(members: frozenset[str], seed_keys: set[str],
-         db_keys: set[str]) -> str:
+def _tag(members: frozenset[str], seed_keys: set[str], db_keys: set[str]) -> str:
     """Label a class by whether its members come from the seed, the DB, or both."""
     keys = {normalize_artist(m) for m in members}
     in_seed = bool(keys & seed_keys)
@@ -61,13 +61,8 @@ def _merged_classes(db: Database) -> list[frozenset[str]]:
 
 
 def _handle_list(db: Database) -> int:
-    seed_keys = {
-        normalize_artist(m) for c in _seed_classes() for m in c
-    }
-    db_keys = {
-        normalize_artist(m)
-        for c in db.get_artist_alias_classes() for m in c
-    }
+    seed_keys = {normalize_artist(m) for c in _seed_classes() for m in c}
+    db_keys = {normalize_artist(m) for c in db.get_artist_alias_classes() for m in c}
     classes = _merged_classes(db)
     if not classes:
         print("No artist alias classes.")
@@ -108,9 +103,7 @@ def _handle_remove(args, db: Database) -> int:
     query_norm = normalize_artist(args.member)
     for members in _seed_classes():
         if any(normalize_artist(m) == query_norm for m in members):
-            print(
-                f'"{args.member}" is a built-in seed alias and cannot be removed.'
-            )
+            print(f'"{args.member}" is a built-in seed alias and cannot be removed.')
             return 1
     print(f'"{args.member}" is not in any user-defined alias class.')
     return 1

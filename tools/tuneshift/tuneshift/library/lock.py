@@ -57,7 +57,7 @@ class ResolveLock:
         except OSError:
             pass
 
-    def __enter__(self) -> "ResolveLock":
+    def __enter__(self) -> ResolveLock:
         self.acquire()
         return self
 

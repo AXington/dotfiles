@@ -1,9 +1,13 @@
 """Playlist intent inference from track metadata."""
+
 from collections import Counter
 from dataclasses import dataclass, field
 
 from tuneshift.sequencer.metadata import TrackMetadata
-from tuneshift.sequencer.narrative_parser import parse_narrative, NarrativeSection  # noqa: F401
+from tuneshift.sequencer.narrative_parser import (  # noqa: F401
+    NarrativeSection,
+    parse_narrative,
+)
 
 
 @dataclass
@@ -37,7 +41,9 @@ def infer_intent(
             theme_counter[tag] += 1
     dominant_themes = [tag for tag, _ in theme_counter.most_common(5)]
 
-    intensities = [t.emotional_intensity for t in tracks if t.emotional_intensity is not None]
+    intensities = [
+        t.emotional_intensity for t in tracks if t.emotional_intensity is not None
+    ]
     if intensities:
         emotional_range = (min(intensities), max(intensities))
     else:
@@ -81,7 +87,7 @@ def _detect_chapters(tracks: list[TrackMetadata], window: int = 3) -> list[int]:
     """Detect chapter boundaries by sliding window Jaccard similarity drop."""
     if len(tracks) < 4:
         return []
-    
+
     effective_window = min(window, len(tracks) // 2)
     if effective_window < 1:
         return []
@@ -89,10 +95,10 @@ def _detect_chapters(tracks: list[TrackMetadata], window: int = 3) -> list[int]:
     boundaries: list[int] = []
     for i in range(effective_window, len(tracks) - effective_window + 1):
         left_tags: set[str] = set()
-        for t in tracks[i - effective_window:i]:
+        for t in tracks[i - effective_window : i]:
             left_tags.update(t.themes + t.vibes)
         right_tags: set[str] = set()
-        for t in tracks[i:min(i + effective_window, len(tracks))]:
+        for t in tracks[i : min(i + effective_window, len(tracks))]:
             right_tags.update(t.themes + t.vibes)
 
         if not left_tags and not right_tags:
@@ -134,6 +140,7 @@ def _parse_narrative_sections(narrative: str, track_count: int) -> list[int]:
     or "BUILD (3-8):" and returns the starting positions as boundaries.
     """
     import re
+
     boundaries: list[int] = []
     # Match patterns like "SECTION (N-M)" or "SECTION (N)"
     section_re = re.compile(r"[A-Z]+\s*\((\d+)(?:-\d+)?\)")
@@ -151,6 +158,7 @@ def _parse_narrative_climax(narrative: str, tracks: list[TrackMetadata]) -> list
     ANTHEM) and returns track IDs in those regions.
     """
     import re
+
     climax_keywords = {"wrath", "climax", "peak", "anthem", "fury", "rage", "eruption"}
     section_re = re.compile(r"([A-Z]+)\s*\((\d+)-(\d+)\)")
 

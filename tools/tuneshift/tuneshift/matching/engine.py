@@ -15,6 +15,7 @@ caps*: a hard version rejection (karaoke/instrumental) or an out-of-band
 duration can cap the result to a non-auto action no matter how close the
 strings match.
 """
+
 from __future__ import annotations
 
 from collections.abc import Iterable
@@ -27,20 +28,20 @@ from tuneshift.matching.penalties import SignalPenalty
 class Recommendation(str, Enum):
     """What to do with a candidate, by decreasing confidence."""
 
-    AUTO = "auto"       # accept without asking
+    AUTO = "auto"  # accept without asking
     SUGGEST = "suggest"  # propose, lightly confirm
-    ASK = "ask"         # surface for explicit review
-    REJECT = "reject"   # do not offer
+    ASK = "ask"  # surface for explicit review
+    REJECT = "reject"  # do not offer
 
 
 @dataclass(frozen=True)
 class RecommendationThresholds:
     """Distance cut-points for the recommendation ladder (defaults tunable)."""
 
-    auto_max: float = 0.15    # distance <= auto_max -> AUTO
+    auto_max: float = 0.15  # distance <= auto_max -> AUTO
     suggest_max: float = 0.35  # <= suggest_max -> SUGGEST
-    ask_max: float = 0.60     # <= ask_max -> ASK; else REJECT
-    gap_min: float = 0.10     # runner-up must be at least this much worse for AUTO
+    ask_max: float = 0.60  # <= ask_max -> ASK; else REJECT
+    gap_min: float = 0.10  # runner-up must be at least this much worse for AUTO
 
 
 DEFAULT_THRESHOLDS = RecommendationThresholds()
@@ -49,7 +50,9 @@ DEFAULT_THRESHOLDS = RecommendationThresholds()
 # ``version:reject`` (source-aware wrong-recording / censored) forces REJECT;
 # the legacy candidate-only karaoke/instrumental caps are retained for callers
 # still building distances from ``version_signals``.
-_HARD_VERSION_CAPS = frozenset({"version:reject", "version:karaoke", "version:instrumental"})
+_HARD_VERSION_CAPS = frozenset(
+    {"version:reject", "version:karaoke", "version:instrumental"}
+)
 # A source-aware substitute (fallback recording) caps to SUGGEST, never AUTO.
 _SUBSTITUTE_CAP = "version:substitute"
 _DURATION_CAP = "duration"

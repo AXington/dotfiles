@@ -1,4 +1,5 @@
 """Order command: sequence a playlist by energy arc."""
+
 import json
 import sys
 
@@ -97,7 +98,9 @@ def _warn_if_energy_sparse(tracks) -> None:
 
 def _print_dry_run(db: Database, track_ids: list[int], name: str, arc: str) -> None:
     """Display proposed order without making changes."""
-    print(f'[DRY RUN] Proposed order for "{name}" ({len(track_ids)} tracks, arc={arc}):')
+    print(
+        f'[DRY RUN] Proposed order for "{name}" ({len(track_ids)} tracks, arc={arc}):'
+    )
     print()
     for i, track_id in enumerate(track_ids, 1):
         track = db.get_track(track_id)
@@ -150,6 +153,8 @@ def _push_order_to_platforms(db: Database, playlist) -> bool:
                 print(f"  {platform_name}: sync failed ({exc})", file=sys.stderr)
                 failures = True
         else:
-            print(f"  {platform_name}: no track mappings found (run tuneshift sync first)")
+            print(
+                f"  {platform_name}: no track mappings found (run tuneshift sync first)"
+            )
 
     return failures

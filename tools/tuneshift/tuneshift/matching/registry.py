@@ -51,9 +51,7 @@ STRUCTURED_AXIS_FIELDS: dict[str, str] = {
 
 #: Whitelist axes whose evidence is PARSED from the free-text title (no reliable
 #: structured field exists for them), gated by the committed whitelist.
-TITLE_AXES: frozenset[str] = frozenset(
-    {"performance", "content", "edit", "production"}
-)
+TITLE_AXES: frozenset[str] = frozenset({"performance", "content", "edit", "production"})
 
 #: Date/year axes (M3). Each maps a preference axis to the candidate metadata
 #: attribute the :class:`~tuneshift.matching.criteria.DateCriterion` reads; the
@@ -182,7 +180,9 @@ def resolve_scoped_specs(
     # Keyed by (axis, canonical target); a later (more specific) scope overwrites,
     # giving most-specific-wins collapse while preserving distinct targets.
     collapsed: dict[tuple[str, str], PreferenceSpec] = {}
-    for scope, layer in zip(_SCOPE_NAMES, (global_prefs, playlist_prefs, playlist_track_prefs)):
+    for scope, layer in zip(
+        _SCOPE_NAMES, (global_prefs, playlist_prefs, playlist_track_prefs)
+    ):
         for row in layer or ():
             axis = row.get("criterion")
             target = row.get("target")
@@ -218,17 +218,19 @@ def resolve_active_preferences(
     active: list[ActivePreference] = []
     for spec in specs:
         criterion = criterion_for(spec.axis, spec.target, wl)
-        ref = PreferenceRef(spec.axis, spec.strength, wl.canonical(spec.target), spec.scope)
+        ref = PreferenceRef(
+            spec.axis, spec.strength, wl.canonical(spec.target), spec.scope
+        )
         active.append(ActivePreference(criterion, ref))
     return active
 
 
 __all__ = [
+    "KNOWN_AXES",
     "STRUCTURED_AXIS_FIELDS",
     "TITLE_AXES",
-    "KNOWN_AXES",
     "PreferenceSpec",
     "criterion_for",
-    "resolve_scoped_specs",
     "resolve_active_preferences",
+    "resolve_scoped_specs",
 ]

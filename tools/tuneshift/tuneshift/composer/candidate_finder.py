@@ -90,7 +90,9 @@ def _stance_score(track: Track, stance: str | None) -> float:
     return 1.0 if str(track_stance).casefold() == stance.casefold() else 0.0
 
 
-def _keyword_score(track: Track, gap: GapSpec, concept: PlaylistConcept | None) -> float:
+def _keyword_score(
+    track: Track, gap: GapSpec, concept: PlaylistConcept | None
+) -> float:
     target_terms = {item.casefold() for item in gap.mood}
     target_terms.update(item.casefold() for item in gap.keywords)
     target_terms |= _concept_terms(concept)

@@ -33,12 +33,26 @@ _TRACK_EDITABLE_COLUMNS = frozenset({"title", "artist", "album"})
 
 # First-class version-selection metadata columns settable via set_track_fields
 # (spec §4.1). Constrains f-string interpolation in the UPDATE to a safe set.
-_TRACK_FIRST_CLASS_COLUMNS = frozenset({
-    "album_artist", "album_type", "label", "recording_date", "release_date",
-    "remaster_year", "audio_modes", "audio_quality", "tidal_version",
-    "language", "composer", "availability", "quarantine_state",
-    "quarantine_reason", "energy", "valence",
-})
+_TRACK_FIRST_CLASS_COLUMNS = frozenset(
+    {
+        "album_artist",
+        "album_type",
+        "label",
+        "recording_date",
+        "release_date",
+        "remaster_year",
+        "audio_modes",
+        "audio_quality",
+        "tidal_version",
+        "language",
+        "composer",
+        "availability",
+        "quarantine_state",
+        "quarantine_reason",
+        "energy",
+        "valence",
+    }
+)
 # First-class columns whose Python value is a list, stored as a JSON string.
 _TRACK_JSON_FIELD_COLUMNS = frozenset({"audio_modes"})
 
@@ -416,7 +430,9 @@ CREATE INDEX IF NOT EXISTS idx_apply_journal_plan
 # broadening it would require a full reindex/backfill migration and could merge
 # rows the UNIQUE constraint currently keeps distinct. Do NOT point this at the
 # aggressive comparison regex. See tests/matching/test_normalizer_contracts.py.
-_REMIX_RE = re.compile(r"\s*\((?:remaster(?:ed)?|deluxe edition)[^)]*\)\s*", re.IGNORECASE)
+_REMIX_RE = re.compile(
+    r"\s*\((?:remaster(?:ed)?|deluxe edition)[^)]*\)\s*", re.IGNORECASE
+)
 
 
 def normalize_title(value: str | None) -> str | None:
@@ -457,6 +473,7 @@ def normalize_ban_name(value: str) -> str:
     so "Beyonce" matches "Beyonce" and "P!nk" matches "Pink".
     """
     import unicodedata
+
     # NFD decomposition separates base chars from combining marks
     decomposed = unicodedata.normalize("NFD", value)
     # Strip combining marks (accents, diacritics)
@@ -523,7 +540,10 @@ class Database:
 
         with self.conn:
             if current_version < 2:
-                cols = {r[1] for r in self.conn.execute("PRAGMA table_info(tracks)").fetchall()}
+                cols = {
+                    r[1]
+                    for r in self.conn.execute("PRAGMA table_info(tracks)").fetchall()
+                }
                 track_identity_columns = {
                     "mb_recording_id": "TEXT",
                     "mb_release_group_id": "TEXT",
@@ -558,7 +578,10 @@ class Database:
 
             if current_version < 3:
                 playlist_cols = {
-                    r[1] for r in self.conn.execute("PRAGMA table_info(playlists)").fetchall()
+                    r[1]
+                    for r in self.conn.execute(
+                        "PRAGMA table_info(playlists)"
+                    ).fetchall()
                 }
                 if "auto_reorder" not in playlist_cols:
                     self.conn.execute(
@@ -596,37 +619,56 @@ class Database:
 
             if current_version < 6:
                 playlist_cols = {
-                    r[1] for r in self.conn.execute("PRAGMA table_info(playlists)").fetchall()
+                    r[1]
+                    for r in self.conn.execute(
+                        "PRAGMA table_info(playlists)"
+                    ).fetchall()
                 }
                 if "narrative" not in playlist_cols:
-                    self.conn.execute(
-                        "ALTER TABLE playlists ADD COLUMN narrative TEXT"
-                    )
+                    self.conn.execute("ALTER TABLE playlists ADD COLUMN narrative TEXT")
 
             if current_version < 7:
                 playlist_cols = {
-                    r[1] for r in self.conn.execute("PRAGMA table_info(playlists)").fetchall()
+                    r[1]
+                    for r in self.conn.execute(
+                        "PRAGMA table_info(playlists)"
+                    ).fetchall()
                 }
                 if "collection" not in playlist_cols:
-                    self.conn.execute("ALTER TABLE playlists ADD COLUMN collection TEXT")
+                    self.conn.execute(
+                        "ALTER TABLE playlists ADD COLUMN collection TEXT"
+                    )
                 if "goal" not in playlist_cols:
                     self.conn.execute("ALTER TABLE playlists ADD COLUMN goal TEXT")
                 if "playlist_type" not in playlist_cols:
-                    self.conn.execute("ALTER TABLE playlists ADD COLUMN playlist_type TEXT")
+                    self.conn.execute(
+                        "ALTER TABLE playlists ADD COLUMN playlist_type TEXT"
+                    )
                 if "weights" not in playlist_cols:
                     self.conn.execute("ALTER TABLE playlists ADD COLUMN weights TEXT")
                 if "mood_profile" not in playlist_cols:
-                    self.conn.execute("ALTER TABLE playlists ADD COLUMN mood_profile TEXT")
+                    self.conn.execute(
+                        "ALTER TABLE playlists ADD COLUMN mood_profile TEXT"
+                    )
                 if "curation_constraints" not in playlist_cols:
-                    self.conn.execute("ALTER TABLE playlists ADD COLUMN curation_constraints TEXT")
+                    self.conn.execute(
+                        "ALTER TABLE playlists ADD COLUMN curation_constraints TEXT"
+                    )
                 if "preferences" not in playlist_cols:
-                    self.conn.execute("ALTER TABLE playlists ADD COLUMN preferences TEXT")
+                    self.conn.execute(
+                        "ALTER TABLE playlists ADD COLUMN preferences TEXT"
+                    )
 
                 playlist_track_cols = {
-                    r[1] for r in self.conn.execute("PRAGMA table_info(playlist_tracks)").fetchall()
+                    r[1]
+                    for r in self.conn.execute(
+                        "PRAGMA table_info(playlist_tracks)"
+                    ).fetchall()
                 }
                 if "version_override" not in playlist_track_cols:
-                    self.conn.execute("ALTER TABLE playlist_tracks ADD COLUMN version_override TEXT")
+                    self.conn.execute(
+                        "ALTER TABLE playlist_tracks ADD COLUMN version_override TEXT"
+                    )
 
             if current_version < 8:
                 # Create artists table
@@ -689,7 +731,8 @@ class Database:
 
                 # Add FK columns to tracks
                 track_cols = {
-                    r[1] for r in self.conn.execute("PRAGMA table_info(tracks)").fetchall()
+                    r[1]
+                    for r in self.conn.execute("PRAGMA table_info(tracks)").fetchall()
                 }
                 if "artist_id" not in track_cols:
                     self.conn.execute(
@@ -800,10 +843,15 @@ class Database:
                     )
                 """)
                 playlist_cols = {
-                    r[1] for r in self.conn.execute("PRAGMA table_info(playlists)").fetchall()
+                    r[1]
+                    for r in self.conn.execute(
+                        "PRAGMA table_info(playlists)"
+                    ).fetchall()
                 }
                 if "tidal_folder_id" not in playlist_cols:
-                    self.conn.execute("ALTER TABLE playlists ADD COLUMN tidal_folder_id TEXT")
+                    self.conn.execute(
+                        "ALTER TABLE playlists ADD COLUMN tidal_folder_id TEXT"
+                    )
 
             if current_version < 11:
                 self.conn.execute("""
@@ -866,14 +914,10 @@ class Database:
                     )
                 track_cols = {
                     row[1]
-                    for row in self.conn.execute(
-                        "PRAGMA table_info(tracks)"
-                    ).fetchall()
+                    for row in self.conn.execute("PRAGMA table_info(tracks)").fetchall()
                 }
                 if "preferences" not in track_cols:
-                    self.conn.execute(
-                        "ALTER TABLE tracks ADD COLUMN preferences TEXT"
-                    )
+                    self.conn.execute("ALTER TABLE tracks ADD COLUMN preferences TEXT")
 
             if current_version < 14:
                 # Artist-alias equivalence: user-curated classes of equivalent
@@ -899,7 +943,8 @@ class Database:
                 # field_provenance JSON column recording (source, timestamp) per
                 # enrichable field. Idempotent ALTERs guarded by PRAGMA.
                 track_cols = {
-                    r[1] for r in self.conn.execute("PRAGMA table_info(tracks)").fetchall()
+                    r[1]
+                    for r in self.conn.execute("PRAGMA table_info(tracks)").fetchall()
                 }
                 first_class_columns = {
                     "album_artist": "TEXT",
@@ -1122,18 +1167,29 @@ class Database:
                 # an existing non-unique index; a migration must DROP it first.
                 artist_cols = {
                     r[1]
-                    for r in self.conn.execute(
-                        "PRAGMA table_info(artists)"
-                    ).fetchall()
+                    for r in self.conn.execute("PRAGMA table_info(artists)").fetchall()
                 }
                 merge_cols = [
-                    c for c in (
-                        "sort_name", "bio", "identity", "tags",
-                        "identity_confidence", "genres", "origin",
-                        "active_start", "active_end", "mb_artist_id",
-                        "tidal_artist_id", "qobuz_artist_id",
-                        "spotify_artist_uri", "lastfm_url", "wikipedia_url",
-                        "enrichment_sources", "verified", "enriched_at",
+                    c
+                    for c in (
+                        "sort_name",
+                        "bio",
+                        "identity",
+                        "tags",
+                        "identity_confidence",
+                        "genres",
+                        "origin",
+                        "active_start",
+                        "active_end",
+                        "mb_artist_id",
+                        "tidal_artist_id",
+                        "qobuz_artist_id",
+                        "spotify_artist_uri",
+                        "lastfm_url",
+                        "wikipedia_url",
+                        "enrichment_sources",
+                        "verified",
+                        "enriched_at",
                         "verified_at",
                     )
                     if c in artist_cols
@@ -1382,7 +1438,9 @@ class Database:
 
     def get_isrc(self, track_id: int) -> str | None:
         """Get the ISRC for a track."""
-        row = self.conn.execute("SELECT isrc FROM tracks WHERE id = ?", (track_id,)).fetchone()
+        row = self.conn.execute(
+            "SELECT isrc FROM tracks WHERE id = ?", (track_id,)
+        ).fetchone()
         return row["isrc"] if row else None
 
     def store_resolution(
@@ -1472,7 +1530,9 @@ class Database:
             ).fetchall()
         else:
             threshold = tier_order.get(below_tier, 0)
-            tiers_below = [tier for tier, order in tier_order.items() if order < threshold]
+            tiers_below = [
+                tier for tier, order in tier_order.items() if order < threshold
+            ]
             if not tiers_below:
                 rows = self.conn.execute(
                     "SELECT * FROM tracks WHERE confidence_tier IS NULL"
@@ -1534,7 +1594,9 @@ class Database:
         limit: int = 20,
     ) -> list[Track]:
         """Search tracks using metadata-backed narrative attributes."""
-        rows = self.conn.execute("SELECT * FROM tracks ORDER BY updated_at DESC, id DESC").fetchall()
+        rows = self.conn.execute(
+            "SELECT * FROM tracks ORDER BY updated_at DESC, id DESC"
+        ).fetchall()
         normalized_stance = stance.casefold() if stance else None
         normalized_keywords = {
             keyword.casefold().strip()
@@ -1592,7 +1654,9 @@ class Database:
                         term_groups.append(str(value))
 
                 haystack = " ".join(term_groups).casefold()
-                overlap_count = sum(1 for keyword in normalized_keywords if keyword in haystack)
+                overlap_count = sum(
+                    1 for keyword in normalized_keywords if keyword in haystack
+                )
                 if overlap_count == 0:
                     continue
 
@@ -1636,7 +1700,9 @@ class Database:
             tidal_folder_id=tidal_folder,
         )
 
-    def set_auto_reorder(self, playlist_id: int, enabled: bool, arc: str = "wave") -> None:
+    def set_auto_reorder(
+        self, playlist_id: int, enabled: bool, arc: str = "wave"
+    ) -> None:
         """Enable or disable auto-reorder for a playlist."""
         self.conn.execute(
             "UPDATE playlists SET auto_reorder = ?, reorder_arc = ?, updated_at = datetime('now') WHERE id = ?",
@@ -1702,7 +1768,9 @@ class Database:
             for row in rows
         ]
 
-    def transfer_pins(self, playlist_id: int, from_track_id: int, to_track_id: int) -> None:
+    def transfer_pins(
+        self, playlist_id: int, from_track_id: int, to_track_id: int
+    ) -> None:
         """Transfer all pins from one track to another within a playlist."""
         with self.conn:
             self.conn.execute(
@@ -1729,7 +1797,8 @@ class Database:
                 if mid == keep_id:
                     continue
                 playlists = [
-                    r[0] for r in conn.execute(
+                    r[0]
+                    for r in conn.execute(
                         "SELECT DISTINCT playlist_id FROM playlist_tracks WHERE track_id = ?",
                         (mid,),
                     ).fetchall()
@@ -1777,7 +1846,9 @@ class Database:
                             (idx, rowid),
                         )
                 # Remove auxiliary rows that lack ON DELETE CASCADE.
-                conn.execute("DELETE FROM track_platform_metadata WHERE track_id = ?", (mid,))
+                conn.execute(
+                    "DELETE FROM track_platform_metadata WHERE track_id = ?", (mid,)
+                )
                 conn.execute("DELETE FROM track_tags WHERE track_id = ?", (mid,))
                 # Delete the track; cascade removes remaining platform_tracks,
                 # playlist_tracks, playlist_pins, and evidence rows.
@@ -1823,9 +1894,7 @@ class Database:
         ).fetchall()
         return [self._row_to_track(row) for row in rows]
 
-    def get_release_years_for_playlist(
-        self, playlist_id: int
-    ) -> dict[int, int | None]:
+    def get_release_years_for_playlist(self, playlist_id: int) -> dict[int, int | None]:
         """Map each track in a playlist to a best-known release year.
 
         Reads ``track_platform_metadata.release_year`` (populated per platform).
@@ -1875,9 +1944,7 @@ class Database:
         ).fetchall()
         return {(row["track_id"], row["rule_key"]) for row in rows}
 
-    def list_concept_acceptances(
-        self, playlist_id: int
-    ) -> list[tuple[int, str]]:
+    def list_concept_acceptances(self, playlist_id: int) -> list[tuple[int, str]]:
         """Return accepted ``(track_id, rule_text)`` pairs for display."""
         rows = self.conn.execute(
             "SELECT track_id, rule_text FROM concept_rule_acceptances "
@@ -1899,7 +1966,9 @@ class Database:
         )
         self.conn.commit()
 
-    def remove_playlist_track_by_position(self, playlist_id: int, position: int) -> None:
+    def remove_playlist_track_by_position(
+        self, playlist_id: int, position: int
+    ) -> None:
         """Remove the track at a specific position and reindex later rows.
 
         Position-scoped (BUG-7): only the row at ``position`` is removed, so a
@@ -2018,7 +2087,14 @@ class Database:
                  reason_code = excluded.reason_code,
                  audit_json = excluded.audit_json,
                  updated_at = excluded.updated_at""",
-            (playlist_id, track_id, platform, audit.availability, audit.reason_code, audit.to_json()),
+            (
+                playlist_id,
+                track_id,
+                platform,
+                audit.availability,
+                audit.reason_code,
+                audit.to_json(),
+            ),
         )
         self.conn.commit()
 
@@ -2052,7 +2128,9 @@ class Database:
             "WHERE track_id = ? AND playlist_id = ?",
             (track_id, playlist_id),
         ).fetchall()
-        return {row["platform"]: MatchAudit.from_json(row["audit_json"]) for row in rows}
+        return {
+            row["platform"]: MatchAudit.from_json(row["audit_json"]) for row in rows
+        }
 
     def get_review_items(
         self,
@@ -2155,7 +2233,9 @@ class Database:
         ).fetchall()
         return [row[0] for row in rows]
 
-    def get_platform_mapping(self, track_id: int, platform: str) -> PlatformMapping | None:
+    def get_platform_mapping(
+        self, track_id: int, platform: str
+    ) -> PlatformMapping | None:
         """Get a platform mapping for a track."""
         row = self.conn.execute(
             "SELECT * FROM platform_tracks WHERE track_id = ? AND platform = ?",
@@ -2234,8 +2314,16 @@ class Database:
                    platform_album = excluded.platform_album,
                    match_score = excluded.match_score,
                    user_approved = excluded.user_approved""",
-                (track_id, platform, platform_track_id, platform_title, platform_artist,
-                 platform_album, match_score, int(user_approved)),
+                (
+                    track_id,
+                    platform,
+                    platform_track_id,
+                    platform_title,
+                    platform_artist,
+                    platform_album,
+                    match_score,
+                    int(user_approved),
+                ),
             )
 
     def delete_platform_mapping(self, track_id: int, platform: str) -> None:
@@ -2307,7 +2395,9 @@ class Database:
         ).fetchone()
         if row is None:
             raise ValueError(f"Track id not found: {track_id}")
-        provenance = json.loads(row["field_provenance"]) if row["field_provenance"] else {}
+        provenance = (
+            json.loads(row["field_provenance"]) if row["field_provenance"] else {}
+        )
 
         now = datetime.now(timezone.utc).isoformat()
         set_clauses: list[str] = []
@@ -2332,7 +2422,9 @@ class Database:
 
     # --- resolution_queue (spec §4.1a: resumable enrich/resolve worker) ---
 
-    def enqueue_resolution(self, track_id: int, next_attempt_at: str | None = None) -> None:
+    def enqueue_resolution(
+        self, track_id: int, next_attempt_at: str | None = None
+    ) -> None:
         """Enqueue a track for resolution/enrichment.
 
         Idempotent per track. Re-enqueuing a track that previously QUARANTINED
@@ -2455,7 +2547,9 @@ class Database:
         order the live gather produced — selection keeps input order for default
         band-ties, so preserving it is what guarantees winner parity (AC-P4).
         """
-        payload = json.dumps(captured_metadata) if captured_metadata is not None else None
+        payload = (
+            json.dumps(captured_metadata) if captured_metadata is not None else None
+        )
         with self.conn:
             self.conn.execute(
                 """INSERT INTO track_candidates
@@ -2469,7 +2563,9 @@ class Database:
                 (track_id, platform, platform_track_id, payload, discovery_rank),
             )
 
-    def clear_track_candidates(self, track_id: int, platform: str | None = None) -> None:
+    def clear_track_candidates(
+        self, track_id: int, platform: str | None = None
+    ) -> None:
         """Remove persisted candidates for a track (optionally one platform).
 
         Called before persisting a fresh candidate set so a refresh REPLACES the
@@ -2568,7 +2664,9 @@ class Database:
             written["album"] = album
             written["norm_album"] = normalize_title(album)
 
-        provenance = json.loads(row["field_provenance"]) if row["field_provenance"] else {}
+        provenance = (
+            json.loads(row["field_provenance"]) if row["field_provenance"] else {}
+        )
         now = datetime.now(timezone.utc).isoformat()
         for column in written:
             if column == "norm_album":
@@ -2658,7 +2756,9 @@ class Database:
                 table_name=row["table_name"],
                 row_key=row["row_key"],
                 op=row["op"],
-                prior_value=json.loads(row["prior_value"]) if row["prior_value"] else None,
+                prior_value=json.loads(row["prior_value"])
+                if row["prior_value"]
+                else None,
                 new_value=json.loads(row["new_value"]) if row["new_value"] else None,
                 applied_at=row["applied_at"],
             )
@@ -2675,9 +2775,7 @@ class Database:
     def clear_journal(self, plan_id: str) -> None:
         """Remove a plan's journal entries (after a successful rollback)."""
         with self.conn:
-            self.conn.execute(
-                "DELETE FROM apply_journal WHERE plan_id = ?", (plan_id,)
-            )
+            self.conn.execute("DELETE FROM apply_journal WHERE plan_id = ?", (plan_id,))
 
     # --- coverage + quarantine surface (spec §4.4; AC-D1, AC-D6) ---
 
@@ -3092,7 +3190,11 @@ class Database:
             (playlist_id, track_id),
         ).fetchall()
         return [
-            {"criterion": r["criterion"], "strength": r["strength"], "target": r["target"]}
+            {
+                "criterion": r["criterion"],
+                "strength": r["strength"],
+                "target": r["target"],
+            }
             for r in rows
         ]
 
@@ -3146,19 +3248,35 @@ class Database:
         if "key" in meta:
             updates.append("key = ?")
             params.append(meta["key"])
-        if "duration_seconds" in meta and meta["duration_seconds"]:
+        # The explicit "key in meta and meta[key]" form is kept over dict.get():
+        # callers (and tests) may pass mapping-like objects whose __contains__ is
+        # authoritative, so collapsing to .get() would change truthiness semantics.
+        if "duration_seconds" in meta and meta["duration_seconds"]:  # noqa: RUF019
             updates.append("duration_seconds = ?")
             params.append(meta["duration_seconds"])
-        if "isrc" in meta and meta["isrc"]:
+        if "isrc" in meta and meta["isrc"]:  # noqa: RUF019
             updates.append("isrc = ?")
             params.append(meta["isrc"])
         # Store extra fields in metadata JSON
         _METADATA_KEYS = (
-            "key_scale", "energy", "valence",
-            "themes", "vibes", "instruments", "density", "era_mood",
-            "emotional_intensity", "lyrical_subject", "narrator_stance",
-            "sonic_texture", "space", "groove_feel", "opens_with",
-            "closes_with", "energy_arc_within", "classification_confidence",
+            "key_scale",
+            "energy",
+            "valence",
+            "themes",
+            "vibes",
+            "instruments",
+            "density",
+            "era_mood",
+            "emotional_intensity",
+            "lyrical_subject",
+            "narrator_stance",
+            "sonic_texture",
+            "space",
+            "groove_feel",
+            "opens_with",
+            "closes_with",
+            "energy_arc_within",
+            "classification_confidence",
         )
         track = self.get_track(track_id)
         if track:
@@ -3169,6 +3287,7 @@ class Database:
             if existing_meta != (track.metadata or {}):
                 updates.append("metadata = ?")
                 import json as _json
+
                 params.append(_json.dumps(existing_meta))
         if updates:
             params.append(track_id)
@@ -3184,7 +3303,9 @@ class Database:
             self._conn.close()
             self._conn = None
 
-    def add_track_to_playlist(self, playlist_id: int, track_id: int, position: int) -> None:
+    def add_track_to_playlist(
+        self, playlist_id: int, track_id: int, position: int
+    ) -> None:
         """Add a track at a specific position (upsert, no error on conflict)."""
         self.conn.execute(
             """INSERT OR REPLACE INTO playlist_tracks (playlist_id, track_id, position)
@@ -3193,7 +3314,9 @@ class Database:
         )
         self.conn.commit()
 
-    def link_platform_playlist(self, playlist_id: int, platform: str, platform_playlist_id: str) -> None:
+    def link_platform_playlist(
+        self, playlist_id: int, platform: str, platform_playlist_id: str
+    ) -> None:
         """Link a canonical playlist to a platform playlist.
 
         Uses ON CONFLICT DO UPDATE rather than INSERT OR REPLACE so re-linking an
@@ -3258,22 +3381,31 @@ class Database:
 
     def set_goal(self, playlist_id: int, goal: str | None) -> None:
         """Set the goal for a playlist."""
-        self.conn.execute("UPDATE playlists SET goal = ? WHERE id = ?", (goal, playlist_id))
+        self.conn.execute(
+            "UPDATE playlists SET goal = ? WHERE id = ?", (goal, playlist_id)
+        )
         self.conn.commit()
 
     def get_goal(self, playlist_id: int) -> str | None:
         """Get the goal for a playlist."""
-        row = self.conn.execute("SELECT goal FROM playlists WHERE id = ?", (playlist_id,)).fetchone()
+        row = self.conn.execute(
+            "SELECT goal FROM playlists WHERE id = ?", (playlist_id,)
+        ).fetchone()
         return row[0] if row else None
 
     def set_collection(self, playlist_id: int, collection: str | None) -> None:
         """Set the collection a playlist belongs to (e.g., Pride, Laurel Canyon)."""
-        self.conn.execute("UPDATE playlists SET collection = ? WHERE id = ?", (collection, playlist_id))
+        self.conn.execute(
+            "UPDATE playlists SET collection = ? WHERE id = ?",
+            (collection, playlist_id),
+        )
         self.conn.commit()
 
     def get_collection(self, playlist_id: int) -> str | None:
         """Get the collection a playlist belongs to."""
-        row = self.conn.execute("SELECT collection FROM playlists WHERE id = ?", (playlist_id,)).fetchone()
+        row = self.conn.execute(
+            "SELECT collection FROM playlists WHERE id = ?", (playlist_id,)
+        ).fetchone()
         return row[0] if row else None
 
     def list_collections(self) -> list[str]:
@@ -3285,39 +3417,54 @@ class Database:
 
     def get_playlists_in_collection(self, collection: str) -> list:
         """Get all playlists belonging to a collection."""
-        return [p for p in self.list_playlists() if self.get_collection(p.id) == collection]
+        return [
+            p for p in self.list_playlists() if self.get_collection(p.id) == collection
+        ]
 
     def set_weights(self, playlist_id: int, weights: dict | None) -> None:
         """Set the weights for a playlist."""
         val = json.dumps(weights) if weights else None
-        self.conn.execute("UPDATE playlists SET weights = ? WHERE id = ?", (val, playlist_id))
+        self.conn.execute(
+            "UPDATE playlists SET weights = ? WHERE id = ?", (val, playlist_id)
+        )
         self.conn.commit()
 
     def get_weights(self, playlist_id: int) -> dict | None:
         """Get the weights for a playlist."""
-        row = self.conn.execute("SELECT weights FROM playlists WHERE id = ?", (playlist_id,)).fetchone()
+        row = self.conn.execute(
+            "SELECT weights FROM playlists WHERE id = ?", (playlist_id,)
+        ).fetchone()
         return json.loads(row[0]) if row and row[0] else None
 
     def set_constraints(self, playlist_id: int, constraints: dict | None) -> None:
         """Set the curation constraints for a playlist."""
         val = json.dumps(constraints) if constraints else None
-        self.conn.execute("UPDATE playlists SET curation_constraints = ? WHERE id = ?", (val, playlist_id))
+        self.conn.execute(
+            "UPDATE playlists SET curation_constraints = ? WHERE id = ?",
+            (val, playlist_id),
+        )
         self.conn.commit()
 
     def get_constraints(self, playlist_id: int) -> dict | None:
         """Get the curation constraints for a playlist."""
-        row = self.conn.execute("SELECT curation_constraints FROM playlists WHERE id = ?", (playlist_id,)).fetchone()
+        row = self.conn.execute(
+            "SELECT curation_constraints FROM playlists WHERE id = ?", (playlist_id,)
+        ).fetchone()
         return json.loads(row[0]) if row and row[0] else None
 
     def set_preferences(self, playlist_id: int, prefs: dict | None) -> None:
         """Set the preferences for a playlist."""
         val = json.dumps(prefs) if prefs else None
-        self.conn.execute("UPDATE playlists SET preferences = ? WHERE id = ?", (val, playlist_id))
+        self.conn.execute(
+            "UPDATE playlists SET preferences = ? WHERE id = ?", (val, playlist_id)
+        )
         self.conn.commit()
 
     def get_preferences(self, playlist_id: int) -> dict | None:
         """Get the preferences for a playlist."""
-        row = self.conn.execute("SELECT preferences FROM playlists WHERE id = ?", (playlist_id,)).fetchone()
+        row = self.conn.execute(
+            "SELECT preferences FROM playlists WHERE id = ?", (playlist_id,)
+        ).fetchone()
         return json.loads(row[0]) if row and row[0] else None
 
     def set_global_preferences(self, prefs: dict | None) -> None:
@@ -3329,7 +3476,9 @@ class Database:
                 (json.dumps(prefs),),
             )
         else:
-            self.conn.execute("DELETE FROM schema_meta WHERE key = 'global_preferences'")
+            self.conn.execute(
+                "DELETE FROM schema_meta WHERE key = 'global_preferences'"
+            )
         self.conn.commit()
 
     def get_global_preferences(self) -> dict | None:
@@ -3428,23 +3577,32 @@ class Database:
 
     def set_playlist_type(self, playlist_id: int, playlist_type: str | None) -> None:
         """Set the playlist type."""
-        self.conn.execute("UPDATE playlists SET playlist_type = ? WHERE id = ?", (playlist_type, playlist_id))
+        self.conn.execute(
+            "UPDATE playlists SET playlist_type = ? WHERE id = ?",
+            (playlist_type, playlist_id),
+        )
         self.conn.commit()
 
     def get_playlist_type(self, playlist_id: int) -> str | None:
         """Get the playlist type."""
-        row = self.conn.execute("SELECT playlist_type FROM playlists WHERE id = ?", (playlist_id,)).fetchone()
+        row = self.conn.execute(
+            "SELECT playlist_type FROM playlists WHERE id = ?", (playlist_id,)
+        ).fetchone()
         return row[0] if row else None
 
     def set_mood_profile(self, playlist_id: int, mood_profile: dict | None) -> None:
         """Set the mood profile for a playlist."""
         val = json.dumps(mood_profile) if mood_profile else None
-        self.conn.execute("UPDATE playlists SET mood_profile = ? WHERE id = ?", (val, playlist_id))
+        self.conn.execute(
+            "UPDATE playlists SET mood_profile = ? WHERE id = ?", (val, playlist_id)
+        )
         self.conn.commit()
 
     def get_mood_profile(self, playlist_id: int) -> dict | None:
         """Get the mood profile for a playlist."""
-        row = self.conn.execute("SELECT mood_profile FROM playlists WHERE id = ?", (playlist_id,)).fetchone()
+        row = self.conn.execute(
+            "SELECT mood_profile FROM playlists WHERE id = ?", (playlist_id,)
+        ).fetchone()
         return json.loads(row[0]) if row and row[0] else None
 
     # ---- Artist methods ----
@@ -3470,22 +3628,42 @@ class Database:
 
     def get_artists_for_playlist(self, playlist_id: int) -> list[Artist]:
         """Get all unique artists in a playlist."""
-        rows = self.conn.execute("""
+        rows = self.conn.execute(
+            """
             SELECT DISTINCT a.* FROM artists a
             JOIN tracks t ON t.artist_id = a.id
             JOIN playlist_tracks pt ON pt.track_id = t.id
             WHERE pt.playlist_id = ?
             ORDER BY a.name
-        """, (playlist_id,)).fetchall()
+        """,
+            (playlist_id,),
+        ).fetchall()
         return [self._row_to_artist(row) for row in rows]
 
-    _UPDATABLE_ARTIST_COLUMNS = frozenset({
-        "name", "norm_name", "sort_name", "bio", "identity", "tags",
-        "identity_confidence", "genres", "origin", "active_start", "active_end",
-        "mb_artist_id", "tidal_artist_id", "spotify_artist_uri", "lastfm_url",
-        "wikipedia_url", "enrichment_sources", "verified", "enriched_at",
-        "verified_at",
-    })
+    _UPDATABLE_ARTIST_COLUMNS = frozenset(
+        {
+            "name",
+            "norm_name",
+            "sort_name",
+            "bio",
+            "identity",
+            "tags",
+            "identity_confidence",
+            "genres",
+            "origin",
+            "active_start",
+            "active_end",
+            "mb_artist_id",
+            "tidal_artist_id",
+            "spotify_artist_uri",
+            "lastfm_url",
+            "wikipedia_url",
+            "enrichment_sources",
+            "verified",
+            "enriched_at",
+            "verified_at",
+        }
+    )
 
     def update_artist(self, artist_id: int, **fields: Any) -> None:
         """Update artist fields by keyword arguments.
@@ -3509,9 +3687,7 @@ class Database:
             return
         sets.append("updated_at = datetime('now')")
         values.append(artist_id)
-        self.conn.execute(
-            f"UPDATE artists SET {', '.join(sets)} WHERE id = ?", values
-        )
+        self.conn.execute(f"UPDATE artists SET {', '.join(sets)} WHERE id = ?", values)
         self.conn.commit()
 
     def _row_to_artist(self, row: sqlite3.Row) -> Artist:
@@ -3534,7 +3710,9 @@ class Database:
             spotify_artist_uri=row["spotify_artist_uri"],
             lastfm_url=row["lastfm_url"],
             wikipedia_url=row["wikipedia_url"],
-            enrichment_sources=json.loads(row["enrichment_sources"]) if row["enrichment_sources"] else [],
+            enrichment_sources=json.loads(row["enrichment_sources"])
+            if row["enrichment_sources"]
+            else [],
             verified=bool(row["verified"]),
             enriched_at=row["enriched_at"],
             verified_at=row["verified_at"],
@@ -3652,15 +3830,21 @@ class Database:
             (name, description),
         )
         self.conn.commit()
-        row = self.conn.execute("SELECT id FROM collections WHERE name = ?", (name,)).fetchone()
+        row = self.conn.execute(
+            "SELECT id FROM collections WHERE name = ?", (name,)
+        ).fetchone()
         return row[0]
 
     def delete_collection(self, name: str) -> bool:
         """Delete a collection and all its playlist associations."""
-        row = self.conn.execute("SELECT id FROM collections WHERE name = ?", (name,)).fetchone()
+        row = self.conn.execute(
+            "SELECT id FROM collections WHERE name = ?", (name,)
+        ).fetchone()
         if not row:
             return False
-        self.conn.execute("DELETE FROM playlist_collections WHERE collection_id = ?", (row[0],))
+        self.conn.execute(
+            "DELETE FROM playlist_collections WHERE collection_id = ?", (row[0],)
+        )
         self.conn.execute("DELETE FROM collections WHERE id = ?", (row[0],))
         self.conn.commit()
         return True
@@ -3676,7 +3860,9 @@ class Database:
 
     def untag_playlist(self, playlist_id: int, collection_name: str) -> bool:
         """Remove a collection tag from a playlist."""
-        row = self.conn.execute("SELECT id FROM collections WHERE name = ?", (collection_name,)).fetchone()
+        row = self.conn.execute(
+            "SELECT id FROM collections WHERE name = ?", (collection_name,)
+        ).fetchone()
         if not row:
             return False
         cursor = self.conn.execute(
@@ -3718,7 +3904,9 @@ class Database:
 
     # ---- Tidal Folder cache methods ----
 
-    def cache_tidal_folder(self, tidal_id: str, name: str, parent_tidal_id: str | None = None) -> None:
+    def cache_tidal_folder(
+        self, tidal_id: str, name: str, parent_tidal_id: str | None = None
+    ) -> None:
         """Cache a Tidal folder's metadata."""
         self.conn.execute(
             "INSERT OR REPLACE INTO tidal_folders (tidal_id, name, parent_tidal_id, last_synced_at) "
@@ -3749,7 +3937,9 @@ class Database:
         self.conn.execute("DELETE FROM tidal_folders WHERE tidal_id = ?", (tidal_id,))
         self.conn.commit()
 
-    def set_playlist_tidal_folder(self, playlist_id: int, tidal_folder_id: str | None) -> None:
+    def set_playlist_tidal_folder(
+        self, playlist_id: int, tidal_folder_id: str | None
+    ) -> None:
         """Set or clear the Tidal folder assignment for a playlist."""
         self.conn.execute(
             "UPDATE playlists SET tidal_folder_id = ? WHERE id = ?",
@@ -3776,10 +3966,12 @@ class Database:
 
     # ---- Platform Metadata methods ----
 
-    def upsert_track_platform_metadata(self, track_id: int, platform: str,
-                                        platform_track_id: str, **fields) -> None:
+    def upsert_track_platform_metadata(
+        self, track_id: int, platform: str, platform_track_id: str, **fields
+    ) -> None:
         """Insert or update platform metadata for a track."""
         import json as _json
+
         # Serialize JSON fields
         for key in ("genres", "audio_qualities", "raw_metadata"):
             if key in fields and not isinstance(fields[key], str):
@@ -3795,7 +3987,8 @@ class Database:
             vals = list(fields.values()) + [track_id, platform]
             self.conn.execute(
                 f"UPDATE track_platform_metadata SET {sets}, fetched_at = datetime('now') "
-                f"WHERE track_id = ? AND platform = ?", vals,
+                f"WHERE track_id = ? AND platform = ?",
+                vals,
             )
         else:
             cols = ["track_id", "platform", "platform_track_id"] + list(fields.keys())
@@ -3810,13 +4003,19 @@ class Database:
     def get_track_platform_metadata(self, track_id: int, platform: str) -> dict | None:
         """Get platform metadata for a track."""
         import json as _json
+
         row = self.conn.execute(
             "SELECT * FROM track_platform_metadata WHERE track_id = ? AND platform = ?",
             (track_id, platform),
         ).fetchone()
         if not row:
             return None
-        cols = [d[1] for d in self.conn.execute("PRAGMA table_info(track_platform_metadata)").fetchall()]
+        cols = [
+            d[1]
+            for d in self.conn.execute(
+                "PRAGMA table_info(track_platform_metadata)"
+            ).fetchall()
+        ]
         result = dict(zip(cols, row))
         for key in ("genres", "audio_qualities", "raw_metadata"):
             if result.get(key) and isinstance(result[key], str):

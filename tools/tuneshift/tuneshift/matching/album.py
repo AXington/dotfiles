@@ -11,6 +11,7 @@ Unlike the track scorer, album scoring has no legacy byte-parity contract; it
 is a new capability, so the signals are expressed purely in the normalized
 distance model (0.0 = perfect, 1.0 = worst).
 """
+
 from __future__ import annotations
 
 from tuneshift.matching.engine import (
@@ -61,7 +62,9 @@ def _title_signal(source_album: str, candidate_album: str) -> SignalPenalty:
     if not src or not cand:
         return SignalPenalty("album:title", 0, 0.0, 0)
     penalty = 0.0 if src == cand else 1.0 - ratio(src, cand)
-    return SignalPenalty("album:title", _signed_points(penalty, _W_TITLE), penalty, _W_TITLE)
+    return SignalPenalty(
+        "album:title", _signed_points(penalty, _W_TITLE), penalty, _W_TITLE
+    )
 
 
 def _artist_signal(source_artist: str, candidate_artist: str) -> SignalPenalty:
@@ -70,7 +73,9 @@ def _artist_signal(source_artist: str, candidate_artist: str) -> SignalPenalty:
     if not src or not cand:
         return SignalPenalty("album:artist", 0, 0.0, 0)
     penalty = 0.0 if src == cand else 1.0 - ratio(src, cand)
-    return SignalPenalty("album:artist", _signed_points(penalty, _W_ARTIST), penalty, _W_ARTIST)
+    return SignalPenalty(
+        "album:artist", _signed_points(penalty, _W_ARTIST), penalty, _W_ARTIST
+    )
 
 
 def edition_cost(album_name: str) -> int:
@@ -86,7 +91,9 @@ def edition_cost(album_name: str) -> int:
 def _edition_signal(candidate_album: str) -> SignalPenalty:
     cost = edition_cost(candidate_album)
     penalty = min(1.0, cost / 10.0)
-    return SignalPenalty("album:edition", _signed_points(penalty, _W_EDITION), penalty, _W_EDITION)
+    return SignalPenalty(
+        "album:edition", _signed_points(penalty, _W_EDITION), penalty, _W_EDITION
+    )
 
 
 def _year_signal(source_year: int | None, candidate_year: int | None) -> SignalPenalty:
@@ -94,16 +101,23 @@ def _year_signal(source_year: int | None, candidate_year: int | None) -> SignalP
         return SignalPenalty("album:year", 0, 0.0, 0)  # missing -> neutral
     diff = abs(source_year - candidate_year)
     penalty = min(1.0, diff / 10.0)
-    return SignalPenalty("album:year", _signed_points(penalty, _W_YEAR), penalty, _W_YEAR)
+    return SignalPenalty(
+        "album:year", _signed_points(penalty, _W_YEAR), penalty, _W_YEAR
+    )
 
 
-def _track_count_signal(source_count: int | None, candidate_count: int | None) -> SignalPenalty:
+def _track_count_signal(
+    source_count: int | None, candidate_count: int | None
+) -> SignalPenalty:
     if not source_count or not candidate_count:
         return SignalPenalty("album:track_count", 0, 0.0, 0)  # missing -> neutral
     diff = abs(source_count - candidate_count)
     penalty = min(1.0, diff / max(source_count, 1))
     return SignalPenalty(
-        "album:track_count", _signed_points(penalty, _W_TRACK_COUNT), penalty, _W_TRACK_COUNT
+        "album:track_count",
+        _signed_points(penalty, _W_TRACK_COUNT),
+        penalty,
+        _W_TRACK_COUNT,
     )
 
 
@@ -151,4 +165,9 @@ def classify_album_results(distances: list[float]) -> str:
     }[action]
 
 
-__all__ = ["score_album_match", "classify_album_results", "edition_cost", "ALBUM_THRESHOLDS"]
+__all__ = [
+    "ALBUM_THRESHOLDS",
+    "classify_album_results",
+    "edition_cost",
+    "score_album_match",
+]

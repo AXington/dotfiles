@@ -17,6 +17,7 @@ Two fingerprints are considered equal when they identify the same recording:
 Duration is compared in a bucket (default ±2s, configurable) so that trivial
 metadata jitter between platforms does not defeat a genuine re-match.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -121,5 +122,7 @@ def fingerprint_equal(
         a.norm_title == b.norm_title
         and a.norm_artist == b.norm_artist
         and a.recording_class == b.recording_class
-        and _duration_matches(a.duration_seconds, b.duration_seconds, duration_bucket_seconds)
+        and _duration_matches(
+            a.duration_seconds, b.duration_seconds, duration_bucket_seconds
+        )
     )

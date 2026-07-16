@@ -121,7 +121,9 @@ class MusicBrainzSource:
         duration_ms = self._parse_duration_ms(recording.get("length"))
 
         release_groups: list[dict[str, str]] = []
-        for release in recording.get("release-list", recording.get("release-group-list", [])):
+        for release in recording.get(
+            "release-list", recording.get("release-group-list", [])
+        ):
             release_group = release.get("release-group", release)
             if release_group.get("id"):
                 release_groups.append(

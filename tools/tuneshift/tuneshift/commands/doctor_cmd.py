@@ -62,8 +62,10 @@ def _handle_orphans(args, db: Database) -> int:
     if getattr(args, "enqueue_orphans", False):
         for track in orphans:
             db.enqueue_resolution(track.id)
-        print(f"\nEnqueued {len(orphans)} track(s) for resolution. "
-              f"Run: tuneshift resolve --all")
+        print(
+            f"\nEnqueued {len(orphans)} track(s) for resolution. "
+            f"Run: tuneshift resolve --all"
+        )
     else:
         print("\nRe-run with --enqueue-orphans to queue these for resolution.")
     return 0
@@ -72,6 +74,7 @@ def _handle_orphans(args, db: Database) -> int:
 # --------------------------------------------------------------------------- #
 # Scan
 # --------------------------------------------------------------------------- #
+
 
 def _load_tidal_client():
     from tuneshift.commands.ingest_cmd import _load_client
@@ -111,11 +114,18 @@ def _handle_scan(args, db: Database) -> int:
             if not tracks:
                 continue
             if not quiet:
-                print(f"Scanning \"{pl.name}\" ({len(tracks)} tracks)...",
-                      file=sys.stderr)
+                print(
+                    f'Scanning "{pl.name}" ({len(tracks)} tracks)...', file=sys.stderr
+                )
             pl_items, next_id = scan_tracks(
-                db, client, tracks, pl.name,
-                max_retries=max_retries, stats=stats, quiet=quiet, start_id=next_id,
+                db,
+                client,
+                tracks,
+                pl.name,
+                max_retries=max_retries,
+                stats=stats,
+                quiet=quiet,
+                start_id=next_id,
             )
             items.extend(pl_items)
     else:
@@ -126,14 +136,21 @@ def _handle_scan(args, db: Database) -> int:
         scope = playlist.name
         tracks = db.get_playlist_tracks(playlist.id)
         if not tracks:
-            print(f"Playlist \"{playlist.name}\" is empty.")
+            print(f'Playlist "{playlist.name}" is empty.')
             return 0
         if not quiet:
-            print(f"Scanning \"{playlist.name}\" ({len(tracks)} tracks)...",
-                  file=sys.stderr)
+            print(
+                f'Scanning "{playlist.name}" ({len(tracks)} tracks)...', file=sys.stderr
+            )
         items, next_id = scan_tracks(
-            db, client, tracks, playlist.name,
-            max_retries=max_retries, stats=stats, quiet=quiet, start_id=next_id,
+            db,
+            client,
+            tracks,
+            playlist.name,
+            max_retries=max_retries,
+            stats=stats,
+            quiet=quiet,
+            start_id=next_id,
         )
 
     if not items:
@@ -149,8 +166,10 @@ def _handle_scan(args, db: Database) -> int:
 
     _print_plan(plan)
     print(f"\nPlan written to {path}")
-    print("Review it, then apply with:  tuneshift doctor --apply"
-          + ("" if scan_all else f" \"{scope}\""))
+    print(
+        "Review it, then apply with:  tuneshift doctor --apply"
+        + ("" if scan_all else f' "{scope}"')
+    )
     return 1
 
 
@@ -171,8 +190,7 @@ def _print_plan(plan: DoctorPlan) -> None:
                 detail = f" -> keep #{item.keep_track_id}, merge {item.merge_track_ids}"
             elif item.proposed_platform_id:
                 detail = f" -> {item.proposed_platform_id} (conf {item.confidence})"
-            print(f"    [{item.id}] {item.title} - {item.artist}  "
-                  f"[{marker}]{detail}")
+            print(f"    [{item.id}] {item.title} - {item.artist}  [{marker}]{detail}")
             if item.note:
                 print(f"        note: {item.note}")
     print()
@@ -181,6 +199,7 @@ def _print_plan(plan: DoctorPlan) -> None:
 # --------------------------------------------------------------------------- #
 # Apply
 # --------------------------------------------------------------------------- #
+
 
 def _parse_overrides(raw: list[str] | None) -> tuple[dict[int, str], str | None]:
     """Parse ``ITEM_ID=TIDAL_ID`` override strings into a mapping."""
@@ -219,10 +238,14 @@ def _handle_apply(args, db: Database) -> int:
     # Dry run: show the resolved apply set without touching the database.
     if getattr(args, "dry_run", False):
         preview = applier_mod.preview_apply(items, overrides)
-        would_apply = sum(1 for _, action, _ in preview if action in ("auto", "override"))
+        would_apply = sum(
+            1 for _, action, _ in preview if action in ("auto", "override")
+        )
         would_skip = sum(1 for _, action, _ in preview if action == "skip")
-        print(f"\nDRY RUN — {len(items)} item(s), "
-              f"{would_apply} would apply, {would_skip} would skip:\n")
+        print(
+            f"\nDRY RUN — {len(items)} item(s), "
+            f"{would_apply} would apply, {would_skip} would skip:\n"
+        )
         for item, action, detail in preview:
             label = "APPLY " if action in ("auto", "override") else "SKIP  "
             tag = f"[{action}]"
@@ -247,7 +270,11 @@ def _handle_apply(args, db: Database) -> int:
         return 2
 
     result = applier_mod.apply_plan(
-        db, plan, items, overrides=overrides, client=client,
+        db,
+        plan,
+        items,
+        overrides=overrides,
+        client=client,
         do_sync=not getattr(args, "no_sync", False),
         quiet=getattr(args, "quiet", False),
     )
@@ -255,18 +282,21 @@ def _handle_apply(args, db: Database) -> int:
     # Persist updated statuses back to the plan file.
     write_plan(db.path, plan)
 
-    print(f"\nApplied: {result.applied}  "
-          f"No-sync: {result.no_sync}  "
-          f"Failed: {result.failed}  "
-          f"Skipped: {result.skipped}")
+    print(
+        f"\nApplied: {result.applied}  "
+        f"No-sync: {result.no_sync}  "
+        f"Failed: {result.failed}  "
+        f"Skipped: {result.skipped}"
+    )
     for item in items:
         if item.status in ("failed", "applied_no_sync", "skipped"):
-            print(f"  [{item.id}] {item.status}: {item.title} - {item.artist}"
-                  + (f" ({item.note})" if item.note else ""))
+            print(
+                f"  [{item.id}] {item.status}: {item.title} - {item.artist}"
+                + (f" ({item.note})" if item.note else "")
+            )
 
     # Exit 0 only if every selected item applied cleanly (and synced). Failed,
     # skipped (manual awaiting override), or applied-without-sync items all
     # signal the plan is not fully resolved.
-    fully_clean = (result.failed == 0 and result.no_sync == 0
-                   and result.skipped == 0)
+    fully_clean = result.failed == 0 and result.no_sync == 0 and result.skipped == 0
     return 0 if fully_clean else 1

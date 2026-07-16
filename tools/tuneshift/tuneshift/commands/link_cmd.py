@@ -1,11 +1,15 @@
 """Link command: auto-discover and link platform playlist IDs by name matching."""
+
 import re
 import sys
+
 from tuneshift.db import Database
 
 # Extract playlist ID from common URL formats
 _URL_PATTERNS = {
-    "spotify": re.compile(r"(?:open\.spotify\.com/playlist/|spotify:playlist:)([a-zA-Z0-9]+)"),
+    "spotify": re.compile(
+        r"(?:open\.spotify\.com/playlist/|spotify:playlist:)([a-zA-Z0-9]+)"
+    ),
     "tidal": re.compile(r"(?:tidal\.com/playlist/|tidal://playlist/)([a-f0-9-]+)"),
     "ytmusic": re.compile(r"(?:music\.youtube\.com/playlist\?list=)([-\w]+)"),
 }
@@ -38,7 +42,10 @@ def handle_link(args, db: Database) -> int:
         return 1
 
     if not client.load_session():
-        print(f"Not logged in to {platform}. Run: tuneshift login {platform}", file=sys.stderr)
+        print(
+            f"Not logged in to {platform}. Run: tuneshift login {platform}",
+            file=sys.stderr,
+        )
         return 1
 
     playlists = db.list_playlists()
@@ -68,7 +75,9 @@ def handle_link(args, db: Database) -> int:
                 print(f"  Not found: {pl.name}", file=sys.stderr)
             skipped += 1
 
-    print(f"\nDone: {linked} linked, {already} already linked, {skipped} not found on {platform}")
+    print(
+        f"\nDone: {linked} linked, {already} already linked, {skipped} not found on {platform}"
+    )
     return 0
 
 
@@ -76,17 +85,22 @@ def _load_client(platform_name: str):
     """Load a platform client by name."""
     if platform_name == "tidal":
         from tuneshift.platforms.tidal import TidalClient
+
         return TidalClient()
     elif platform_name == "spotify":
         from tuneshift.platforms.spotify import SpotifyClient
+
         return SpotifyClient()
     elif platform_name == "ytmusic":
         from tuneshift.platforms.ytmusic import YTMusicClient
+
         return YTMusicClient()
     return None
 
 
-def _handle_manual_link(args, db: Database, platform: str, playlist_name: str, url_or_id: str) -> int:
+def _handle_manual_link(
+    args, db: Database, platform: str, playlist_name: str, url_or_id: str
+) -> int:
     """Manually link a playlist to a platform URL or ID."""
     playlist = db.find_playlist_by_name(playlist_name)
     if not playlist:

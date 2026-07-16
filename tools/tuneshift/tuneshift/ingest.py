@@ -1,4 +1,5 @@
 """Platform playlist ingestion: import playlists into canonical DB."""
+
 from tuneshift.db import Database
 
 
@@ -48,6 +49,7 @@ def ingest_from_platform(
                 track_id = existing.id
             else:
                 from tuneshift.models import Track
+
                 new_track = Track(
                     title=tr.title,
                     artist=tr.artist,
@@ -64,19 +66,23 @@ def ingest_from_platform(
 
             # Store platform mapping
             from tuneshift.models import PlatformMapping
-            db.upsert_platform_mapping(PlatformMapping(
-                track_id=track_id,
-                platform=platform_name,
-                platform_track_id=tr.platform_id,
-                platform_title=tr.title,
-                platform_artist=tr.artist,
-                platform_album=tr.album,
-                match_score=100,
-                status="matched",
-                user_approved=True,
-            ))
+
+            db.upsert_platform_mapping(
+                PlatformMapping(
+                    track_id=track_id,
+                    platform=platform_name,
+                    platform_track_id=tr.platform_id,
+                    platform_title=tr.title,
+                    platform_artist=tr.artist,
+                    platform_album=tr.album,
+                    match_score=100,
+                    status="matched",
+                    user_approved=True,
+                )
+            )
         except Exception as exc:
             import sys
+
             print(f"  Skipping track at position {position}: {exc}", file=sys.stderr)
             skipped_count += 1
 
@@ -124,24 +130,31 @@ def _enrich_tracks(db: Database, client: object, tracks: list[tuple[int, str]]) 
                 )
 
     if enriched:
-        print(f"  Enriched {enriched}/{len(tracks)} tracks with audio metadata", file=sys.stderr)
+        print(
+            f"  Enriched {enriched}/{len(tracks)} tracks with audio metadata",
+            file=sys.stderr,
+        )
 
 
-def _auto_classify_batch(db: Database, track_ids_to_enrich: list[tuple[int, str]]) -> None:
+def _auto_classify_batch(
+    db: Database, track_ids_to_enrich: list[tuple[int, str]]
+) -> None:
     """Classify new tracks and enrich their artists after ingest.
 
     Uses the search-grounded pipeline (Last.fm + Genius + LLM synthesis).
     """
     import json
     import sys
-    from tuneshift.sequencer.classifier import TrackClassifier
+
     from tuneshift.enrichment.pipeline import classify_track_grounded
+    from tuneshift.sequencer.classifier import TrackClassifier
 
     classifier = TrackClassifier()
 
     # Enrich artists first (so we have genre context)
     seen_artists: set[str] = set()
     from tuneshift.library.enrichment import _enrich_artist_via_llm
+
     for track_id, _ in track_ids_to_enrich:
         track = db.get_track(track_id)
         if not track or track.artist in seen_artists:
@@ -152,11 +165,12 @@ def _auto_classify_batch(db: Database, track_ids_to_enrich: list[tuple[int, str]
             _enrich_artist_via_llm(db, artist, classifier)
 
     enriched_artists = sum(
-        1 for a in seen_artists
-        if (art := db.get_artist_by_name(a)) and art.enriched_at
+        1 for a in seen_artists if (art := db.get_artist_by_name(a)) and art.enriched_at
     )
     if enriched_artists:
-        print(f"  Enriched {enriched_artists} artist(s) with genre data", file=sys.stderr)
+        print(
+            f"  Enriched {enriched_artists} artist(s) with genre data", file=sys.stderr
+        )
 
     # Classify tracks with grounded pipeline
     if not classifier.available:
@@ -175,7 +189,8 @@ def _auto_classify_batch(db: Database, track_ids_to_enrich: list[tuple[int, str]
         artist_genres = artist.genres if artist else []
 
         result = classify_track_grounded(
-            track.title, track.artist,
+            track.title,
+            track.artist,
             artist_genres=artist_genres,
             classifier=classifier,
         )
@@ -188,8 +203,15 @@ def _auto_classify_batch(db: Database, track_ids_to_enrich: list[tuple[int, str]
             classified += 1
 
         if (i + 1) % 10 == 0:
-            print(f"  Classified {i + 1}/{len(track_ids_to_enrich)}...", end="\r", file=sys.stderr)
+            print(
+                f"  Classified {i + 1}/{len(track_ids_to_enrich)}...",
+                end="\r",
+                file=sys.stderr,
+            )
 
     if classified:
         db.conn.commit()
-        print(f"  Classified {classified}/{len(track_ids_to_enrich)} tracks (search-grounded)", file=sys.stderr)
+        print(
+            f"  Classified {classified}/{len(track_ids_to_enrich)} tracks (search-grounded)",
+            file=sys.stderr,
+        )

@@ -8,6 +8,7 @@ contract. ``score_track_match`` is the new engine-native entry point that
 returns a full :class:`~tuneshift.matching.engine.Distance` for callers that
 want the distance, breakdown and recommendation (not just an integer).
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -56,7 +57,7 @@ def score_match(
     result_album: str | None = None,
     weights: Weights = DEFAULT_WEIGHTS,
     *,
-    alias_resolver: "AliasResolver | None" = None,
+    alias_resolver: AliasResolver | None = None,
 ) -> int:
     """Score a search result against source metadata. Returns 0-100.
 
@@ -73,14 +74,19 @@ def score_match(
     if result_title is None and result_artist is None and result_album is None:
         canonical = source_title
         candidate = source_artist
-        if not all(hasattr(obj, attr) for obj, attr in (
-            (canonical, "title"),
-            (canonical, "artist"),
-            (candidate, "title"),
-            (candidate, "artist"),
-            (candidate, "album"),
-        )):
-            raise TypeError("score_match requires either 6 fields or track-like objects")
+        if not all(
+            hasattr(obj, attr)
+            for obj, attr in (
+                (canonical, "title"),
+                (canonical, "artist"),
+                (candidate, "title"),
+                (candidate, "artist"),
+                (candidate, "album"),
+            )
+        ):
+            raise TypeError(
+                "score_match requires either 6 fields or track-like objects"
+            )
         source_title = canonical.title
         source_artist = canonical.artist
         source_album = canonical.album
@@ -91,9 +97,13 @@ def score_match(
     if result_title is None or result_artist is None or result_album is None:
         raise TypeError("score_match requires complete candidate metadata")
 
-    title = title_signal(normalize_title(source_title), normalize_title(result_title), weights)
+    title = title_signal(
+        normalize_title(source_title), normalize_title(result_title), weights
+    )
     artist = artist_signal(
-        normalize_artist(source_artist), normalize_artist(result_artist), weights,
+        normalize_artist(source_artist),
+        normalize_artist(result_artist),
+        weights,
         resolver=alias_resolver,
     )
     album = album_signal(
@@ -105,7 +115,9 @@ def score_match(
     score = title.points + artist.points + album.points
 
     if canonical is not None and candidate is not None:
-        isrc = isrc_signal(getattr(canonical, "isrc", None), getattr(candidate, "isrc", None), weights)
+        isrc = isrc_signal(
+            getattr(canonical, "isrc", None), getattr(candidate, "isrc", None), weights
+        )
         score = min(100, score + isrc.points)
 
     return min(100, score)
@@ -123,7 +135,9 @@ def duration_penalty(
     weights: Weights = DEFAULT_WEIGHTS,
 ) -> int:
     """Penalize tracks significantly longer OR shorter than expected (0-20)."""
-    return -duration_signal(candidate_duration, reference_duration, all_durations, weights).points
+    return -duration_signal(
+        candidate_duration, reference_duration, all_durations, weights
+    ).points
 
 
 def duration_proximity_bonus(
@@ -164,7 +178,7 @@ def score_match_with_version(
     avoid: frozenset[str] = frozenset(),
     source_explicit: bool | None = None,
     cand_explicit: bool | None = None,
-    alias_resolver: "AliasResolver | None" = None,
+    alias_resolver: AliasResolver | None = None,
 ) -> int:
     """Score a search result with source-aware version + duration penalties.
 
@@ -188,8 +202,12 @@ def score_match_with_version(
     sim_source = strip_version_markers(source_title)
     sim_result = strip_version_markers(result_title)
     base = score_match(
-        sim_source, source_artist, source_album,
-        sim_result, result_artist, result_album,
+        sim_source,
+        source_artist,
+        source_album,
+        sim_result,
+        result_artist,
+        result_album,
         weights,
         alias_resolver=alias_resolver,
     )
@@ -201,26 +219,40 @@ def score_match_with_version(
     base_source, base_result = base_title(sim_source), base_title(sim_result)
     if base_source != sim_source or base_result != sim_result:
         base_only = score_match(
-            base_source, source_artist, source_album,
-            base_result, result_artist, result_album,
+            base_source,
+            source_artist,
+            source_album,
+            base_result,
+            result_artist,
+            result_album,
             weights,
             alias_resolver=alias_resolver,
         )
         base = max(base, base_only - _SUBTITLE_PENALTY)
     vsignals = source_aware_version_signals(
-        source_title, source_album or "", result_title, result_album,
-        source_explicit=source_explicit, cand_explicit=cand_explicit,
-        prefer=prefer, avoid=avoid, weights=weights,
+        source_title,
+        source_album or "",
+        result_title,
+        result_album,
+        source_explicit=source_explicit,
+        cand_explicit=cand_explicit,
+        prefer=prefer,
+        avoid=avoid,
+        weights=weights,
     )
     penalty = -sum(s.points for s in vsignals)
-    dur_pen = duration_penalty(result_duration, reference_duration, all_durations, weights)
+    dur_pen = duration_penalty(
+        result_duration, reference_duration, all_durations, weights
+    )
     # BUG-3: a same-title candidate by a clearly different artist (no alias, no
     # containment, no fuzzy overlap) is a hard reject, not a low-confidence
     # accept. Covers/tributes are handled by the version axis above; this only
     # catches genuinely different songs that merely share a title.
     if artist_overlap_absent(
-        normalize_artist(source_artist), normalize_artist(result_artist),
-        weights, resolver=alias_resolver,
+        normalize_artist(source_artist),
+        normalize_artist(result_artist),
+        weights,
+        resolver=alias_resolver,
     ):
         return 0
     return max(0, min(100, base - penalty - dur_pen))
@@ -234,7 +266,7 @@ def score_track_match(
     all_durations: list[int] | None = None,
     prefer: frozenset[str] = frozenset(),
     avoid: frozenset[str] = frozenset(),
-    alias_resolver: "AliasResolver | None" = None,
+    alias_resolver: AliasResolver | None = None,
 ) -> Distance:
     """Engine-native track scorer: build the full Distance for one candidate.
 
@@ -247,14 +279,17 @@ def score_track_match(
     class to the source's, so a live source matches a live take instead of being
     penalised for it.     ``prefer``/``avoid`` are recording-class preference sets.
     """
-    return Distance(score_signals(
-        source, candidate,
-        weights=weights,
-        all_durations=all_durations,
-        prefer=prefer,
-        avoid=avoid,
-        alias_resolver=alias_resolver,
-    ))
+    return Distance(
+        score_signals(
+            source,
+            candidate,
+            weights=weights,
+            all_durations=all_durations,
+            prefer=prefer,
+            avoid=avoid,
+            alias_resolver=alias_resolver,
+        )
+    )
 
 
 def classify_results(scores: list[int]) -> str:

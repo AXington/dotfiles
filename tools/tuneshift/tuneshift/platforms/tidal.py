@@ -3,9 +3,10 @@
 import json
 import random
 import time
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import tidalapi
 
@@ -16,7 +17,9 @@ from tuneshift.platforms.timeout import PlatformTimeout, call_with_timeout
 
 _TOKEN_DIR = Path.home() / ".local" / "share" / "tuneshift"
 _TOKEN_FILE = _TOKEN_DIR / "tidal.json"
-_LEGACY_TOKEN_FILE = Path.home() / ".local" / "share" / "tidal-importer" / "session.json"
+_LEGACY_TOKEN_FILE = (
+    Path.home() / ".local" / "share" / "tidal-importer" / "session.json"
+)
 
 
 def _retry(fn: Callable[[], Any], max_retries: int = 3) -> Any:
@@ -36,7 +39,11 @@ def _retry(fn: Callable[[], Any], max_retries: int = 3) -> Any:
             if attempt == max_retries:
                 raise
             error_text = str(exc).lower()
-            if "429" not in error_text and "rate" not in error_text and "connection" not in error_text:
+            if (
+                "429" not in error_text
+                and "rate" not in error_text
+                and "connection" not in error_text
+            ):
                 raise
             delay = (2**attempt) + random.uniform(0.0, 0.5)
             time.sleep(delay)
@@ -129,7 +136,9 @@ class TidalClient:
 
         def _search() -> list[TrackResult]:
             assert self._session is not None
-            results = self._session.search(query, models=[tidalapi.media.Track], limit=limit)
+            results = self._session.search(
+                query, models=[tidalapi.media.Track], limit=limit
+            )
             tracks = results.get("tracks", []) or []
             return [self._track_to_result(track) for track in tracks]
 
@@ -150,7 +159,9 @@ class TidalClient:
 
         def _search() -> list[AlbumResult]:
             assert self._session is not None
-            results = self._session.search(query, models=[tidalapi.album.Album], limit=limit)
+            results = self._session.search(
+                query, models=[tidalapi.album.Album], limit=limit
+            )
             albums = results.get("albums", []) or []
             return [
                 AlbumResult(
@@ -182,7 +193,9 @@ class TidalClient:
 
         def _search() -> list[ArtistResult]:
             assert self._session is not None
-            results = self._session.search(query, models=[tidalapi.artist.Artist], limit=limit)
+            results = self._session.search(
+                query, models=[tidalapi.artist.Artist], limit=limit
+            )
             artists = results.get("artists", []) or []
             return [
                 ArtistResult(
@@ -258,6 +271,7 @@ class TidalClient:
         no usable metadata (None name). Prints warnings to stderr.
         """
         import sys
+
         self._ensure_session()
 
         def _get_tracks() -> list[TrackResult]:
@@ -273,10 +287,16 @@ class TidalClient:
                     results.append(self._track_to_result(track))
                 except Exception as exc:
                     track_id = getattr(track, "id", "unknown")
-                    print(f"  Skipping unavailable track {track_id}: {exc}", file=sys.stderr)
+                    print(
+                        f"  Skipping unavailable track {track_id}: {exc}",
+                        file=sys.stderr,
+                    )
                     skipped += 1
             if skipped:
-                print(f"  Warning: {skipped} unavailable track(s) skipped", file=sys.stderr)
+                print(
+                    f"  Warning: {skipped} unavailable track(s) skipped",
+                    file=sys.stderr,
+                )
             return results
 
         return self._call_with_retry(_get_tracks)
@@ -406,7 +426,9 @@ class TidalClient:
             "token_type": self._session.token_type,
             "access_token": self._session.access_token,
             "refresh_token": self._session.refresh_token,
-            "expiry_time": self._session.expiry_time.isoformat() if self._session.expiry_time else None,
+            "expiry_time": self._session.expiry_time.isoformat()
+            if self._session.expiry_time
+            else None,
         }
         secure_write(self._token_path, json.dumps(data))
 
@@ -446,7 +468,9 @@ class TidalClient:
             title=track.name or "",
             artist=track.artist.name if getattr(track, "artist", None) else "",
             album=album.name if album is not None else "",
-            duration_seconds=track.duration if getattr(track, "duration", None) else None,
+            duration_seconds=track.duration
+            if getattr(track, "duration", None)
+            else None,
             isrc=getattr(track, "isrc", None),
             available=available if isinstance(available, bool) else None,
             tier_restricted=tier_restricted,

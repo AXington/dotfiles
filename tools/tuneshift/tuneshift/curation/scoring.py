@@ -1,7 +1,9 @@
 """Curation scoring engine: rate each track's contribution to the playlist."""
-from typing import Callable
-from tuneshift.sequencer.metadata import TrackMetadata
+
+from collections.abc import Callable
+
 from tuneshift.curation.context import PlaylistContext
+from tuneshift.sequencer.metadata import TrackMetadata
 
 
 def _word_similarity(word1: str, word2: str) -> float:
@@ -20,7 +22,7 @@ def _word_similarity(word1: str, word2: str) -> float:
         "empowerment": {"power", "empower", "empowerment"},
         "power": {"empowerment", "empower", "power"},
         "empower": {"empowerment", "power", "empower"},
-        "trans": {"transgender", "transgender", "trans"},
+        "trans": {"transgender", "trans"},
         "transgender": {"trans", "transgender"},
     }
     if w1 in synonyms and w2 in synonyms[w1]:
@@ -31,7 +33,9 @@ def _word_similarity(word1: str, word2: str) -> float:
     return 0.0
 
 
-def score_narrative_fit(track: TrackMetadata, ctx: PlaylistContext, all_tracks: list) -> float:
+def score_narrative_fit(
+    track: TrackMetadata, ctx: PlaylistContext, all_tracks: list
+) -> float:
     """Score how well this track serves the narrative goal."""
     if not ctx.goal and not ctx.narrative_sections:
         return 0.5
@@ -60,7 +64,9 @@ def score_narrative_fit(track: TrackMetadata, ctx: PlaylistContext, all_tracks: 
     total_similarity = 0.0
     max_similarities = 0
     for tword in track_words:
-        max_sim = max((_word_similarity(tword, gword) for gword in target_words), default=0.0)
+        max_sim = max(
+            (_word_similarity(tword, gword) for gword in target_words), default=0.0
+        )
         total_similarity += max_sim
         if max_sim > 0:
             max_similarities += 1
@@ -76,7 +82,9 @@ def score_narrative_fit(track: TrackMetadata, ctx: PlaylistContext, all_tracks: 
     return min(1.0, base_score + intensity_boost)
 
 
-def score_mood_contribution(track: TrackMetadata, ctx: PlaylistContext, all_tracks: list) -> float:
+def score_mood_contribution(
+    track: TrackMetadata, ctx: PlaylistContext, all_tracks: list
+) -> float:
     """Score how well this track contributes to the mood profile."""
     if not ctx.mood_profile:
         return 0.5
@@ -94,25 +102,33 @@ def score_mood_contribution(track: TrackMetadata, ctx: PlaylistContext, all_trac
     return min(1.0, 0.3 + overlap * 0.7)
 
 
-def score_sonic_role(track: TrackMetadata, ctx: PlaylistContext, all_tracks: list) -> float:
+def score_sonic_role(
+    track: TrackMetadata, ctx: PlaylistContext, all_tracks: list
+) -> float:
     """Score the sonic diversity contribution of this track."""
     if not track.sonic_texture and not track.instruments:
         return 0.5
     # Unique sonic texture relative to other tracks adds value
-    other_textures = [getattr(t, "sonic_texture", None) for t in all_tracks if t != track]
+    other_textures = [
+        getattr(t, "sonic_texture", None) for t in all_tracks if t != track
+    ]
     if track.sonic_texture and track.sonic_texture not in other_textures:
         return 0.7
     return 0.5
 
 
-def score_energy_role(track: TrackMetadata, ctx: PlaylistContext, all_tracks: list) -> float:
+def score_energy_role(
+    track: TrackMetadata, ctx: PlaylistContext, all_tracks: list
+) -> float:
     """Score whether this track fills a needed energy niche."""
     if track.energy is None:
         return 0.5
     return 0.5  # Neutral by default; enhanced by curation engine with full context
 
 
-def score_uniqueness(track: TrackMetadata, ctx: PlaylistContext, all_tracks: list) -> float:
+def score_uniqueness(
+    track: TrackMetadata, ctx: PlaylistContext, all_tracks: list
+) -> float:
     """Score how unique this track is relative to the rest of the playlist."""
     if not track.themes and not track.vibes:
         return 0.5
@@ -123,9 +139,13 @@ def score_uniqueness(track: TrackMetadata, ctx: PlaylistContext, all_tracks: lis
     for other in all_tracks:
         if other == track:
             continue
-        other_sig = set(getattr(other, "themes", None) or []) | set(getattr(other, "vibes", None) or [])
+        other_sig = set(getattr(other, "themes", None) or []) | set(
+            getattr(other, "vibes", None) or []
+        )
         if other_sig:
-            overlap = len(track_signature & other_sig) / max(len(track_signature | other_sig), 1)
+            overlap = len(track_signature & other_sig) / max(
+                len(track_signature | other_sig), 1
+            )
             similarities.append(overlap)
     if not similarities:
         return 0.8  # Only track = very unique
@@ -133,11 +153,15 @@ def score_uniqueness(track: TrackMetadata, ctx: PlaylistContext, all_tracks: lis
     return 1.0 - avg_similarity
 
 
-def score_redundancy(track: TrackMetadata, ctx: PlaylistContext, all_tracks: list) -> float:
+def score_redundancy(
+    track: TrackMetadata, ctx: PlaylistContext, all_tracks: list
+) -> float:
     """Score redundancy (inverse: high = NOT redundant, low = very redundant)."""
     # This is the inverse of uniqueness from a different angle
     # Check artist repetition
-    artist_count = sum(1 for t in all_tracks if getattr(t, "artist", "") == track.artist)
+    artist_count = sum(
+        1 for t in all_tracks if getattr(t, "artist", "") == track.artist
+    )
     if artist_count > 3:
         return 0.2  # Very redundant
     if artist_count > 2:
@@ -159,4 +183,7 @@ def score_track_contribution(
     track: TrackMetadata, ctx: PlaylistContext, all_tracks: list
 ) -> dict[str, float]:
     """Score a track across all curation dimensions."""
-    return {name: scorer(track, ctx, all_tracks) for name, scorer in CURATION_SCORERS.items()}
+    return {
+        name: scorer(track, ctx, all_tracks)
+        for name, scorer in CURATION_SCORERS.items()
+    }

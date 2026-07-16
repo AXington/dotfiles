@@ -75,7 +75,7 @@ class PlanItem:
             raise ValueError(f"Unknown status: {self.status!r}")
 
     @classmethod
-    def from_dict(cls, data: dict) -> "PlanItem":
+    def from_dict(cls, data: dict) -> PlanItem:
         """Build a PlanItem from a plain dict, ignoring unknown keys."""
         known = {f for f in cls.__dataclass_fields__}  # type: ignore[attr-defined]
         filtered = {k: v for k, v in data.items() if k in known}
@@ -102,7 +102,7 @@ class DoctorPlan:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "DoctorPlan":
+    def from_dict(cls, data: dict) -> DoctorPlan:
         items = [PlanItem.from_dict(d) for d in data.get("items", [])]
         return cls(
             scope=data.get("scope", ""),
@@ -140,9 +140,7 @@ def read_plan(db_path: Path) -> DoctorPlan:
     """Load the saved plan. Raises PlanError if missing or malformed."""
     path = plan_path(db_path)
     if not path.exists():
-        raise PlanError(
-            f"No plan found at {path}. Run `tuneshift doctor` first."
-        )
+        raise PlanError(f"No plan found at {path}. Run `tuneshift doctor` first.")
     try:
         data = json.loads(path.read_text())
     except (json.JSONDecodeError, OSError) as exc:

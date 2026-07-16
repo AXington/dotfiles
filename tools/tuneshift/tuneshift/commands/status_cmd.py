@@ -1,4 +1,5 @@
 """Status command: show playlist info and sync state."""
+
 import sys
 
 from tuneshift.db import Database
@@ -16,7 +17,9 @@ def handle_status(args, db: Database) -> int:
         # Show all playlists
         playlists = db.list_playlists()
         if not playlists:
-            print("No playlists. Use 'tuneshift ingest' or 'tuneshift add' to create one.")
+            print(
+                "No playlists. Use 'tuneshift ingest' or 'tuneshift add' to create one."
+            )
             return 0
         for pl in playlists:
             _show_playlist_status(db, pl)
@@ -35,7 +38,11 @@ def _show_playlist_status(db, playlist) -> None:
         print("    Platforms:")
         for platform in platforms:
             last_synced = db.get_last_synced(playlist.id, platform)
-            state = f"last synced {last_synced}" if last_synced else "push pending (never synced)"
+            state = (
+                f"last synced {last_synced}"
+                if last_synced
+                else "push pending (never synced)"
+            )
             print(f"      {platform}: {state}")
     else:
         print("    Platforms: (none linked)")

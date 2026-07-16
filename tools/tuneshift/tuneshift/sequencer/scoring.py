@@ -76,13 +76,20 @@ _SONIC_BRIDGE_PAIRS = {
 }
 
 _COMPLEMENTARY_TEXTURES = {
-    ("warm", "lush"), ("raw", "gritty"), ("polished", "crystalline"),
-    ("lo-fi", "warm"), ("cold", "crystalline"),
+    ("warm", "lush"),
+    ("raw", "gritty"),
+    ("polished", "crystalline"),
+    ("lo-fi", "warm"),
+    ("cold", "crystalline"),
 }
 
 _SMOOTH_SPACE_TRANSITIONS = {
-    ("intimate", "intimate"), ("intimate", "room"), ("room", "hall"),
-    ("hall", "vast"), ("vast", "vast"), ("room", "room"),
+    ("intimate", "intimate"),
+    ("intimate", "room"),
+    ("room", "hall"),
+    ("hall", "vast"),
+    ("vast", "vast"),
+    ("room", "room"),
 }
 
 
@@ -98,20 +105,25 @@ def transition_score(a: TrackMetadata, b: TrackMetadata) -> float:
                 score += 0.3
                 break
         else:
-            if ("silence" in a_close and "explosion" in b_open) or \
-               ("silence" in a_close and "drum" in b_open):
+            if ("silence" in a_close and "explosion" in b_open) or (
+                "silence" in a_close and "drum" in b_open
+            ):
                 score += 0.15
 
     if a.sonic_texture and b.sonic_texture:
         if a.sonic_texture == b.sonic_texture:
             score += 0.1
-        elif (a.sonic_texture, b.sonic_texture) in _COMPLEMENTARY_TEXTURES or \
-             (b.sonic_texture, a.sonic_texture) in _COMPLEMENTARY_TEXTURES:
+        elif (a.sonic_texture, b.sonic_texture) in _COMPLEMENTARY_TEXTURES or (
+            b.sonic_texture,
+            a.sonic_texture,
+        ) in _COMPLEMENTARY_TEXTURES:
             score += 0.05
 
     if a.space and b.space:
-        if (a.space, b.space) in _SMOOTH_SPACE_TRANSITIONS or \
-           (b.space, a.space) in _SMOOTH_SPACE_TRANSITIONS:
+        if (a.space, b.space) in _SMOOTH_SPACE_TRANSITIONS or (
+            b.space,
+            a.space,
+        ) in _SMOOTH_SPACE_TRANSITIONS:
             score += 0.1
 
     return min(1.0, score)
@@ -278,6 +290,7 @@ def resolve_weights(
 
     return base
 
+
 _LEGACY_DIMENSION_MAP = {
     "themes": "mood_continuity",
     "energy": "energy_flow",
@@ -340,7 +353,7 @@ def score_pair(
 ) -> float:
     """Compute a weighted transition score between two tracks."""
     applicable: dict[str, float] = {}
-    
+
     for dimension, weight in weights.items():
         if weight <= 0:
             continue
@@ -349,17 +362,17 @@ def score_pair(
             continue
         if _has_dimension_data(a, dimension) and _has_dimension_data(b, dimension):
             applicable[dimension] = weight
-    
+
     if not applicable:
         return duration_score(a.duration_ms, b.duration_ms)
-    
+
     total = sum(applicable.values())
     normalized = {dim: w / total for dim, w in applicable.items()}
-    
+
     score = 0.0
     for dimension, weight in normalized.items():
         resolved = _LEGACY_DIMENSION_MAP.get(dimension, dimension)
         scorer = DIMENSION_SCORERS[resolved]
         score += weight * scorer(a, b)
-    
+
     return score

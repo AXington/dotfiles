@@ -16,8 +16,9 @@ hard error, never a silent or dynamic query.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any
 
 from tuneshift.db import Database
 from tuneshift.planapply.models import Plan, PlanChange
@@ -164,9 +165,7 @@ def _insert_row(db: Database, spec: _TableSpec, proposed: dict[str, Any]) -> Non
         if updates
         else f" ON CONFLICT({pk_list}) DO NOTHING"
     )
-    sql = (
-        f"INSERT INTO {spec.name} ({col_list}) VALUES ({placeholders}){conflict}"  # noqa: S608
-    )
+    sql = f"INSERT INTO {spec.name} ({col_list}) VALUES ({placeholders}){conflict}"  # noqa: S608
     db.conn.execute(sql, tuple(proposed[c] for c in cols))
 
 
@@ -352,7 +351,7 @@ def apply_plan(
                 _apply_one(db, plan.plan_id, change, remote_executor)
             change.status = "applied"
             report.applied += 1
-        except Exception as exc:  # noqa: BLE001 - recorded in report, never swallowed
+        except Exception as exc:
             change.status = "failed"
             report.failed += 1
             report.errors.append(f"change {change.change_id}: {exc}")

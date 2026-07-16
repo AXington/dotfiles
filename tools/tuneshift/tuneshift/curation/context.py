@@ -1,4 +1,5 @@
 """Playlist context for curation decisions."""
+
 from dataclasses import dataclass
 
 

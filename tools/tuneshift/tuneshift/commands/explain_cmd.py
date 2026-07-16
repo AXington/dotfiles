@@ -13,6 +13,7 @@ soft), the winner's weighted signal breakdown, the precedence tie-break, and —
 for a miss (AC-CLI5) — every rejected candidate with its per-candidate rejection
 reason. ``why`` is a deprecated alias kept for one release.
 """
+
 import sys
 
 from tuneshift.db import Database
@@ -77,8 +78,10 @@ def handle_explain(args, db: Database) -> int:
     if not audits:
         scope_hint = f" {playlist_label}" if playlist_label else ""
         print(f"No stored match decision for this track{scope_hint} yet.")
-        print("Run `tuneshift sync` / `tuneshift doctor`, or `tuneshift explain "
-              f"{track.id} --live` to reconcile now.")
+        print(
+            "Run `tuneshift sync` / `tuneshift doctor`, or `tuneshift explain "
+            f"{track.id} --live` to reconcile now."
+        )
         return 1
 
     for platform in sorted(audits):
@@ -89,8 +92,9 @@ def handle_explain(args, db: Database) -> int:
 # Deprecated alias: ``tuneshift why`` still works for one release.
 def handle_why(args, db: Database) -> int:
     """Deprecated alias for :func:`handle_explain` (kept for one release)."""
-    print("note: `tuneshift why` is deprecated; use `tuneshift explain`.",
-          file=sys.stderr)
+    print(
+        "note: `tuneshift why` is deprecated; use `tuneshift explain`.", file=sys.stderr
+    )
     return handle_explain(args, db)
 
 
@@ -107,8 +111,10 @@ def _explain_live(db: Database, track, platforms: list[str], playlist_id: int) -
             print(f"{platform}: unknown platform, skipped", file=sys.stderr)
             continue
         if not client.load_session():
-            print(f"{platform}: not logged in (run `tuneshift login {platform}`), skipped",
-                  file=sys.stderr)
+            print(
+                f"{platform}: not logged in (run `tuneshift login {platform}`), skipped",
+                file=sys.stderr,
+            )
             continue
         result = reconcile_track(db, track.id, client, force=True, playlist_id=scope)
         db.save_match_audit(track.id, platform, result.audit, playlist_id)
@@ -182,5 +188,4 @@ def _format_rejected(cand) -> str:
         why = cand.decisive_signal
     else:
         why = "not chosen"
-    return (f"[{cand.score}] {cand.title} — {cand.artist} "
-            f"({cand.album}) — {why}")
+    return f"[{cand.score}] {cand.title} — {cand.artist} ({cand.album}) — {why}"

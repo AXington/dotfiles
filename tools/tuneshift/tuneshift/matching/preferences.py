@@ -8,6 +8,7 @@ Global preferences live in the ``schema_meta`` key/value store; per-playlist
 preferences live in ``playlists.preferences`` (JSON). Both are resolved into a
 single effective :class:`Preferences` used by the reconciliation scorer.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -200,9 +201,9 @@ def scoring_intent(
 __all__ = [
     "Preferences",
     "VersionPreferences",
-    "resolve_preferences",
-    "preference_sort_bias",
-    "version_intent",
     "edition_buckets",
+    "preference_sort_bias",
+    "resolve_preferences",
     "scoring_intent",
+    "version_intent",
 ]

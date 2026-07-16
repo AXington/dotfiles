@@ -125,7 +125,7 @@ def _render_composition(result: ComposeResult, sections: list) -> None:
         )
 
 
-def _build_artist_lookup(db: Database, playlist_id: int) -> dict[str, "Artist"]:
+def _build_artist_lookup(db: Database, playlist_id: int) -> dict[str, Artist]:
     """Build a name->Artist lookup for all artists in a playlist."""
     artists = db.get_artists_for_playlist(playlist_id)
     return {a.name.casefold(): a for a in artists}
@@ -145,7 +145,10 @@ def handle_compose(args, db: Database) -> int:
 
     sections = parse_enhanced_narrative(narrative)
     if not sections:
-        print(f'No sections could be parsed from "{playlist.name}" narrative.', file=sys.stderr)
+        print(
+            f'No sections could be parsed from "{playlist.name}" narrative.',
+            file=sys.stderr,
+        )
         return 1
 
     concept = _get_concept(db, playlist.id)
@@ -153,8 +156,13 @@ def handle_compose(args, db: Database) -> int:
     pins = db.get_pins(playlist.id)
     artist_lookup = _build_artist_lookup(db, playlist.id)
     from tuneshift.composer.concept_llm import make_concept_judge
+
     result = compose_playlist(
-        tracks, narrative, concept=concept, pins=pins, artist_lookup=artist_lookup,
+        tracks,
+        narrative,
+        concept=concept,
+        pins=pins,
+        artist_lookup=artist_lookup,
         year_lookup=db.get_release_years_for_playlist(playlist.id),
         llm_judge=make_concept_judge(),
         accepted=db.get_concept_acceptances(playlist.id),
@@ -186,7 +194,9 @@ def handle_compose(args, db: Database) -> int:
     _render_composition(result, sections)
 
     if getattr(args, "apply", False):
-        db.set_playlist_tracks(playlist.id, [track.track_id for track in result.ordered_tracks])
+        db.set_playlist_tracks(
+            playlist.id, [track.track_id for track in result.ordered_tracks]
+        )
         print(f'\nApplied composed order to "{playlist.name}".')
     elif getattr(args, "dry_run", False):
         print("\nDry run only, no changes applied.")
@@ -207,7 +217,13 @@ def handle_concept(args, db: Database) -> int:
         return 0
 
     concept = _get_concept(db, playlist.id)
-    if not any((getattr(args, "theme", None), getattr(args, "require", None), getattr(args, "prefer", None))):
+    if not any(
+        (
+            getattr(args, "theme", None),
+            getattr(args, "require", None),
+            getattr(args, "prefer", None),
+        )
+    ):
         if concept is None:
             print(f'No concept set for "{playlist.name}".')
             return 0
@@ -230,7 +246,10 @@ def handle_concept(args, db: Database) -> int:
     }
     if getattr(args, "theme", None):
         concept_data["theme"] = args.theme
-    if getattr(args, "require", None) and args.require not in concept_data["hard_rules"]:
+    if (
+        getattr(args, "require", None)
+        and args.require not in concept_data["hard_rules"]
+    ):
         concept_data["hard_rules"].append(args.require)
     if getattr(args, "prefer", None) and args.prefer not in concept_data["soft_rules"]:
         concept_data["soft_rules"].append(args.prefer)
@@ -240,8 +259,9 @@ def handle_concept(args, db: Database) -> int:
     return 0
 
 
-def _accept_concept_findings(db, playlist, concept, track_id: int,
-                             rule: str | None) -> int:
+def _accept_concept_findings(
+    db, playlist, concept, track_id: int, rule: str | None
+) -> int:
     """Record acceptance of concept findings for one track.
 
     With ``rule`` set, accepts exactly that rule for the track. Without it,
@@ -255,9 +275,7 @@ def _accept_concept_findings(db, playlist, concept, track_id: int,
     playlist_tracks = db.get_playlist_tracks(playlist.id)
     target = next((t for t in playlist_tracks if t.id == track_id), None)
     if target is None:
-        print(
-            f'Track {track_id} is not in "{playlist.name}".', file=sys.stderr
-        )
+        print(f'Track {track_id} is not in "{playlist.name}".', file=sys.stderr)
         return 1
 
     if rule is not None:
@@ -269,9 +287,13 @@ def _accept_concept_findings(db, playlist, concept, track_id: int,
     artist_lookup = _build_artist_lookup(db, playlist.id)
     year_lookup = db.get_release_years_for_playlist(playlist.id)
     from tuneshift.composer.concept_llm import make_concept_judge
+
     findings = review_playlist(
-        tracks, concept=concept, artist_lookup=artist_lookup,
-        year_lookup=year_lookup, llm_judge=make_concept_judge(),
+        tracks,
+        concept=concept,
+        artist_lookup=artist_lookup,
+        year_lookup=year_lookup,
+        llm_judge=make_concept_judge(),
         accepted=db.get_concept_acceptances(playlist.id),
     )
     needle = f'"{target.title}" by {target.artist} '
@@ -283,14 +305,14 @@ def _accept_concept_findings(db, playlist, concept, track_id: int,
                 accepted_rules.add(match.group(1))
 
     if not accepted_rules:
-        print(f'No current concept findings for track {track_id} ({target.title}).')
+        print(f"No current concept findings for track {track_id} ({target.title}).")
         return 0
 
     for accepted_rule in sorted(accepted_rules):
         db.add_concept_acceptance(playlist.id, track_id, accepted_rule)
     print(
-        f'Accepted {len(accepted_rules)} rule(s) for track {track_id} '
-        f'({target.title}): {", ".join(sorted(accepted_rules))}'
+        f"Accepted {len(accepted_rules)} rule(s) for track {track_id} "
+        f"({target.title}): {', '.join(sorted(accepted_rules))}"
     )
     return 0
 
@@ -307,7 +329,9 @@ def handle_review(args, db: Database) -> int:
 
     concept = _get_concept(db, playlist.id)
     if concept is None:
-        print(f'No concept set for "{playlist.name}". Nothing to review.', file=sys.stderr)
+        print(
+            f'No concept set for "{playlist.name}". Nothing to review.', file=sys.stderr
+        )
         return 1
 
     if getattr(args, "list_accepted", False):
@@ -322,8 +346,9 @@ def handle_review(args, db: Database) -> int:
 
     accept_track = getattr(args, "accept_track", None)
     if accept_track is not None:
-        return _accept_concept_findings(db, playlist, concept, accept_track,
-                                        getattr(args, "rule", None))
+        return _accept_concept_findings(
+            db, playlist, concept, accept_track, getattr(args, "rule", None)
+        )
 
     tracks = [track_to_metadata(track) for track in db.get_playlist_tracks(playlist.id)]
     artist_lookup = _build_artist_lookup(db, playlist.id)
@@ -341,11 +366,12 @@ def handle_review(args, db: Database) -> int:
     )
 
     print(f'Review: "{playlist.name}" ({len(tracks)} tracks)')
-    print(f'Concept: {concept.theme}')
-    print(f'Hard rules: {concept.hard_rules}')
-    print(f'Soft rules: {concept.soft_rules}')
+    print(f"Concept: {concept.theme}")
+    print(f"Hard rules: {concept.hard_rules}")
+    print(f"Soft rules: {concept.soft_rules}")
 
     from tuneshift.composer.rules import RuleKind, classify_rule
+
     has_thematic = any(
         classify_rule(rule) is RuleKind.THEMATIC for rule in concept.hard_rules
     )
@@ -353,11 +379,11 @@ def handle_review(args, db: Database) -> int:
         label = getattr(llm_judge, "model_label", None)
         if label:
             print(
-                f'Thematic rules judged by: {label} '
-                f'(verdict quality is model-dependent)'
+                f"Thematic rules judged by: {label} "
+                f"(verdict quality is model-dependent)"
             )
         else:
-            print('Thematic rules: no LLM backend reachable (reported as unverified)')
+            print("Thematic rules: no LLM backend reachable (reported as unverified)")
     print()
 
     if not findings:
@@ -393,6 +419,7 @@ def handle_review(args, db: Database) -> int:
             # Extract track title from finding description
             # Format: 'HARD: "Title" by Artist - Rule: ...'
             import re as _re
+
             title_match = _re.search(r'"([^"]+)" by (.+?) - Rule:', finding.description)
             if not title_match:
                 continue

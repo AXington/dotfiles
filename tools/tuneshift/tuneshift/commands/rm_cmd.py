@@ -1,4 +1,5 @@
 """Remove command: remove a track from a playlist and sync to platforms."""
+
 import sys
 
 from tuneshift.db import Database
@@ -16,20 +17,25 @@ def handle_rm(args, db: Database) -> int:
 
     # Try title match first (even if target looks numeric, e.g., "360")
     target_lower = target.lower()
-    matches = [(i + 1, t) for i, t in enumerate(tracks) if target_lower in t.title.lower()]
+    matches = [
+        (i + 1, t) for i, t in enumerate(tracks) if target_lower in t.title.lower()
+    ]
 
     # If no title match and target is numeric, treat as position
     if not matches:
         try:
             position = int(target)
             if position < 1 or position > len(tracks):
-                print(f"Position {position} out of range (1-{len(tracks)})", file=sys.stderr)
+                print(
+                    f"Position {position} out of range (1-{len(tracks)})",
+                    file=sys.stderr,
+                )
                 return 1
             track = tracks[position - 1]
             had_failure = _remove_and_sync(db, playlist, track, position)
             return 1 if had_failure else 0
         except ValueError:
-            print(f"No track matching \"{target}\" in \"{playlist.name}\"", file=sys.stderr)
+            print(f'No track matching "{target}" in "{playlist.name}"', file=sys.stderr)
             return 1
 
     if len(matches) == 1:
@@ -38,7 +44,7 @@ def handle_rm(args, db: Database) -> int:
         return 1 if had_failure else 0
 
     # Multiple matches: show and ask
-    print(f"Multiple matches for \"{target}\":")
+    print(f'Multiple matches for "{target}":')
     for pos, track in matches:
         print(f"  {pos}. {track.title} - {track.artist}")
     choice = input("Remove which position? ").strip()
@@ -69,7 +75,9 @@ def _remove_and_sync(db: Database, playlist, track, position: int) -> bool:
     ).fetchall()
     stored_position = ordered[position - 1]["position"]
     db.remove_playlist_track_by_position(playlist.id, stored_position)
-    print(f"Removed \"{track.title} - {track.artist}\" (position {position}) from \"{playlist.name}\"")
+    print(
+        f'Removed "{track.title} - {track.artist}" (position {position}) from "{playlist.name}"'
+    )
 
     # Auto-reorder if enabled
     row = db.conn.execute(
@@ -78,6 +86,7 @@ def _remove_and_sync(db: Database, playlist, track, position: int) -> bool:
     ).fetchone()
     if row and row[0]:
         from tuneshift.sequencer.optimizer import sequence_playlist
+
         arc = row[1] or "wave"
         sequence_playlist(db, playlist.id, arc=arc)
 
@@ -101,7 +110,8 @@ def _remove_and_sync(db: Database, playlist, track, position: int) -> bool:
             # Find by matching title (position may differ due to prior divergence)
             target_lower = track.title.lower()
             matches = [
-                i for i, pt in enumerate(platform_tracks)
+                i
+                for i, pt in enumerate(platform_tracks)
                 if target_lower in pt.title.lower()
             ]
             if matches:

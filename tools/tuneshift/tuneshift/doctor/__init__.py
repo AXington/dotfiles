@@ -19,9 +19,9 @@ from tuneshift.doctor.plan import (
 )
 
 __all__ = [
-    "DoctorPlan",
-    "PlanItem",
     "ISSUE_TYPES",
     "STATUS_VALUES",
+    "DoctorPlan",
+    "PlanItem",
     "plan_path",
 ]

@@ -90,7 +90,9 @@ def run_resolve(args: Namespace, db: Database) -> None:
     worker = ResolutionWorker(
         db,
         resolver,
-        enricher=make_enricher(tidal_client=client if platform_name == "tidal" else None),
+        enricher=make_enricher(
+            tidal_client=client if platform_name == "tidal" else None
+        ),
         rate_limiter=RateLimiter(max_per_second=throttle or 3.0),
     )
 
@@ -132,13 +134,17 @@ def _select_single_track(db: Database, title: str, artist: str) -> Track | None:
     """Find a single track by title/artist, prompting to disambiguate."""
     matches = db.find_tracks_by_title_artist(title=title, artist=artist)
     if not matches:
-        print("Error: Track not in database. Use `tuneshift add` first.", file=sys.stderr)
+        print(
+            "Error: Track not in database. Use `tuneshift add` first.", file=sys.stderr
+        )
         raise SystemExit(1)
     if len(matches) == 1:
         return matches[0]
     print(f"Multiple matches for '{title}' by '{artist}':")
     for index, match in enumerate(matches, 1):
-        print(f"  {index}. {match.title} - {match.artist} ({match.album or 'no album'})")
+        print(
+            f"  {index}. {match.title} - {match.artist} ({match.album or 'no album'})"
+        )
     choice = input("Select [1]: ").strip() or "1"
     try:
         return matches[int(choice) - 1]
@@ -231,14 +237,18 @@ def _print_library_status(db: Database, *, verbose: bool) -> None:
         for r in needs_attention:
             pct = int(r["pct"] * 100)
             note = _coverage_note(r)
-            print(f"    {pct:>3}%  {r['name'][:32]:<32} ({r['playable']}/{r['total']}){note}")
+            print(
+                f"    {pct:>3}%  {r['name'][:32]:<32} ({r['playable']}/{r['total']}){note}"
+            )
     if fully:
         print(f"\n  {fully} playlist(s) fully playable.")
 
     if verbose and s["quarantined"]:
         print("\n  Quarantined tracks:")
         for q in db.get_quarantined_tracks():
-            print(f"    [{q['track_id']}] {q['title']} - {q['artist']}  ({q['reason']})")
+            print(
+                f"    [{q['track_id']}] {q['title']} - {q['artist']}  ({q['reason']})"
+            )
 
 
 def _coverage_note(row: dict) -> str:

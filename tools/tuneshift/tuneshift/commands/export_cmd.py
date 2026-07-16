@@ -1,4 +1,5 @@
 """Export command: export playlists in multiple formats."""
+
 import csv
 import io
 import json
@@ -17,7 +18,7 @@ def handle_export(args, db: Database) -> int:
 
     tracks = db.get_playlist_tracks(playlist.id)
     if not tracks:
-        print(f"Playlist \"{playlist.name}\" is empty.", file=sys.stderr)
+        print(f'Playlist "{playlist.name}" is empty.', file=sys.stderr)
         return 1
 
     fmt = args.format
@@ -31,7 +32,7 @@ def handle_export(args, db: Database) -> int:
         path = Path(output_path)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
-        print(f"Exported \"{playlist.name}\" ({len(tracks)} tracks) to {path}")
+        print(f'Exported "{playlist.name}" ({len(tracks)} tracks) to {path}')
 
     return 0
 
@@ -77,19 +78,23 @@ def _render_csv(tracks, db: Database) -> str:
     """Standard CSV with all metadata."""
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["Position", "Title", "Artist", "Album", "ISRC", "Duration_s", "BPM", "Key"])
+    writer.writerow(
+        ["Position", "Title", "Artist", "Album", "ISRC", "Duration_s", "BPM", "Key"]
+    )
 
     for i, track in enumerate(tracks, 1):
-        writer.writerow([
-            i,
-            track.title,
-            track.artist,
-            track.album or "",
-            track.isrc or "",
-            track.duration_seconds or "",
-            track.tempo or "",
-            track.key or "",
-        ])
+        writer.writerow(
+            [
+                i,
+                track.title,
+                track.artist,
+                track.album or "",
+                track.isrc or "",
+                track.duration_seconds or "",
+                track.tempo or "",
+                track.key or "",
+            ]
+        )
 
     return output.getvalue()
 
@@ -111,16 +116,18 @@ def _render_json(playlist, tracks, db: Database) -> str:
         data["platforms"]["ytmusic"] = ytm_id
 
     for i, track in enumerate(tracks, 1):
-        data["tracks"].append({
-            "position": i,
-            "title": track.title,
-            "artist": track.artist,
-            "album": track.album,
-            "isrc": track.isrc,
-            "duration_seconds": track.duration_seconds,
-            "bpm": track.tempo,
-            "key": track.key,
-        })
+        data["tracks"].append(
+            {
+                "position": i,
+                "title": track.title,
+                "artist": track.artist,
+                "album": track.album,
+                "isrc": track.isrc,
+                "duration_seconds": track.duration_seconds,
+                "bpm": track.tempo,
+                "key": track.key,
+            }
+        )
 
     return json.dumps(data, indent=2, ensure_ascii=False) + "\n"
 
@@ -132,12 +139,14 @@ def _render_soundiiz(tracks, db: Database) -> str:
     writer.writerow(["Title", "Artist", "Album", "ISRC"])
 
     for track in tracks:
-        writer.writerow([
-            track.title,
-            track.artist,
-            track.album or "",
-            track.isrc or "",
-        ])
+        writer.writerow(
+            [
+                track.title,
+                track.artist,
+                track.album or "",
+                track.isrc or "",
+            ]
+        )
 
     return output.getvalue()
 
@@ -149,10 +158,12 @@ def _render_tunemymusic(tracks, db: Database) -> str:
     writer.writerow(["Track Name", "Artist Name", "Album Name"])
 
     for track in tracks:
-        writer.writerow([
-            track.title,
-            track.artist,
-            track.album or "",
-        ])
+        writer.writerow(
+            [
+                track.title,
+                track.artist,
+                track.album or "",
+            ]
+        )
 
     return output.getvalue()

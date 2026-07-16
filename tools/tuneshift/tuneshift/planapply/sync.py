@@ -49,10 +49,12 @@ def _reorder_tracks(tracks: list, ordered_track_ids: list[int]) -> list:
     return ordered
 
 
-def _remote_ids(client: MusicPlatformClient, platform_playlist_id: str) -> list[str] | None:
+def _remote_ids(
+    client: MusicPlatformClient, platform_playlist_id: str
+) -> list[str] | None:
     try:
         return [t.platform_id for t in client.get_playlist_tracks(platform_playlist_id)]
-    except Exception:  # noqa: BLE001 - remote read is best-effort context only
+    except Exception:
         return None
 
 
@@ -231,7 +233,7 @@ def build_compensating_plan(
     for change_id, entry in enumerate(report.compensating, start=1):
         prior = entry.prior_value or {}
         row = json.loads(entry.row_key)
-        platform = entry.table_name[len(REMOTE_TABLE_PREFIX):]
+        platform = entry.table_name[len(REMOTE_TABLE_PREFIX) :]
         changes.append(
             PlanChange(
                 op="remote_push",

@@ -1,4 +1,5 @@
 """Shared auth/path security helpers."""
+
 import os
 import stat
 import tempfile

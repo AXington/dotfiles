@@ -1,6 +1,6 @@
 """Weight profiles and playlist intent configuration."""
-from dataclasses import dataclass, field
 
+from dataclasses import dataclass, field
 
 DEFAULT_WEIGHTS: dict[str, float] = {
     "themes": 0.35,

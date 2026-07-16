@@ -30,7 +30,13 @@ PLAN_VERSION = 1
 
 OP_VALUES = ("insert", "update", "delete", "remote_push")
 STATUS_VALUES = ("pending", "applied", "skipped", "rejected", "failed")
-CLASSIFICATION_VALUES = ("improved", "unchanged", "needs-human-judgment", "locked", "downgrade-flag")
+CLASSIFICATION_VALUES = (
+    "improved",
+    "unchanged",
+    "needs-human-judgment",
+    "locked",
+    "downgrade-flag",
+)
 
 
 def row_key_for(**primary_key: object) -> str:
@@ -73,7 +79,7 @@ class PlanChange:
         return self.status in ("pending", "failed")
 
     @classmethod
-    def from_dict(cls, data: dict) -> "PlanChange":
+    def from_dict(cls, data: dict) -> PlanChange:
         known = {f for f in cls.__dataclass_fields__}  # type: ignore[attr-defined]
         return cls(**{k: v for k, v in data.items() if k in known})
 
@@ -102,7 +108,7 @@ class Plan:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "Plan":
+    def from_dict(cls, data: dict) -> Plan:
         changes = [PlanChange.from_dict(d) for d in data.get("changes", [])]
         return cls(
             plan_id=data.get("plan_id", ""),

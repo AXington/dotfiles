@@ -1,4 +1,5 @@
 """Greedy nearest-neighbor plus 2-opt sequence optimizer."""
+
 import math
 import random
 from typing import TYPE_CHECKING
@@ -125,7 +126,9 @@ def distribute_artists(
         best_target = None
         best_distance = -1
         artist_positions = [
-            index for index in range(track_count) if result[index].artist == violator.artist
+            index
+            for index in range(track_count)
+            if result[index].artist == violator.artist
         ]
 
         for target_idx in range(track_count):
@@ -375,8 +378,11 @@ def _prepare_free_pool(
 
     anchor_blocks: list[list[TrackMetadata]] = []
     for group_track_ids in adjacency_groups.values():
-        block = [track_map[tid] for tid in group_track_ids if tid in track_map
-                 and tid != opener.track_id and tid != closer.track_id]
+        block = [
+            track_map[tid]
+            for tid in group_track_ids
+            if tid in track_map and tid != opener.track_id and tid != closer.track_id
+        ]
         if block:
             anchor_blocks.append(block)
 
@@ -494,7 +500,9 @@ def optimize_sequence(
     track_count = len(tracks)
     track_map = {track.track_id: track for track in tracks}
 
-    pinned_opener_id, pinned_closer_id, adjacency_groups, position_pins = _resolve_pins(pins, track_map)
+    pinned_opener_id, pinned_closer_id, adjacency_groups, position_pins = _resolve_pins(
+        pins, track_map
+    )
 
     # Playlists of <=2 tracks have no interior region to optimize, but pins
     # must still be honored (opener/closer/position/adjacency). The greedy /
@@ -502,13 +510,18 @@ def optimize_sequence(
     # small case directly.
     if track_count <= 2:
         return _order_small_playlist(
-            tracks, track_map, pinned_opener_id, pinned_closer_id,
-            adjacency_groups, position_pins,
+            tracks,
+            track_map,
+            pinned_opener_id,
+            pinned_closer_id,
+            adjacency_groups,
+            position_pins,
         )
 
     # Narrative section-based sequencing: hard-place tracks into declared sections
     if arc == "narrative" and narrative:
         from tuneshift.sequencer.narrative_parser import parse_narrative
+
         sections = parse_narrative(narrative)
         if sections:
             total_capacity = sum(s.capacity for s in sections)
@@ -518,9 +531,11 @@ def optimize_sequence(
                 ordered: list[TrackMetadata] = []
                 idx = 0
                 for section in sections:
-                    section_tracks = tracks[idx:idx + section.capacity]
+                    section_tracks = tracks[idx : idx + section.capacity]
                     if len(section_tracks) > 1:
-                        section_ordered = _optimize_within_section(section_tracks, weights, arc)
+                        section_ordered = _optimize_within_section(
+                            section_tracks, weights, arc
+                        )
                         ordered.extend(section_ordered)
                     else:
                         ordered.extend(section_tracks)
@@ -535,7 +550,9 @@ def optimize_sequence(
                 for section in sections:
                     section_tracks = assignments.get(section.name, [])
                     if len(section_tracks) > 1:
-                        section_ordered = _optimize_within_section(section_tracks, weights, arc)
+                        section_ordered = _optimize_within_section(
+                            section_tracks, weights, arc
+                        )
                         ordered.extend(section_ordered)
                     else:
                         ordered.extend(section_tracks)
@@ -544,6 +561,7 @@ def optimize_sequence(
 
     # Infer intent early for narrative arc
     from tuneshift.sequencer.intent import infer_intent
+
     intent = infer_intent(tracks, narrative=narrative) if arc == "narrative" else None
 
     # Collect moment track IDs and determine their target positions
@@ -561,13 +579,18 @@ def optimize_sequence(
         pinned_closer_id = position_pins.pop(track_count - 1)
 
     opener, closer, remaining = _select_endpoints(
-        tracks, track_map, pinned_opener_id, pinned_closer_id, arc,
+        tracks,
+        track_map,
+        pinned_opener_id,
+        pinned_closer_id,
+        arc,
         exclude_from_auto=set(position_pins.values()),
     )
 
     # Remove opener/closer from position_pins to prevent duplication
     position_pins = {
-        pos: tid for pos, tid in position_pins.items()
+        pos: tid
+        for pos, tid in position_pins.items()
         if tid != opener.track_id and tid != closer.track_id
     }
 
@@ -576,13 +599,26 @@ def optimize_sequence(
     remaining = [t for t in remaining if t.track_id not in position_pinned_ids]
 
     free_tracks, anchor_blocks = _prepare_free_pool(
-        remaining, track_map, adjacency_groups, opener, closer,
+        remaining,
+        track_map,
+        adjacency_groups,
+        opener,
+        closer,
     )
 
     sequence = _greedy_build(
-        opener, closer, free_tracks, anchor_blocks,
-        track_count - len(position_pins), weights, arc, bold_jump_chance,
-        narrative_mode, context_window, penalty_overrides, intent,
+        opener,
+        closer,
+        free_tracks,
+        anchor_blocks,
+        track_count - len(position_pins),
+        weights,
+        arc,
+        bold_jump_chance,
+        narrative_mode,
+        context_window,
+        penalty_overrides,
+        intent,
     )
 
     # Insert position-pinned tracks at their target indices
@@ -593,13 +629,19 @@ def optimize_sequence(
             sequence.insert(idx, track_map[tid])
 
     # Post-optimization: 2-opt and artist distribution, protecting pinned positions
-    pinned_positions = _get_pinned_positions(sequence, pinned_opener_id, pinned_closer_id, adjacency_groups)
+    pinned_positions = _get_pinned_positions(
+        sequence, pinned_opener_id, pinned_closer_id, adjacency_groups
+    )
     # Also protect position-pinned indices
     for target_idx in position_pins:
         if target_idx < len(sequence):
             pinned_positions.add(target_idx)
-    sequence = _two_opt(sequence, weights, max_iterations=100, protected=pinned_positions)
-    sequence = distribute_artists(sequence, min_separation=artist_min_separation, protected=pinned_positions)
+    sequence = _two_opt(
+        sequence, weights, max_iterations=100, protected=pinned_positions
+    )
+    sequence = distribute_artists(
+        sequence, min_separation=artist_min_separation, protected=pinned_positions
+    )
     return sequence
 
 
@@ -652,13 +694,19 @@ def sequence_playlist(
     if len(track_ids) <= 1:
         return list(track_ids)
 
-    unavailable_ids = set(db.get_unavailable_track_ids(playlist_id, availability_platform))
+    unavailable_ids = set(
+        db.get_unavailable_track_ids(playlist_id, availability_platform)
+    )
     sequenceable_ids = [tid for tid in track_ids if tid not in unavailable_ids]
 
     profile_config = get_profile(profile)
     resolved_arc = arc or profile_config.arc
     metadata_map = get_track_metadata_map(db, sequenceable_ids)
-    metadata_tracks = [metadata_map[track_id] for track_id in sequenceable_ids if track_id in metadata_map]
+    metadata_tracks = [
+        metadata_map[track_id]
+        for track_id in sequenceable_ids
+        if track_id in metadata_map
+    ]
 
     # Everything not placed by the optimizer (unavailable + metadata-less)
     # tails the result in original playlist order, never dropped.
@@ -666,13 +714,16 @@ def sequence_playlist(
         return [tid for tid in track_ids if tid not in placed]
 
     if not metadata_tracks:
-        return list(sequenceable_ids) + [tid for tid in track_ids if tid in unavailable_ids]
+        return list(sequenceable_ids) + [
+            tid for tid in track_ids if tid in unavailable_ids
+        ]
 
     if len(metadata_tracks) == 1:
         placed = {metadata_tracks[0].track_id}
         return [metadata_tracks[0].track_id] + _tail(placed)
 
     from tuneshift.models import PlaylistPin
+
     pins: list[PlaylistPin] = db.get_pins(playlist_id)
 
     # Load playlist narrative for narrative arc sequencing
@@ -701,6 +752,7 @@ def sequence_playlist(
     deferred = len(tail)
     if deferred:
         import sys
+
         print(
             f"  Note: {deferred} track(s) (no sequencer metadata or unavailable on "
             f"{availability_platform}) appended at end",
@@ -782,7 +834,8 @@ def _optimize_within_section(
     if len(tracks) <= 2:
         return tracks
 
-    from tuneshift.sequencer.scoring import score_pair, resolve_weights
+    from tuneshift.sequencer.scoring import resolve_weights, score_pair
+
     resolved_weights = resolve_weights(weights, None, None)
 
     # Greedy nearest-neighbor within section
@@ -809,7 +862,9 @@ def _score_track_section_fitness(
     score = 0.0
 
     # Intensity match
-    track_intensity = track.emotional_intensity if track.emotional_intensity is not None else 0.5
+    track_intensity = (
+        track.emotional_intensity if track.emotional_intensity is not None else 0.5
+    )
     intensity_match = 1.0 - abs(track_intensity - section.implied_intensity)
     score += 0.5 * intensity_match
 
@@ -817,7 +872,10 @@ def _score_track_section_fitness(
     if section.implied_stance and track.narrator_stance:
         if track.narrator_stance == section.implied_stance:
             score += 0.3
-        elif track.narrator_stance in ("angry", "defiant", "fierce") and section.implied_stance == "defiant":
+        elif (
+            track.narrator_stance in ("angry", "defiant", "fierce")
+            and section.implied_stance == "defiant"
+        ):
             score += 0.2
 
     # Lyrical/theme relevance to section description

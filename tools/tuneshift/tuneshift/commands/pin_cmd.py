@@ -1,4 +1,5 @@
 """Pin command: manage track pins for sequencer constraints."""
+
 import sys
 
 from tuneshift.db import Database
@@ -33,7 +34,10 @@ def handle_pin(args, db: Database) -> int:
     if getattr(args, "moment", None):
         return _set_moment_pin(db, playlist, args.moment)
 
-    print("Specify --opener, --closer, --position, --adjacent, --moment, --remove, or --list.", file=sys.stderr)
+    print(
+        "Specify --opener, --closer, --position, --adjacent, --moment, --remove, or --list.",
+        file=sys.stderr,
+    )
     return 1
 
 
@@ -104,7 +108,11 @@ def _set_index_pin(db: Database, playlist, title: str, position: int) -> int:
             db.remove_pin(playlist.id, member.track_id)
             # Clear any existing pin at this position
             for pin in existing_pins:
-                if pin.pin_type == "position" and pin.group_order == target_pos and pin.track_id != member.track_id:
+                if (
+                    pin.pin_type == "position"
+                    and pin.group_order == target_pos
+                    and pin.track_id != member.track_id
+                ):
                     db.remove_pin(playlist.id, pin.track_id)
             db.set_pin(playlist.id, member.track_id, "position", group_order=target_pos)
 
@@ -128,7 +136,9 @@ def _set_index_pin(db: Database, playlist, title: str, position: int) -> int:
     return 0
 
 
-def _set_adjacency(db: Database, playlist, titles: list[str], group_name: str | None) -> int:
+def _set_adjacency(
+    db: Database, playlist, titles: list[str], group_name: str | None
+) -> int:
     """Pin tracks as an adjacency group."""
     tracks = []
     for title in titles:
@@ -142,7 +152,9 @@ def _set_adjacency(db: Database, playlist, titles: list[str], group_name: str | 
     for order, track in enumerate(tracks):
         # Remove any existing pin for this track first
         db.remove_pin(playlist.id, track.id)
-        db.set_pin(playlist.id, track.id, "anchor", group_id=group_id, group_order=order)
+        db.set_pin(
+            playlist.id, track.id, "anchor", group_id=group_id, group_order=order
+        )
 
     track_names = " -> ".join(f'"{t.title}"' for t in tracks)
     print(f'Pinned adjacency group "{group_id}": {track_names}')

@@ -58,8 +58,10 @@ def handle_import_json(args, db: Database) -> int:
         # then enqueue resolution (identity/platform mapping re-resolves).
         album = entry.get("album")
         found = db.find_track(title, artist, album)
-        track_id = found.id if found is not None else db.add_track(
-            Track(title=title, artist=artist, album=album)
+        track_id = (
+            found.id
+            if found is not None
+            else db.add_track(Track(title=title, artist=artist, album=album))
         )
         position = len(db.get_playlist_tracks(playlist_id)) + 1
         db.add_track_to_playlist(playlist_id, track_id, position)
@@ -68,5 +70,5 @@ def handle_import_json(args, db: Database) -> int:
         existing.add((title.casefold(), artist.casefold()))
         added += 1
 
-    print(f"Restored \"{name}\": {added} track(s) added, {already} already present.")
+    print(f'Restored "{name}": {added} track(s) added, {already} already present.')
     return 0

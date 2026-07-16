@@ -1,4 +1,5 @@
 """Dedicated narrative parser producing structured NarrativeSection objects."""
+
 import re
 from dataclasses import dataclass
 
@@ -15,16 +16,40 @@ class NarrativeSection:
 
 
 # Keywords that suggest high emotional intensity
-_HIGH_INTENSITY_WORDS = frozenset({
-    "fury", "rage", "wrath", "anger", "fire", "defiance", "defiant",
-    "fight", "scream", "storm", "chaos", "menace", "annihilation",
-})
+_HIGH_INTENSITY_WORDS = frozenset(
+    {
+        "fury",
+        "rage",
+        "wrath",
+        "anger",
+        "fire",
+        "defiance",
+        "defiant",
+        "fight",
+        "scream",
+        "storm",
+        "chaos",
+        "menace",
+        "annihilation",
+    }
+)
 
 # Keywords that suggest low intensity
-_LOW_INTENSITY_WORDS = frozenset({
-    "exhale", "drone", "collapse", "quiet", "gentle", "calm", "rest",
-    "still", "fade", "whisper", "lull",
-})
+_LOW_INTENSITY_WORDS = frozenset(
+    {
+        "exhale",
+        "drone",
+        "collapse",
+        "quiet",
+        "gentle",
+        "calm",
+        "rest",
+        "still",
+        "fade",
+        "whisper",
+        "lull",
+    }
+)
 
 # Section name pattern: NAME (N) or NAME (N-M)
 # Captures everything from the colon to the next section header or end of text.
@@ -80,14 +105,16 @@ def parse_narrative(narrative: str | None) -> list[NarrativeSection]:
         end = int(match.group(3)) if match.group(3) else start
         description = match.group(4).strip()
 
-        sections.append(NarrativeSection(
-            name=name,
-            start_position=start,
-            end_position=end,
-            description=description,
-            implied_intensity=_estimate_intensity(name, description),
-            implied_stance=_estimate_stance(name, description),
-            capacity=end - start + 1,
-        ))
+        sections.append(
+            NarrativeSection(
+                name=name,
+                start_position=start,
+                end_position=end,
+                description=description,
+                implied_intensity=_estimate_intensity(name, description),
+                implied_stance=_estimate_stance(name, description),
+                capacity=end - start + 1,
+            )
+        )
 
     return sections

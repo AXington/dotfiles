@@ -1,5 +1,7 @@
 """Gap analysis: detect narrative and energy gaps in playlist composition."""
+
 from dataclasses import dataclass
+
 from tuneshift.sequencer.metadata import TrackMetadata
 
 
@@ -36,16 +38,18 @@ def analyze_gaps(
     for section in sections:
         capacity = section["end"] - section["start"] + 1
         allocated_tracks = capacity * tracks_per_position
-        
+
         # Section is thin if we have less than 0.5 tracks per position
         if tracks_per_position < 0.5:
-            gaps.append(GapReport(
-                gap_type="thin_section",
-                section_name=section["name"],
-                description=f"{section['name']} needs ~{capacity} tracks but playlist only has ~{allocated_tracks:.0f} allocated",
-                severity=min(1.0, (capacity - allocated_tracks) / max(capacity, 1)),
-                suggestion=f"Add {int(capacity - allocated_tracks)} tracks matching: {section.get('description', '')}",
-            ))
+            gaps.append(
+                GapReport(
+                    gap_type="thin_section",
+                    section_name=section["name"],
+                    description=f"{section['name']} needs ~{capacity} tracks but playlist only has ~{allocated_tracks:.0f} allocated",
+                    severity=min(1.0, (capacity - allocated_tracks) / max(capacity, 1)),
+                    suggestion=f"Add {int(capacity - allocated_tracks)} tracks matching: {section.get('description', '')}",
+                )
+            )
 
     # Detect missing transitions between consecutive sections
     for i in range(len(sections) - 1):
@@ -61,14 +65,12 @@ def analyze_gaps(
         curr_intensities = [
             t.emotional_intensity
             for idx, t in enumerate(tracks)
-            if t.emotional_intensity is not None
-            and curr_start <= idx <= curr_end
+            if t.emotional_intensity is not None and curr_start <= idx <= curr_end
         ]
         next_intensities = [
             t.emotional_intensity
             for idx, t in enumerate(tracks)
-            if t.emotional_intensity is not None
-            and next_start <= idx <= next_end
+            if t.emotional_intensity is not None and next_start <= idx <= next_end
         ]
 
         if curr_intensities and next_intensities:
@@ -80,12 +82,14 @@ def analyze_gaps(
             intensity_jump = abs(curr_intensity - next_intensity)
             # Threshold: 0.5 intensity difference is a significant jump
             if intensity_jump > 0.5:
-                gaps.append(GapReport(
-                    gap_type="missing_transition",
-                    section_name=f"{curr_section['name']}->{next_section['name']}",
-                    description=f"Abrupt intensity jump ({intensity_jump:.1f}) between {curr_section['name']} and {next_section['name']}",
-                    severity=min(1.0, intensity_jump),
-                    suggestion=f"Add a transitional track (intensity ~{(curr_intensity + next_intensity) / 2:.1f}) between sections",
-                ))
+                gaps.append(
+                    GapReport(
+                        gap_type="missing_transition",
+                        section_name=f"{curr_section['name']}->{next_section['name']}",
+                        description=f"Abrupt intensity jump ({intensity_jump:.1f}) between {curr_section['name']} and {next_section['name']}",
+                        severity=min(1.0, intensity_jump),
+                        suggestion=f"Add a transitional track (intensity ~{(curr_intensity + next_intensity) / 2:.1f}) between sections",
+                    )
+                )
 
     return gaps

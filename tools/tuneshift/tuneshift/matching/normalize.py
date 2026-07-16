@@ -7,6 +7,7 @@ and the version-keyword patterns (live/remix/karaoke/...) consumed by the
 scorers in `track.py`. Keeping the patterns in one place prevents the
 "four copies of edition knowledge" drift the overhaul is undoing.
 """
+
 import re
 import unicodedata
 from typing import TYPE_CHECKING
@@ -42,14 +43,20 @@ _EXPLICIT_CLEAN_LABEL_RE = re.compile(
     r"\s*[\(\[]\s*(?:explicit|clean)(?:\s+version)?\s*[\)\]]",
     re.IGNORECASE,
 )
-_PUNCT_NORMALIZE = str.maketrans({
-    "\u2018": "'", "\u2019": "'",
-    "\u201c": '"', "\u201d": '"',
-    "\u2026": "...",
-    "\u2013": "-", "\u2014": "-", "\u2015": "-",  # en/em/horizontal dashes
-    "\u00a0": " ",  # non-breaking space
-    "\u00b0": " degrees ",  # degree sign: "98°" -> "98 degrees" (band names)
-})
+_PUNCT_NORMALIZE = str.maketrans(
+    {
+        "\u2018": "'",
+        "\u2019": "'",
+        "\u201c": '"',
+        "\u201d": '"',
+        "\u2026": "...",
+        "\u2013": "-",
+        "\u2014": "-",
+        "\u2015": "-",  # en/em/horizontal dashes
+        "\u00a0": " ",  # non-breaking space
+        "\u00b0": " degrees ",  # degree sign: "98°" -> "98 degrees" (band names)
+    }
+)
 _WHITESPACE_RE = re.compile(r"\s+")
 # Expand "Pt." / "Pt" part-abbreviations to "Part" so multi-part titles match.
 # Word-boundaried on both sides so "Ptolemy" is untouched.
@@ -64,8 +71,12 @@ _ARTIST_SPLIT_RE = re.compile(
     r"\bwith\b|\bx\b|\u00d7|/)\s*",
     re.IGNORECASE,
 )
-_BOUNDARY_PUNCT_RE = re.compile(r"(?:^[^\w]+|[^\w]+$)")  # Leading/trailing non-word chars
-_STANDALONE_PUNCT_RE = re.compile(r"\s+[^\w\s]+\s+")  # Standalone punctuation between words
+_BOUNDARY_PUNCT_RE = re.compile(
+    r"(?:^[^\w]+|[^\w]+$)"
+)  # Leading/trailing non-word chars
+_STANDALONE_PUNCT_RE = re.compile(
+    r"\s+[^\w\s]+\s+"
+)  # Standalone punctuation between words
 # The FEATURED-credit boundary: everything after an explicit feat/ft/featuring
 # marker is a featured artist, not a main one (M5). Deliberately does NOT include
 # "with"/"&"/","/"x" — those join co-billed MAIN artists and stay in the main set.
@@ -111,11 +122,7 @@ def split_artists(name: str, *, resolver: "AliasResolver | None" = None) -> set[
     resolver = resolver or default_resolver()
     folded = fold_accents(name).translate(_PUNCT_NORMALIZE)
     parts = _ARTIST_SPLIT_RE.split(folded)
-    return {
-        resolver.canonical(p.strip().casefold())
-        for p in parts
-        if p and p.strip()
-    }
+    return {resolver.canonical(p.strip().casefold()) for p in parts if p and p.strip()}
 
 
 def artist_set_overlap(
@@ -161,9 +168,7 @@ def split_artist_roles(
         return set(), set()
     parts = _FEAT_ROLE_SPLIT_RE.split(name, maxsplit=1)
     main = split_artists(parts[0], resolver=resolver)
-    featured = (
-        split_artists(parts[1], resolver=resolver) if len(parts) > 1 else set()
-    )
+    featured = split_artists(parts[1], resolver=resolver) if len(parts) > 1 else set()
     # A featured artist is never also counted as main.
     return main, featured - main
 
@@ -303,9 +308,7 @@ _REMIX_RE = re.compile(
     r"bootleg|mash-?up)\b",
     re.IGNORECASE,
 )
-_REMASTER_RE = re.compile(
-    r"\b(remaster(?:ed)?)\b", re.IGNORECASE
-)
+_REMASTER_RE = re.compile(r"\b(remaster(?:ed)?)\b", re.IGNORECASE)
 _DELUXE_RE = re.compile(
     r"\b(deluxe|expanded|anniversary|special edition|bonus track|"
     r"celebration)\b",
@@ -318,18 +321,10 @@ _COMPILATION_RE = re.compile(
     r"the very best)\b",
     re.IGNORECASE,
 )
-_TRIBUTE_RE = re.compile(
-    r"\b(tribute|reimagin|covers?|revamp)\b", re.IGNORECASE
-)
-_KARAOKE_RE = re.compile(
-    r"\b(karaoke)\b", re.IGNORECASE
-)
-_INSTRUMENTAL_RE = re.compile(
-    r"\b(instrumental)\b", re.IGNORECASE
-)
-_ACOUSTIC_RE = re.compile(
-    r"\b(acoustic|stripped)\b", re.IGNORECASE
-)
+_TRIBUTE_RE = re.compile(r"\b(tribute|reimagin|covers?|revamp)\b", re.IGNORECASE)
+_KARAOKE_RE = re.compile(r"\b(karaoke)\b", re.IGNORECASE)
+_INSTRUMENTAL_RE = re.compile(r"\b(instrumental)\b", re.IGNORECASE)
+_ACOUSTIC_RE = re.compile(r"\b(acoustic|stripped)\b", re.IGNORECASE)
 _RADIO_EDIT_RE = re.compile(
     r"\b(radio edit|radio version|single edit|single version)\b",
     re.IGNORECASE,
@@ -361,9 +356,18 @@ _CONTINUOUS_MIX_VERSION_RE = re.compile(
 # title via ``infer_version``) owns the "same version?" judgement, so the
 # similarity title only needs to answer "same song?".
 _VERSION_MARKER_REGEXES = (
-    _LIVE_RE, _REMIX_RE, _REMASTER_RE, _ACOUSTIC_RE, _KARAOKE_RE,
-    _INSTRUMENTAL_RE, _TRIBUTE_RE, _RADIO_EDIT_RE, _DELUXE_RE, _COMPILATION_RE,
-    _SPED_UP_RE, _CONTINUOUS_MIX_RE,
+    _LIVE_RE,
+    _REMIX_RE,
+    _REMASTER_RE,
+    _ACOUSTIC_RE,
+    _KARAOKE_RE,
+    _INSTRUMENTAL_RE,
+    _TRIBUTE_RE,
+    _RADIO_EDIT_RE,
+    _DELUXE_RE,
+    _COMPILATION_RE,
+    _SPED_UP_RE,
+    _CONTINUOUS_MIX_RE,
 )
 _DASH_SUFFIX_RE = re.compile(r"\s+[-\u2013\u2014]\s+([^-\u2013\u2014]+)$")
 _TRAILING_PAREN_RE = re.compile(r"\s*[\(\[][^\(\)\[\]]*[\)\]]\s*$")

@@ -226,10 +226,14 @@ def capture_tidal_catalog(
             db, track_id, platform_track_id, client=client, refresh=refresh
         )
         if tags:
-            logger.info("derived tidal tags for track=%s: %s", track_id, ", ".join(tags))
+            logger.info(
+                "derived tidal tags for track=%s: %s", track_id, ", ".join(tags)
+            )
         return tags
-    except Exception:  # noqa: BLE001 - catalog capture is best-effort
-        logger.warning("tidal catalog capture failed: track=%s", track_id, exc_info=True)
+    except Exception:
+        logger.warning(
+            "tidal catalog capture failed: track=%s", track_id, exc_info=True
+        )
         return []
 
 

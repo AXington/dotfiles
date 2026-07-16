@@ -27,7 +27,9 @@ def handle_untag(args, db: Database) -> int:
     if db.untag_playlist(playlist.id, args.collection):
         print(f'Removed "{args.collection}" from "{playlist.name}"')
     else:
-        print(f'"{playlist.name}" is not tagged with "{args.collection}"', file=sys.stderr)
+        print(
+            f'"{playlist.name}" is not tagged with "{args.collection}"', file=sys.stderr
+        )
         return 1
     return 0
 
@@ -94,14 +96,17 @@ def handle_folders(args, db: Database) -> int:
     elif action == "status":
         return _folders_status(db)
     else:
-        print("Usage: tuneshift folders <list|import|create|rename|delete|move|unassign|sync|pull|status>",
-              file=sys.stderr)
+        print(
+            "Usage: tuneshift folders <list|import|create|rename|delete|move|unassign|sync|pull|status>",
+            file=sys.stderr,
+        )
         return 1
 
 
 def _get_tidal_client():
     """Load and authenticate Tidal client."""
     from tuneshift.commands.ingest_cmd import _load_client
+
     client = _load_client("tidal")
     if not client or not client.load_session():
         print("Not logged in to Tidal. Run: tuneshift login tidal", file=sys.stderr)
@@ -116,6 +121,7 @@ def _folders_list(db: Database) -> int:
         return 1
 
     import requests
+
     session = client._session
     headers = {"Authorization": f"Bearer {session.access_token}"}
     params = {
@@ -129,7 +135,8 @@ def _folders_list(db: Database) -> int:
 
     resp = requests.get(
         "https://api.tidal.com/v2/my-collection/playlists/folders",
-        headers=headers, params=params,
+        headers=headers,
+        params=params,
     )
     if resp.status_code != 200:
         print(f"Tidal API error: {resp.status_code}", file=sys.stderr)
@@ -151,7 +158,9 @@ def _folders_list(db: Database) -> int:
                 headers=headers,
                 params={**params, "folderId": trn.replace("trn:folder:", "")},
             )
-            sub_items = sub_resp.json().get("items", []) if sub_resp.status_code == 200 else []
+            sub_items = (
+                sub_resp.json().get("items", []) if sub_resp.status_code == 200 else []
+            )
             print(f"\n  [{name}] ({len(sub_items)} items)")
             for s in sub_items:
                 print(f"    - {s.get('name', '?')}")
@@ -175,6 +184,7 @@ def _folders_import(db: Database) -> int:
         return 1
 
     import requests
+
     session = client._session
     headers = {"Authorization": f"Bearer {session.access_token}"}
     params = {
@@ -188,7 +198,8 @@ def _folders_import(db: Database) -> int:
 
     resp = requests.get(
         "https://api.tidal.com/v2/my-collection/playlists/folders",
-        headers=headers, params=params,
+        headers=headers,
+        params=params,
     )
     if resp.status_code != 200:
         print(f"Tidal API error: {resp.status_code}", file=sys.stderr)
@@ -232,9 +243,13 @@ def _folders_import(db: Database) -> int:
             else:
                 print(f"    -> {s_name} (no local match)")
 
-    print(f"\nImported {imported_folders} folders, linked {assigned_playlists} playlists")
+    print(
+        f"\nImported {imported_folders} folders, linked {assigned_playlists} playlists"
+    )
 
-    create = input("Create local collections matching folder names? [y/N] ").strip().lower()
+    create = (
+        input("Create local collections matching folder names? [y/N] ").strip().lower()
+    )
     if create in ("y", "yes"):
         for folder in db.get_cached_tidal_folders():
             db.create_collection(folder["name"])
@@ -255,11 +270,16 @@ def _folders_create(db: Database, name: str) -> int:
     # The folder API requires creating via the session
     try:
         import requests
+
         session = client._session
         resp = requests.put(
             "https://api.tidal.com/v2/my-collection/playlists/folders/create-folder",
             headers={"Authorization": f"Bearer {session.access_token}"},
-            params={"folderId": "root", "name": name, "countryCode": session.country_code},
+            params={
+                "folderId": "root",
+                "name": name,
+                "countryCode": session.country_code,
+            },
         )
         if resp.status_code in (200, 201):
             data = resp.json()
@@ -269,7 +289,9 @@ def _folders_create(db: Database, name: str) -> int:
                 print(f'Created folder "{name}" on Tidal (id: {folder_id})')
                 return 0
         # Fallback: try via tidalapi if available
-        print(f"Failed to create folder: {resp.status_code} {resp.text}", file=sys.stderr)
+        print(
+            f"Failed to create folder: {resp.status_code} {resp.text}", file=sys.stderr
+        )
         return 1
     except (OSError, ValueError, KeyError) as exc:
         print(f"Failed to create folder: {exc}", file=sys.stderr)
@@ -280,7 +302,10 @@ def _folders_rename(db: Database, old_name: str, new_name: str) -> int:
     """Rename a folder on Tidal."""
     folder = db.get_tidal_folder_by_name(old_name)
     if not folder:
-        print(f'Folder not found in cache: "{old_name}". Run: tuneshift folders list', file=sys.stderr)
+        print(
+            f'Folder not found in cache: "{old_name}". Run: tuneshift folders list',
+            file=sys.stderr,
+        )
         return 1
 
     client = _get_tidal_client()
@@ -290,7 +315,9 @@ def _folders_rename(db: Database, old_name: str, new_name: str) -> int:
     try:
         tidal_folder = client._session.folder(folder["tidal_id"])
         tidal_folder.rename(new_name)
-        db.cache_tidal_folder(folder["tidal_id"], new_name, folder.get("parent_tidal_id"))
+        db.cache_tidal_folder(
+            folder["tidal_id"], new_name, folder.get("parent_tidal_id")
+        )
         print(f'Renamed "{old_name}" to "{new_name}" on Tidal')
         return 0
     except (OSError, RuntimeError) as exc:
@@ -302,7 +329,10 @@ def _folders_delete(db: Database, name: str) -> int:
     """Delete a folder on Tidal."""
     folder = db.get_tidal_folder_by_name(name)
     if not folder:
-        print(f'Folder not found in cache: "{name}". Run: tuneshift folders list', file=sys.stderr)
+        print(
+            f'Folder not found in cache: "{name}". Run: tuneshift folders list',
+            file=sys.stderr,
+        )
         return 1
 
     # Show affected playlists
@@ -342,11 +372,16 @@ def _folders_move(db: Database, playlist_name: str, folder_name: str) -> int:
 
     folder = db.get_tidal_folder_by_name(folder_name)
     if not folder:
-        print(f'Folder not found in cache: "{folder_name}". Run: tuneshift folders list', file=sys.stderr)
+        print(
+            f'Folder not found in cache: "{folder_name}". Run: tuneshift folders list',
+            file=sys.stderr,
+        )
         return 1
 
     db.set_playlist_tidal_folder(playlist.id, folder["tidal_id"])
-    print(f'Assigned "{playlist.name}" to folder "{folder_name}". Run: tuneshift folders sync')
+    print(
+        f'Assigned "{playlist.name}" to folder "{folder_name}". Run: tuneshift folders sync'
+    )
     return 0
 
 
@@ -369,6 +404,7 @@ def _folders_sync(db: Database) -> int:
         return 1
 
     import requests
+
     session = client._session
     headers = {"Authorization": f"Bearer {session.access_token}"}
 
@@ -376,8 +412,14 @@ def _folders_sync(db: Database) -> int:
     resp = requests.get(
         "https://api.tidal.com/v2/my-collection/playlists/folders",
         headers=headers,
-        params={"folderId": "root", "countryCode": session.country_code,
-                "limit": "50", "offset": "0", "order": "NAME", "includeOnly": ""},
+        params={
+            "folderId": "root",
+            "countryCode": session.country_code,
+            "limit": "50",
+            "offset": "0",
+            "order": "NAME",
+            "includeOnly": "",
+        },
     )
     if resp.status_code == 200:
         for item in resp.json().get("items", []):
@@ -404,10 +446,16 @@ def _folders_sync(db: Database) -> int:
             target_folder.add_items([playlist_trn])
             moved += 1
             folder_info = next(
-                (f for f in db.get_cached_tidal_folders() if f["tidal_id"] == playlist.tidal_folder_id),
+                (
+                    f
+                    for f in db.get_cached_tidal_folders()
+                    if f["tidal_id"] == playlist.tidal_folder_id
+                ),
                 None,
             )
-            folder_name = folder_info["name"] if folder_info else playlist.tidal_folder_id
+            folder_name = (
+                folder_info["name"] if folder_info else playlist.tidal_folder_id
+            )
             print(f"  {playlist.name} -> {folder_name}")
         except (OSError, RuntimeError, ValueError) as exc:
             print(f"  {playlist.name}: failed ({exc})", file=sys.stderr)
@@ -424,6 +472,7 @@ def _folders_pull(db: Database) -> int:
         return 1
 
     import requests
+
     session = client._session
     headers = {"Authorization": f"Bearer {session.access_token}"}
     params = {
@@ -437,7 +486,8 @@ def _folders_pull(db: Database) -> int:
 
     resp = requests.get(
         "https://api.tidal.com/v2/my-collection/playlists/folders",
-        headers=headers, params=params,
+        headers=headers,
+        params=params,
     )
     if resp.status_code != 200:
         print(f"Tidal API error: {resp.status_code}", file=sys.stderr)

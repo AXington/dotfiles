@@ -1,6 +1,5 @@
 """Share command: generate shareable URLs for a playlist across platforms."""
 
-
 # Platform URL templates (playlist ID -> public URL)
 PLATFORM_URL_TEMPLATES = {
     "tidal": "https://tidal.com/playlist/{id}",

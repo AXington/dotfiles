@@ -8,6 +8,7 @@ disturbing the scorers.
 Inputs are expected to be already normalized (see :mod:`matching.normalize`);
 ``ratio`` performs no normalization of its own so callers stay in control.
 """
+
 from difflib import SequenceMatcher
 
 

@@ -35,8 +35,18 @@ def _get_ytm_credentials() -> tuple[str, str]:
     # Try 1Password CLI
     try:
         result = subprocess.run(
-            ["op", "item", "get", _OP_ITEM_TITLE, "--fields", "credential,Section_Additional.client_secret", "--reveal"],
-            capture_output=True, text=True, timeout=10,
+            [
+                "op",
+                "item",
+                "get",
+                _OP_ITEM_TITLE,
+                "--fields",
+                "credential,Section_Additional.client_secret",
+                "--reveal",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         if result.returncode == 0:
             parts = result.stdout.strip().split(",")
@@ -56,10 +66,12 @@ def _get_oauth_credentials():
     client_id, client_secret = _get_ytm_credentials()
     try:
         from ytmusicapi import OAuthCredentials
+
         return OAuthCredentials(client_id=client_id, client_secret=client_secret)
     except ImportError:
         try:
             from ytmusicapi.auth.oauth import OAuthCredentials
+
             return OAuthCredentials(client_id=client_id, client_secret=client_secret)
         except (ImportError, TypeError):
             return None
@@ -91,6 +103,7 @@ class YTMusicClient:
             return False
         try:
             import json
+
             token_data = json.loads(self._token_path.read_text())
             self._access_token = token_data.get("access_token")
             self._refresh_token = token_data.get("refresh_token")
@@ -99,7 +112,10 @@ class YTMusicClient:
             # Unauthenticated YTMusic instance for search only
             self._yt = YTMusic()
         except (json.JSONDecodeError, KeyError, OSError) as exc:
-            print(f"  ytmusic: session load failed ({type(exc).__name__}: {exc})", file=__import__('sys').stderr)
+            print(
+                f"  ytmusic: session load failed ({type(exc).__name__}: {exc})",
+                file=__import__("sys").stderr,
+            )
             return False
         self._fix_token_perms()
         return True
@@ -113,29 +129,43 @@ class YTMusicClient:
         """Refresh OAuth token if expired."""
         import json
         import time
+
         token_data = json.loads(self._token_path.read_text())
         expires_at = token_data.get("expires_at", 0)
         if time.time() < expires_at - 60:
             return
         client_id, client_secret = _get_ytm_credentials()
         import requests as req
-        resp = req.post("https://oauth2.googleapis.com/token", data={
-            "client_id": client_id,
-            "client_secret": client_secret,
-            "refresh_token": self._refresh_token,
-            "grant_type": "refresh_token",
-        })
+
+        resp = req.post(
+            "https://oauth2.googleapis.com/token",
+            data={
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "refresh_token": self._refresh_token,
+                "grant_type": "refresh_token",
+            },
+        )
         if resp.status_code == 200:
             new_data = resp.json()
             self._access_token = new_data["access_token"]
             token_data["access_token"] = new_data["access_token"]
-            token_data["expires_at"] = int(time.time()) + new_data.get("expires_in", 3600)
+            token_data["expires_at"] = int(time.time()) + new_data.get(
+                "expires_in", 3600
+            )
             self._token_path.write_text(json.dumps(token_data))
             self._fix_token_perms()
 
-    def _data_api(self, method: str, endpoint: str, params: dict | None = None, json_body: dict | None = None) -> dict:
+    def _data_api(
+        self,
+        method: str,
+        endpoint: str,
+        params: dict | None = None,
+        json_body: dict | None = None,
+    ) -> dict:
         """Make a YouTube Data API v3 call."""
         import requests as req
+
         self._rate_limiter.wait()
         url = f"https://www.googleapis.com/youtube/v3/{endpoint}"
         headers = self._auth_headers()
@@ -150,7 +180,9 @@ class YTMusicClient:
     def search_track(self, query: str, limit: int = 10) -> list[TrackResult]:
         """Search YT Music songs by text (uses unauthenticated ytmusicapi)."""
         ytmusic = self._ensure_session()
-        items = self._call_api(lambda: ytmusic.search(query, filter="songs", limit=limit))
+        items = self._call_api(
+            lambda: ytmusic.search(query, filter="songs", limit=limit)
+        )
         return [self._to_result(item) for item in items if item.get("videoId")]
 
     def search_isrc(self, isrc: str) -> TrackResult | None:
@@ -160,7 +192,9 @@ class YTMusicClient:
     def search_album(self, query: str, limit: int = 5) -> list[AlbumResult]:
         """Search for albums on YouTube Music."""
         ytmusic = self._ensure_session()
-        items = self._call_api(lambda: ytmusic.search(query, filter="albums", limit=limit))
+        items = self._call_api(
+            lambda: ytmusic.search(query, filter="albums", limit=limit)
+        )
         results: list[AlbumResult] = []
         for item in items:
             browse_id = item.get("browseId", "")
@@ -168,13 +202,15 @@ class YTMusicClient:
                 continue
             artists = item.get("artists", [])
             artist_name = artists[0]["name"] if artists else ""
-            results.append(AlbumResult(
-                platform_id=browse_id,
-                title=item.get("title", ""),
-                artist=artist_name,
-                track_count=0,
-                release_year=_parse_year(item.get("year")),
-            ))
+            results.append(
+                AlbumResult(
+                    platform_id=browse_id,
+                    title=item.get("title", ""),
+                    artist=artist_name,
+                    track_count=0,
+                    release_year=_parse_year(item.get("year")),
+                )
+            )
         return results
 
     def get_album_tracks(self, album_id: str) -> list[TrackResult]:
@@ -187,16 +223,20 @@ class YTMusicClient:
     def search_artist(self, query: str, limit: int = 3) -> list[ArtistResult]:
         """Search for artists on YouTube Music."""
         ytmusic = self._ensure_session()
-        items = self._call_api(lambda: ytmusic.search(query, filter="artists", limit=limit))
+        items = self._call_api(
+            lambda: ytmusic.search(query, filter="artists", limit=limit)
+        )
         results: list[ArtistResult] = []
         for item in items:
             browse_id = item.get("browseId", "")
             if not browse_id:
                 continue
-            results.append(ArtistResult(
-                platform_id=browse_id,
-                name=item.get("artist", item.get("title", "")),
-            ))
+            results.append(
+                ArtistResult(
+                    platform_id=browse_id,
+                    name=item.get("artist", item.get("title", "")),
+                )
+            )
         return results
 
     def get_artist_albums(self, artist_id: str, limit: int = 20) -> list[AlbumResult]:
@@ -210,13 +250,15 @@ class YTMusicClient:
             browse_id = album.get("browseId", "")
             if not browse_id:
                 continue
-            results.append(AlbumResult(
-                platform_id=browse_id,
-                title=album.get("title", ""),
-                artist=artist_data.get("name", ""),
-                track_count=0,
-                release_year=_parse_year(album.get("year")),
-            ))
+            results.append(
+                AlbumResult(
+                    platform_id=browse_id,
+                    title=album.get("title", ""),
+                    artist=artist_data.get("name", ""),
+                    track_count=0,
+                    release_year=_parse_year(album.get("year")),
+                )
+            )
         return results
 
     def get_track(self, track_id: str) -> TrackResult | None:
@@ -240,7 +282,11 @@ class YTMusicClient:
     def get_playlist(self, playlist_id: str) -> PlaylistInfo | None:
         """Return playlist metadata via Data API v3."""
         try:
-            data = self._data_api("get", "playlists", params={"part": "snippet,contentDetails", "id": playlist_id})
+            data = self._data_api(
+                "get",
+                "playlists",
+                params={"part": "snippet,contentDetails", "id": playlist_id},
+            )
         except (OSError, RuntimeError, KeyError, ValueError):
             return None
         items = data.get("items", [])
@@ -256,21 +302,29 @@ class YTMusicClient:
     def get_playlist_tracks(self, playlist_id: str) -> list[TrackResult]:
         """Return all tracks in the playlist via Data API v3."""
         results: list[TrackResult] = []
-        params: dict[str, Any] = {"part": "snippet", "playlistId": playlist_id, "maxResults": 50}
+        params: dict[str, Any] = {
+            "part": "snippet",
+            "playlistId": playlist_id,
+            "maxResults": 50,
+        }
         while True:
             data = self._data_api("get", "playlistItems", params=params)
             for item in data.get("items", []):
                 snippet = item["snippet"]
                 video_id = snippet.get("resourceId", {}).get("videoId", "")
                 if video_id:
-                    results.append(TrackResult(
-                        platform_id=video_id,
-                        title=snippet.get("title", ""),
-                        artist=snippet.get("videoOwnerChannelTitle", "").removesuffix(" - Topic"),
-                        album="",
-                        duration_seconds=0,
-                        isrc=None,
-                    ))
+                    results.append(
+                        TrackResult(
+                            platform_id=video_id,
+                            title=snippet.get("title", ""),
+                            artist=snippet.get(
+                                "videoOwnerChannelTitle", ""
+                            ).removesuffix(" - Topic"),
+                            album="",
+                            duration_seconds=0,
+                            isrc=None,
+                        )
+                    )
             next_page = data.get("nextPageToken")
             if not next_page:
                 break
@@ -279,10 +333,15 @@ class YTMusicClient:
 
     def create_playlist(self, name: str, description: str = "") -> PlaylistInfo:
         """Create a YT Music playlist via Data API v3."""
-        data = self._data_api("post", "playlists", params={"part": "snippet,status"}, json_body={
-            "snippet": {"title": name, "description": description or " "},
-            "status": {"privacyStatus": "private"},
-        })
+        data = self._data_api(
+            "post",
+            "playlists",
+            params={"part": "snippet,status"},
+            json_body={
+                "snippet": {"title": name, "description": description or " "},
+                "status": {"privacyStatus": "private"},
+            },
+        )
         playlist_id = data["id"]
         return PlaylistInfo(platform_id=playlist_id, name=name, num_tracks=0)
 
@@ -293,12 +352,20 @@ class YTMusicClient:
         added = 0
         for video_id in track_ids:
             try:
-                self._data_api("post", "playlistItems", params={"part": "snippet"}, json_body={
-                    "snippet": {
-                        "playlistId": playlist_id,
-                        "resourceId": {"kind": "youtube#video", "videoId": video_id},
+                self._data_api(
+                    "post",
+                    "playlistItems",
+                    params={"part": "snippet"},
+                    json_body={
+                        "snippet": {
+                            "playlistId": playlist_id,
+                            "resourceId": {
+                                "kind": "youtube#video",
+                                "videoId": video_id,
+                            },
+                        },
                     },
-                })
+                )
                 added += 1
             except req.HTTPError as exc:
                 status = exc.response.status_code if exc.response is not None else 0
@@ -314,7 +381,11 @@ class YTMusicClient:
             return 0
         # Fetch all playlist item IDs
         item_ids: list[str] = []
-        params: dict[str, Any] = {"part": "id", "playlistId": playlist_id, "maxResults": 50}
+        params: dict[str, Any] = {
+            "part": "id",
+            "playlistId": playlist_id,
+            "maxResults": 50,
+        }
         while True:
             data = self._data_api("get", "playlistItems", params=params)
             for item in data.get("items", []):
@@ -336,7 +407,11 @@ class YTMusicClient:
         import requests as req
 
         # Remove all existing items
-        params: dict[str, Any] = {"part": "id", "playlistId": playlist_id, "maxResults": 50}
+        params: dict[str, Any] = {
+            "part": "id",
+            "playlistId": playlist_id,
+            "maxResults": 50,
+        }
         try:
             while True:
                 data = self._data_api("get", "playlistItems", params=params)
@@ -345,9 +420,13 @@ class YTMusicClient:
                     break
                 for item in items:
                     try:
-                        self._data_api("delete", "playlistItems", params={"id": item["id"]})
+                        self._data_api(
+                            "delete", "playlistItems", params={"id": item["id"]}
+                        )
                     except req.HTTPError as exc:
-                        status = exc.response.status_code if exc.response is not None else 0
+                        status = (
+                            exc.response.status_code if exc.response is not None else 0
+                        )
                         if status == 404:
                             continue
                         raise
@@ -363,7 +442,11 @@ class YTMusicClient:
 
     def find_playlist_by_name(self, name: str) -> PlaylistInfo | None:
         """Find a playlist by name in the user's library via Data API v3."""
-        params: dict[str, Any] = {"part": "snippet,contentDetails", "mine": "true", "maxResults": 50}
+        params: dict[str, Any] = {
+            "part": "snippet,contentDetails",
+            "mine": "true",
+            "maxResults": 50,
+        }
         while True:
             data = self._data_api("get", "playlists", params=params)
             for item in data.get("items", []):
@@ -393,6 +476,7 @@ class YTMusicClient:
         client_id, client_secret = _get_ytm_credentials()
         if hasattr(ytmusicapi, "setup_oauth"):
             import inspect
+
             sig = inspect.signature(ytmusicapi.setup_oauth)
             if "client_id" in sig.parameters:
                 ytmusicapi.setup_oauth(
@@ -402,7 +486,9 @@ class YTMusicClient:
                     open_browser=True,
                 )
             else:
-                ytmusicapi.setup_oauth(filepath=str(self._token_path), open_browser=True)
+                ytmusicapi.setup_oauth(
+                    filepath=str(self._token_path), open_browser=True
+                )
             return
         if hasattr(YTMusic, "setup"):
             YTMusic.setup(filepath=str(self._token_path))

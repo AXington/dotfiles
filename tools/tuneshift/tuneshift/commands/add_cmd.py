@@ -3,6 +3,7 @@
 Library-first (AC-D7): resolution/enrichment and any remote push are deferred to
 the async resolution worker; the interactive add path never blocks on network.
 """
+
 import sys
 
 from tuneshift.db import Database
@@ -13,11 +14,12 @@ def handle_add(args, db: Database) -> int:
     """Add a track to a playlist."""
     # Check banned artists BEFORE doing anything
     from tuneshift.commands.batch_cmd import check_track_against_bans
+
     banned = check_track_against_bans(db, args.title, args.artist)
     if banned:
         print(
-            f"Blocked: \"{args.title}\" by {args.artist} "
-            f"includes banned artist \"{banned}\".",
+            f'Blocked: "{args.title}" by {args.artist} '
+            f'includes banned artist "{banned}".',
             file=sys.stderr,
         )
         return 1
@@ -59,7 +61,7 @@ def handle_add(args, db: Database) -> int:
         position = row[0] if row else None
         db.transfer_pins(playlist_id, old_track.id, track_id)
         db.remove_track_from_playlist(playlist_id, old_track.id)
-        
+
         # After removal, positions are renumbered. Get current track list and insert at old position
         track_ids = db.get_playlist_track_ids(playlist_id)
         track_ids.insert(position, track_id)
@@ -70,7 +72,9 @@ def handle_add(args, db: Database) -> int:
         position = len(tracks) + 1
         db.add_track_to_playlist(playlist_id, track_id, position)
 
-    print(f"Added \"{args.title}\" by {args.artist} to \"{args.playlist}\" at position {position}")
+    print(
+        f'Added "{args.title}" by {args.artist} to "{args.playlist}" at position {position}'
+    )
 
     # Library-first (AC-D7): enqueue async resolution + enrichment instead of
     # blocking the interactive add path on MusicBrainz/LLM/remote calls. The
@@ -85,7 +89,9 @@ def handle_add(args, db: Database) -> int:
     return 0
 
 
-def _sync_add_to_platforms(db: Database, playlist_id: int, track_id: int, title: str, artist: str) -> bool:
+def _sync_add_to_platforms(
+    db: Database, playlist_id: int, track_id: int, title: str, artist: str
+) -> bool:
     """Reconcile and add the track on all linked platforms.
 
     Returns True if any platform operation failed.
@@ -116,8 +122,12 @@ def _sync_add_to_platforms(db: Database, playlist_id: int, track_id: int, title:
             continue
 
         # Reconcile the track
-        result = reconcile_track(db, track_id, client, force=False, playlist_id=playlist_id)
-        db.save_match_audit(track_id, platform_name, result.audit, playlist_id=playlist_id)
+        result = reconcile_track(
+            db, track_id, client, force=False, playlist_id=playlist_id
+        )
+        db.save_match_audit(
+            track_id, platform_name, result.audit, playlist_id=playlist_id
+        )
         if result.platform_track_id:
             try:
                 client.add_tracks(platform_playlist_id, [result.platform_track_id])
@@ -127,7 +137,7 @@ def _sync_add_to_platforms(db: Database, playlist_id: int, track_id: int, title:
                 print(f"  {platform_name}: failed ({exc})", file=sys.stderr)
                 failures = True
         else:
-            print(f"  {platform_name}: could not find \"{title}\" by {artist}")
+            print(f'  {platform_name}: could not find "{title}" by {artist}')
 
     return failures
 
@@ -140,5 +150,6 @@ def _auto_reorder(db: Database, playlist_id: int) -> None:
     ).fetchone()
     if row and row[0]:
         from tuneshift.sequencer.optimizer import sequence_playlist
+
         arc = row[1] or "wave"
         sequence_playlist(db, playlist_id, arc=arc)

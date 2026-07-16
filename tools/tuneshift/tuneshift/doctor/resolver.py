@@ -29,8 +29,13 @@ DEFAULT_CONFIDENCE_THRESHOLD = 70
 _RECONCILE_ISSUES = ("unavailable", "version_mismatch", "unmapped")
 
 
-def resolve_item(db: Database, client, item: PlanItem, *,
-                 threshold: int = DEFAULT_CONFIDENCE_THRESHOLD) -> PlanItem:
+def resolve_item(
+    db: Database,
+    client,
+    item: PlanItem,
+    *,
+    threshold: int = DEFAULT_CONFIDENCE_THRESHOLD,
+) -> PlanItem:
     """Fill in the proposed fix for a single plan item (mutates and returns it)."""
     if item.issue == "duplicate":
         # Scanner already set keep/merge; nothing to search.
@@ -50,7 +55,10 @@ def resolve_item(db: Database, client, item: PlanItem, *,
     if item.issue in _RECONCILE_ISSUES:
         _playlist = db.find_playlist_by_name(item.playlist) if item.playlist else None
         result = reconcile_track(
-            db, item.track_id, client, force=True,
+            db,
+            item.track_id,
+            client,
+            force=True,
             playlist_id=_playlist.id if _playlist else None,
         )
         db.save_match_audit(item.track_id, client.platform_name, result.audit)
@@ -62,6 +70,7 @@ def resolve_item(db: Database, client, item: PlanItem, *,
             # "platform can't distinguish" so the human knows what to do next.
             if result.audit is not None:
                 from tuneshift.matching import describe_reason
+
                 detail = describe_reason(result.audit.reason_code)
             else:
                 detail = "no candidate found"
@@ -74,11 +83,14 @@ def resolve_item(db: Database, client, item: PlanItem, *,
         item.confidence = int(result.score)
 
         # A proposal identical to the current mapping is not a fix.
-        if (item.current_platform_id
-                and item.proposed_platform_id == item.current_platform_id):
+        if (
+            item.current_platform_id
+            and item.proposed_platform_id == item.current_platform_id
+        ):
             item.resolution = "manual"
-            item.note = (item.note + "; " if item.note else "") + \
-                "best candidate is the current mapping"
+            item.note = (
+                item.note + "; " if item.note else ""
+            ) + "best candidate is the current mapping"
             return item
 
         item.resolution = "auto" if item.confidence >= threshold else "manual"
@@ -89,15 +101,24 @@ def resolve_item(db: Database, client, item: PlanItem, *,
     return item
 
 
-def resolve_all(db: Database, client, items: list[PlanItem], *,
-                threshold: int = DEFAULT_CONFIDENCE_THRESHOLD,
-                quiet: bool = False) -> list[PlanItem]:
+def resolve_all(
+    db: Database,
+    client,
+    items: list[PlanItem],
+    *,
+    threshold: int = DEFAULT_CONFIDENCE_THRESHOLD,
+    quiet: bool = False,
+) -> list[PlanItem]:
     """Resolve every item in place. Returns the same list for convenience."""
     total = len(items)
     for i, item in enumerate(items):
         if not quiet:
-            print(f"  Resolving [{i + 1}/{total}] {item.title} - {item.artist}...",
-                  end="\r", file=sys.stderr, flush=True)
+            print(
+                f"  Resolving [{i + 1}/{total}] {item.title} - {item.artist}...",
+                end="\r",
+                file=sys.stderr,
+                flush=True,
+            )
         resolve_item(db, client, item, threshold=threshold)
     if not quiet and total:
         print(file=sys.stderr)

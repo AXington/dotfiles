@@ -5,6 +5,7 @@ track and a ``--strip-album-from-title`` cleanup that removes a trailing
 parenthetical when it merely repeats the track's album name. ``--dry-run``
 previews every change without writing.
 """
+
 import re
 import sys
 
@@ -74,7 +75,7 @@ def _handle_field_edit(args, db: Database) -> int:
     if changed == 0:
         print(f"Track {track_id} already has those values; nothing changed.")
     else:
-        print(f'Updated track {track_id} ({changed} field(s) changed).')
+        print(f"Updated track {track_id} ({changed} field(s) changed).")
     return 0
 
 

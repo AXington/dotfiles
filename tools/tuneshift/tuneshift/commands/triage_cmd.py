@@ -10,6 +10,7 @@ It is read-only: it shows what needs deciding and where, so a reviewer can act
 in bulk (e.g. via ``tuneshift map`` / ``tuneshift edit``) instead of answering N
 identical prompts mid-sync.
 """
+
 import sys
 
 from tuneshift.db import Database
@@ -39,13 +40,18 @@ def handle_triage(args, db: Database) -> int:
         clusters = cluster_reviews(items)
 
         scope = f'"{args.playlist}"' if playlist_id is not None else "all playlists"
-        print(f"Review burden for {scope}"
-              + (f" on {platform}" if platform else "") + ":")
-        print(f"  {burden.needs_review} of {burden.total_tracks} tracks need review "
-              f"({burden.per_1000:g} per 1,000)")
+        print(
+            f"Review burden for {scope}" + (f" on {platform}" if platform else "") + ":"
+        )
+        print(
+            f"  {burden.needs_review} of {burden.total_tracks} tracks need review "
+            f"({burden.per_1000:g} per 1,000)"
+        )
         print(f"    ambiguous: {burden.ambiguous}   hard-fail: {burden.hard_fail}")
-        print(f"  zero-intervention playlists: {burden.zero_intervention_playlists}"
-              f"/{burden.total_playlists} ({burden.zero_intervention_pct:g}%)")
+        print(
+            f"  zero-intervention playlists: {burden.zero_intervention_playlists}"
+            f"/{burden.total_playlists} ({burden.zero_intervention_pct:g}%)"
+        )
 
         if clusters:
             print(f"\n{len(clusters)} cluster(s), largest first:\n")
@@ -58,8 +64,10 @@ def handle_triage(args, db: Database) -> int:
             print("\nNothing to review — every track resolved cleanly.")
 
     if quarantined:
-        print(f"\nQuarantined ({len(quarantined)}) — "
-              "excluded from selection until resolved or approved:")
+        print(
+            f"\nQuarantined ({len(quarantined)}) — "
+            "excluded from selection until resolved or approved:"
+        )
         for q in quarantined:
             reason = f": {q['reason']}" if q["reason"] else ""
             print(f"  #{q['track_id']} {q['title']} — {q['artist']}{reason}")

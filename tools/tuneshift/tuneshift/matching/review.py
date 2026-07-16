@@ -18,6 +18,7 @@ This module turns raw per-track outcomes into:
 It is pure logic over plain data objects so it is trivially testable and has no
 DB or network dependency; callers (the ``review`` command) supply the items.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -133,7 +134,9 @@ def cluster_reviews(items: list[ReviewItem]) -> list[ReviewCluster]:
         key = (item.reason_code, normalize_artist(item.artist or ""))
         cluster = grouped.get(key)
         if cluster is None:
-            cluster = ReviewCluster(reason_code=item.reason_code, artist=item.artist or "")
+            cluster = ReviewCluster(
+                reason_code=item.reason_code, artist=item.artist or ""
+            )
             grouped[key] = cluster
         cluster.items.append(item)
     return sorted(

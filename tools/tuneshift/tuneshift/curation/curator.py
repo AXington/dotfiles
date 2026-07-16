@@ -1,8 +1,10 @@
 """Curation engine: trim and analyze playlist contents."""
+
 from dataclasses import dataclass, field
-from tuneshift.sequencer.metadata import TrackMetadata
+
 from tuneshift.curation.context import PlaylistContext
 from tuneshift.curation.scoring import score_track_contribution
+from tuneshift.sequencer.metadata import TrackMetadata
 
 
 @dataclass
@@ -55,7 +57,10 @@ def curate_trim(
     # Apply track count limit
     keep_count = min(hard_limit_count, len(scored))
     if target_count:
-        keep_count = min(keep_count, target_count + (constraints.get("track_count", {}).get("tolerance", 0)))
+        keep_count = min(
+            keep_count,
+            target_count + (constraints.get("track_count", {}).get("tolerance", 0)),
+        )
 
     keep = [t for t, _ in scored[:keep_count]]
     cut = [t for t in tracks if t not in keep]
