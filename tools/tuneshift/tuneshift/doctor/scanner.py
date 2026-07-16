@@ -81,7 +81,10 @@ def _has_extra_version_keyword(canonical_title: str, platform_title: str) -> boo
 
 
 def detect_duplicates(
-    db: Database, tracks: list, playlist_name: str, next_id: int
+    db: Database,  # noqa: ARG001 - uniform detector signature
+    tracks: list,
+    playlist_name: str,
+    next_id: int,
 ) -> tuple[list[PlanItem], int]:
     """Detect canonical tracks that collapse to the same normalized identity.
 

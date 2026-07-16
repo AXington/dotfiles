@@ -2,7 +2,7 @@
 
 The legacy version scorer only inspected the *candidate*: it penalised any
 result whose title/album carried a "version" keyword (live, karaoke, ...).
-That is wrong when the SOURCE is itself a live/karaoke/etc. recording — the
+That is wrong when the SOURCE is itself a live/karaoke/etc. recording, the
 correct match then *shares* that class and must NOT be penalised, while the
 studio master becomes the substitute.
 
@@ -12,7 +12,7 @@ track and each candidate, then compares them *asymmetrically*:
 * studio source + non-studio candidate  -> REJECT   (wrong recording)
 * live source   + live candidate         -> MATCH
 * live source   + studio candidate        -> SUBSTITUTE (fallback recording)
-* live source   + karaoke candidate       -> REJECT   (two different non-studio recordings)
+* live source   + karaoke candidate    -> REJECT   (two different non-studio recordings)
 * remaster of the same recording          -> SOFT     (cosmetic, same take)
 * explicit source + clean candidate        -> REJECT   (censored lyrics differ)
 

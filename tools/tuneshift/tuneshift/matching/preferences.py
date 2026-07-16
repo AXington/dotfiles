@@ -168,11 +168,11 @@ def scoring_intent(
     Each returned set unions three axes the scorer understands, all of which
     share a disjoint token space so a single set is unambiguous:
 
-    * recording classes (``live``, ``remix``, ``acoustic``, ...) — consumed by
+    * recording classes (``live``, ``remix``, ``acoustic``, ...), consumed by
       :func:`~tuneshift.matching.version.compare_version`;
-    * lyric tokens (``clean``, ``explicit``) — also consumed by
+    * lyric tokens (``clean``, ``explicit``), also consumed by
       ``compare_version``;
-    * edition buckets (``radio_edit``, ``deluxe``, ``compilation``) — consumed
+    * edition buckets (``radio_edit``, ``deluxe``, ``compilation``), consumed
       by the residual edition penalties in :mod:`tuneshift.matching.penalties`.
 
     Callers are responsible for the default no-op guard (an all-default

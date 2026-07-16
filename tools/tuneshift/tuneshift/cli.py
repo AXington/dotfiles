@@ -61,7 +61,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--apply",
         action="store_true",
         help="Build and apply the push in one step (default writes a plan and "
-        "pushes nothing — AC-P1)",
+        "pushes nothing - AC-P1)",
     )
     p_sync.add_argument(
         "--interactive",
@@ -209,12 +209,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_enrich.add_argument(
         "--all",
         action="store_true",
-        help="Enrich Tidal catalog metadata for every playlist (slow, retries on rate limits)",
+        help="Enrich Tidal catalog metadata for every playlist (slow, retries on rate limits)",  # noqa: E501
     )
     p_enrich.add_argument(
         "--catalog",
         action="store_true",
-        help="Fetch Tidal catalog metadata (Atmos, release year, genres, quality) with retry",
+        help="Fetch Tidal catalog metadata (Atmos, release year, genres, quality) with retry",  # noqa: E501
     )
     p_enrich.add_argument(
         "--platform", default=None, help="Source platform for audio metadata (BPM, key)"
@@ -234,7 +234,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--max-retries",
         type=int,
         default=3,
-        help="Max retry attempts per track on rate limit/transient errors (default: 3, 0 = skip on error)",
+        help="Max retry attempts per track on rate limit/transient errors (default: 3, 0 = skip on error)",  # noqa: E501
     )
     p_enrich.add_argument(
         "--refresh", action="store_true", help="Re-fetch even if metadata is cached"
@@ -284,7 +284,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--override",
         action="append",
         metavar="ITEM_ID=TIDAL_ID",
-        help="With --apply: override an item's fix (remap id, or keep-track id for duplicates)",
+        help="With --apply: override an item's fix (remap id, or keep-track id for duplicates)",  # noqa: E501
     )
     p_doctor.add_argument(
         "--no-sync",
@@ -381,7 +381,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--ytmusic", action="store_true", help="Remove YouTube Music mapping"
     )
 
-    # lock — routed identity lock (global default or per-playlist override)
+    # lock - routed identity lock (global default or per-playlist override)
     p_lock = sub.add_parser(
         "lock",
         help="Lock a track to a specific platform release (routed via plan/apply)",
@@ -421,7 +421,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Step through the change before applying",
     )
 
-    # unlock — release an identity lock (global default or per-playlist override)
+    # unlock - release an identity lock (global default or per-playlist override)
     p_unlock = sub.add_parser(
         "unlock", help="Release an identity lock (routed via plan/apply)"
     )
@@ -590,12 +590,12 @@ def build_parser() -> argparse.ArgumentParser:
         "key",
         nargs="?",
         help="criterion axis (spatial/mix/fidelity/performance/content/edit/"
-        "production) — or legacy version.<field>",
+        "production) - or legacy version.<field>",
     )
     p_prefs.add_argument(
         "value",
         nargs="?",
-        help="strength (require/prefer/avoid/forbid) — or legacy value",
+        help="strength (require/prefer/avoid/forbid) - or legacy value",
     )
     p_prefs.add_argument(
         "target",
@@ -1151,7 +1151,7 @@ def _handle_analyze(args, db) -> int:
 
     print(f"=== {playlist.name} ({result['total_tracks']} tracks) ===")
     print(
-        f"  Enriched: {result['enriched_tracks']}/{result['total_tracks']} tracks have platform metadata"
+        f"  Enriched: {result['enriched_tracks']}/{result['total_tracks']} tracks have platform metadata"  # noqa: E501
     )
     if result["era"]:
         print(f"  Era: {result['era']}")
@@ -1159,7 +1159,7 @@ def _handle_analyze(args, db) -> int:
         genre_str = ", ".join(f"{g} ({c})" for g, c in result["top_genres"])
         print(f"  Genres: {genre_str}")
     print(
-        f"  Quality: {result['atmos_pct']:.0f}% Atmos, {result['lossless_pct']:.0f}% lossless"
+        f"  Quality: {result['atmos_pct']:.0f}% Atmos, {result['lossless_pct']:.0f}% lossless"  # noqa: E501
     )
     if result["top_tags"]:
         tag_str = ", ".join(f"{t} ({c})" for t, c in result["top_tags"][:5])

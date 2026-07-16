@@ -76,7 +76,7 @@ def handle_link(args, db: Database) -> int:
             skipped += 1
 
     print(
-        f"\nDone: {linked} linked, {already} already linked, {skipped} not found on {platform}"
+        f"\nDone: {linked} linked, {already} already linked, {skipped} not found on {platform}"  # noqa: E501
     )
     return 0
 
@@ -99,7 +99,11 @@ def _load_client(platform_name: str):
 
 
 def _handle_manual_link(
-    args, db: Database, platform: str, playlist_name: str, url_or_id: str
+    args,  # noqa: ARG001 - required by CLI subcommand handler signature
+    db: Database,
+    platform: str,
+    playlist_name: str,
+    url_or_id: str,
 ) -> int:
     """Manually link a playlist to a platform URL or ID."""
     playlist = db.find_playlist_by_name(playlist_name)

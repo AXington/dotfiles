@@ -1,7 +1,7 @@
 """Match auditing and availability model for the reconcile pipeline.
 
 This module makes matching *explainable*. Every reconcile decision can be
-captured as a :class:`MatchAudit` — what was chosen, what was rejected and why,
+captured as a :class:`MatchAudit`, what was chosen, what was rejected and why,
 which signal was decisive, and whether a durable lock forced the outcome. The
 ``tuneshift explain`` command surfaces this record so a human can see exactly why
 the engine picked (or refused to pick) a platform track.
@@ -32,13 +32,13 @@ class Availability:
     #: The requested recording is available and was matched.
     EXACT_AVAILABLE = "exact_available"
     #: The recording is known to the platform but blocked here (region/tier).
-    #: NOT the same as "does not exist" — it is held, never silently dropped.
+    #: NOT the same as "does not exist" - it is held, never silently dropped.
     EXACT_UNAVAILABLE = "exact_unavailable"
     #: The exact recording was not available, but an acceptable fallback
     #: (e.g. the studio master for a live source) is and was surfaced.
     SUBSTITUTE_AVAILABLE = "substitute_available"
     #: The platform cannot distinguish blocked-vs-absent (YT Music), or the top
-    #: candidates are too close to choose confidently — needs human review.
+    #: candidates are too close to choose confidently - needs human review.
     AMBIGUOUS = "ambiguous"
     #: Genuinely no acceptable candidate on a platform we *can* trust.
     NOT_FOUND = "not_found"
@@ -70,7 +70,7 @@ class ReasonCode:
     NO_CANDIDATES = "no_candidates"
     #: Candidates existed but all scored below the acceptance threshold.
     ALL_BELOW_THRESHOLD = "all_below_threshold"
-    #: The best candidate was the wrong recording class (live/karaoke/cover…).
+    #: The best candidate was the wrong recording class (live/karaoke/cover...).
     VERSION_REJECTED = "version_rejected"
     #: The exact recording exists but is blocked in this market/region.
     BLOCKED_IN_MARKET = "blocked_in_market"
@@ -95,7 +95,7 @@ class RejectedCandidate:
     """A candidate that was not chosen, with the reason it lost.
 
     ``decisive_signal`` is the name of the signal that most hurt this candidate
-    (e.g. ``version:reject``, ``duration``, ``title``) — the single most useful
+    (e.g. ``version:reject``, ``duration``, ``title``), the single most useful
     thing to show a human asking "why not this one?". ``rejection`` is the
     machine-stable *class* of that loss for the failed-match explain surface
     (AC-CLI5): ``unavailable`` (blocked/tier-gated), ``hard_filter`` (failed an
@@ -134,13 +134,13 @@ class RejectedCandidate:
 class CriterionOutcome:
     """An active user-preference criterion and how it acted in this decision.
 
-    ``kind`` is ``hard`` (require/forbid — a Phase-1 filter) or ``soft``
-    (prefer/avoid — a Phase-2 ranking bias). ``fired`` is True when the criterion
-    actually affected the outcome: a hard criterion that eliminated ≥1 candidate,
+    ``kind`` is ``hard`` (require/forbid, a Phase-1 filter) or ``soft``
+    (prefer/avoid, a Phase-2 ranking bias). ``fired`` is True when the criterion
+    actually affected the outcome: a hard criterion that eliminated >=1 candidate,
     or a soft criterion that broke the winning tie. A hard criterion that
     eliminated nothing (e.g. every candidate already satisfied it, or none could
     be judged) is recorded with ``fired=False`` so the explain surface shows it
-    was in force yet inert — the "mono demoted to soft" transparency (AC-CLI3).
+    was in force yet inert, the "mono demoted to soft" transparency (AC-CLI3).
     """
 
     criterion: str
@@ -200,7 +200,7 @@ class MatchAudit:
     ``criteria`` records the active user-preference criteria (hard vs soft, and
     whether each fired), ``signal_breakdown`` the winner's weighted per-signal
     distance breakdown, and ``tie_break`` the preference criterion that resolved
-    a within-delta contention by precedence — together the AC-CLI3 match
+    a within-delta contention by precedence, together the AC-CLI3 match
     explanation. The per-candidate ``rejection`` fields drive the AC-CLI5
     failed-match explanation.
     """
@@ -265,21 +265,21 @@ _REASON_TEXT = {
     ReasonCode.LOCKED: "a durable lock decided this",
     ReasonCode.NO_CANDIDATES: "no candidate returned by any search strategy",
     ReasonCode.ALL_BELOW_THRESHOLD: "candidates existed but all scored too low",
-    ReasonCode.VERSION_REJECTED: "the best candidate was the wrong version (live/cover/karaoke/…)",
-    ReasonCode.BLOCKED_IN_MARKET: "the exact recording exists but is blocked in this market",
-    ReasonCode.TIER_RESTRICTED: "the exact recording exists but needs a higher subscription tier",
+    ReasonCode.VERSION_REJECTED: "the best candidate was the wrong version (live/cover/karaoke/...)",  # noqa: E501
+    ReasonCode.BLOCKED_IN_MARKET: "the exact recording exists but is blocked in this market",  # noqa: E501
+    ReasonCode.TIER_RESTRICTED: "the exact recording exists but needs a higher subscription tier",  # noqa: E501
     ReasonCode.AMBIGUOUS_TOP: "the top candidates were too close to choose confidently",
-    ReasonCode.PLATFORM_CANNOT_DISTINGUISH: "this platform can't tell blocked from absent",
+    ReasonCode.PLATFORM_CANNOT_DISTINGUISH: "this platform can't tell blocked from absent",  # noqa: E501
     ReasonCode.SUBSTITUTED: "an acceptable non-exact version was chosen as a fallback",
-    ReasonCode.LOCK_HEALED: "the locked track's id changed; re-bound to the same recording",
-    ReasonCode.LOCK_HELD: "the locked recording is gone; held rather than swapped to a different one",
+    ReasonCode.LOCK_HEALED: "the locked track's id changed; re-bound to the same recording",  # noqa: E501
+    ReasonCode.LOCK_HELD: "the locked recording is gone; held rather than swapped to a different one",  # noqa: E501
 }
 
 _AVAILABILITY_TEXT = {
     Availability.EXACT_AVAILABLE: "exact version available",
     Availability.EXACT_UNAVAILABLE: "exact version found but not playable",
     Availability.SUBSTITUTE_AVAILABLE: "substitute version available",
-    Availability.AMBIGUOUS: "ambiguous — needs review",
+    Availability.AMBIGUOUS: "ambiguous, needs review",
     Availability.NOT_FOUND: "not found",
 }
 

@@ -4,7 +4,7 @@ This is the user-facing surface of the plan/apply engine (ACs P1-P5). Mutating
 routes (``sync``, ``rematch``, ``migrate``) generate a durable plan file and
 apply NOTHING on their own (AC-P1). The plan can be inspected (``show``), pruned
 (``reject``), applied (``apply``, optionally ``--interactive`` / stepping
-accept-reject, AC-P2), and reversed (``rollback``, AC-P4 — local changes replay
+accept-reject, AC-P2), and reversed (``rollback``, AC-P4, local changes replay
 the journal; remote pushes yield a compensating plan).
 
 The broader per-command surface (prefs/lock/explain/triage) lands in Chunk 6;
@@ -52,7 +52,7 @@ def handle_plan(args, db: Database) -> int:
     handler = dispatch.get(action)
     if handler is None:
         print(
-            "Usage: tuneshift plan {sync|rematch|migrate|heal|list|show|reject|apply|rollback}",
+            "Usage: tuneshift plan {sync|rematch|migrate|heal|list|show|reject|apply|rollback}",  # noqa: E501
             file=sys.stderr,
         )
         return 1
@@ -174,7 +174,7 @@ def _generate_heal(args, db: Database) -> int:
 # --- plan inspection & editing -----------------------------------------------
 
 
-def _list(args, db: Database) -> int:
+def _list(args, db: Database) -> int:  # noqa: ARG001 - required by CLI subcommand handler signature
     ids = list_plans(db.path)
     if not ids:
         print("No saved plans.")
@@ -220,7 +220,7 @@ def _show(args, db: Database) -> int:
     plan = _load(db, args.plan_id)
     if plan is None:
         return 1
-    print(f"Plan {plan.plan_id} ({plan.kind}) — {plan.scope}")
+    print(f"Plan {plan.plan_id} ({plan.kind}) - {plan.scope}")
     for change in plan.changes:
         print(_format_change(change))
     return 0

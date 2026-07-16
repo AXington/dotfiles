@@ -1,4 +1,4 @@
-"""Plan/apply data model (§7, ACs P1-P5).
+"""Plan/apply data model (section 7, ACs P1-P5).
 
 A :class:`Plan` is what a mutating command produces instead of writing directly.
 It is a list of :class:`PlanChange` rows, each describing one row-level mutation
@@ -9,7 +9,7 @@ Design notes:
 
 - ``row_key`` is a stable JSON encoding of the target row's primary key. It is
   the join key between a plan change and its journal entry, so it must be
-  deterministic (sorted keys) — see :func:`row_key_for`.
+  deterministic (sorted keys), see :func:`row_key_for`.
 - ``locked`` marks a change that touches a ``user_approved``/locked row. Such
   changes are excluded from apply by default (AC-P3); an explicit opt-in is
   required to include them.

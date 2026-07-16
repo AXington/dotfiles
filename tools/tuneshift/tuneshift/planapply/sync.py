@@ -1,7 +1,7 @@
-"""ROUTED remote push for sync (§7.1 routing table, AC-P4 forward-only).
+"""ROUTED remote push for sync (section 7.1 routing table, AC-P4 forward-only).
 
 A ``sync`` pushes a playlist's reconciled ordered track list to a streaming
-platform. Under the plan/apply architecture that push is not performed inline —
+platform. Under the plan/apply architecture that push is not performed inline,
 it is a ``remote_push`` change the apply engine executes through a
 :data:`~tuneshift.planapply.apply.RemoteExecutor`, journaling it under a
 ``remote:`` table name. Remote pushes are forward-only: :func:`rollback_plan`

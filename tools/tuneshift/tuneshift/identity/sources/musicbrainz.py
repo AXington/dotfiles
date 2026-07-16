@@ -153,7 +153,7 @@ class MusicBrainzSource:
         when ``inc=work-rels`` was requested). The work-id ties covers and
         re-recordings of the same composition together and separates same-titled
         different songs. Returns ``None`` when no work relation is present (parity
-        rule §5.1) — MB work coverage is inconsistent, so absence is expected.
+        rule section 5.1), MB work coverage is inconsistent, so absence is expected.
         """
         for relation in recording.get("work-relation-list", []):
             work_id = relation.get("work", {}).get("id")
@@ -167,8 +167,8 @@ class MusicBrainzSource:
 
         Prefers the recording-level ``language`` (present when ``inc=language``
         was requested); falls back to the first related work's ``language``.
-        Returns ``None`` when neither is present — the criterion then emits no
-        verdict rather than fabricating a value (parity rule §5.1).
+        Returns ``None`` when neither is present, the criterion then emits no
+        verdict rather than fabricating a value (parity rule section 5.1).
         """
         language = recording.get("language")
         if language:
@@ -187,7 +187,8 @@ class MusicBrainzSource:
         ``artist-relation-list``, collects artists whose relation ``type`` is
         ``composer``. Multiple composers are joined with ``", "`` in first-seen
         order. Returns ``None`` when no composer relation is present (parity rule
-        §5.1) — this data is inconsistent in MB, so absence is expected, not a bug.
+        section 5.1), this data is inconsistent in MB, so absence is expected,
+        not a bug.
         """
         composers: list[str] = []
         for relation in recording.get("work-relation-list", []):

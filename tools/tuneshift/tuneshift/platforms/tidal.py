@@ -108,7 +108,7 @@ class TidalClient:
         return True
 
     def load_session(self) -> bool:
-        """Load a saved OAuth session from disk. Falls back to tidal-importer session."""
+        """Load a saved OAuth session from disk. Falls back to tidal-importer session."""  # noqa: E501
         token_path = self._token_path
         if not token_path.exists():
             # Fall back to legacy tidal-importer session
@@ -396,9 +396,9 @@ class TidalClient:
                     meta["key_scale"] = str(track.key_scale)
             if track.isrc:
                 meta["isrc"] = str(track.isrc)
-            # Native version/audio metadata (spec §4.2, BUILD-FIRST): these settle
+            # Native version/audio metadata (spec section 4.2, BUILD-FIRST): these settle  # noqa: E501
             # the Atmos/named-mix/fidelity axes without string-parsing. Read
-            # defensively — tidalapi may omit them on some tracks/versions.
+            # defensively - tidalapi may omit them on some tracks/versions.
             audio_modes = getattr(track, "audio_modes", None)
             if audio_modes:
                 meta["audio_modes"] = list(audio_modes)
@@ -441,9 +441,9 @@ class TidalClient:
         premium = getattr(track, "premium_streaming_only", None)
         pay = getattr(track, "pay_to_stream", None)
         tier_restricted = premium is True or pay is True
-        # Native version/audio metadata (spec §4.2, BUILD-FIRST): the SEARCH
+        # Native version/audio metadata (spec section 4.2, BUILD-FIRST): the SEARCH
         # path is the candidate source for matching, so preserve the same fields
-        # get_track_metadata captures — otherwise the Atmos/named-mix/fidelity
+        # get_track_metadata captures - otherwise the Atmos/named-mix/fidelity
         # axes are blind on every candidate. Read defensively; tidalapi omits
         # them on some tracks/versions.
         album = getattr(track, "album", None)

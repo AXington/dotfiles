@@ -36,12 +36,12 @@ def handle_curate(args, db: Database) -> int:
         print("Strongest tracks:")
         for entry in report.get("strongest", [])[:5]:
             print(
-                f"  {entry['title']} - {entry['artist']} (score: {entry['average']:.2f})"
+                f"  {entry['title']} - {entry['artist']} (score: {entry['average']:.2f})"  # noqa: E501
             )
         print("\nWeakest tracks:")
         for entry in report.get("weakest", [])[:5]:
             print(
-                f"  {entry['title']} - {entry['artist']} (score: {entry['average']:.2f})"
+                f"  {entry['title']} - {entry['artist']} (score: {entry['average']:.2f})"  # noqa: E501
             )
         return 0
 
@@ -71,7 +71,7 @@ def handle_curate(args, db: Database) -> int:
             new_order = [t.track_id for t in result.keep]
             db.set_playlist_tracks(pid, new_order)
             print(
-                f'Trimmed "{args.playlist}": kept {len(result.keep)}, removed {len(result.cut)} tracks.'
+                f'Trimmed "{args.playlist}": kept {len(result.keep)}, removed {len(result.cut)} tracks.'  # noqa: E501
             )
         return 0
 

@@ -56,20 +56,20 @@ def handle_triage(args, db: Database) -> int:
         if clusters:
             print(f"\n{len(clusters)} cluster(s), largest first:\n")
             for cluster in clusters:
-                print(f"  ▸ {cluster.summary}")
+                print(f"  - {cluster.summary}")
                 for item in cluster.items:
                     where = f" [{item.playlist_name}]" if item.playlist_name else ""
-                    print(f"      #{item.track_id} {item.title} — {item.artist}{where}")
+                    print(f"      #{item.track_id} {item.title} - {item.artist}{where}")
         else:
-            print("\nNothing to review — every track resolved cleanly.")
+            print("\nNothing to review - every track resolved cleanly.")
 
     if quarantined:
         print(
-            f"\nQuarantined ({len(quarantined)}) — "
+            f"\nQuarantined ({len(quarantined)}) - "
             "excluded from selection until resolved or approved:"
         )
         for q in quarantined:
             reason = f": {q['reason']}" if q["reason"] else ""
-            print(f"  #{q['track_id']} {q['title']} — {q['artist']}{reason}")
+            print(f"  #{q['track_id']} {q['title']} - {q['artist']}{reason}")
 
     return 0

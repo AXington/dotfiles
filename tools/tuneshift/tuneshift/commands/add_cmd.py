@@ -55,14 +55,14 @@ def handle_add(args, db: Database) -> int:
             return 1
         old_track = old_matches[0]
         row = db.conn.execute(
-            "SELECT position FROM playlist_tracks WHERE playlist_id = ? AND track_id = ?",
+            "SELECT position FROM playlist_tracks WHERE playlist_id = ? AND track_id = ?",  # noqa: E501
             (playlist_id, old_track.id),
         ).fetchone()
         position = row[0] if row else None
         db.transfer_pins(playlist_id, old_track.id, track_id)
         db.remove_track_from_playlist(playlist_id, old_track.id)
 
-        # After removal, positions are renumbered. Get current track list and insert at old position
+        # After removal, positions are renumbered. Get current track list and insert at old position  # noqa: E501
         track_ids = db.get_playlist_track_ids(playlist_id)
         track_ids.insert(position, track_id)
         db.set_playlist_tracks(playlist_id, track_ids)
@@ -73,7 +73,7 @@ def handle_add(args, db: Database) -> int:
         db.add_track_to_playlist(playlist_id, track_id, position)
 
     print(
-        f'Added "{args.title}" by {args.artist} to "{args.playlist}" at position {position}'
+        f'Added "{args.title}" by {args.artist} to "{args.playlist}" at position {position}'  # noqa: E501
     )
 
     # Library-first (AC-D7): enqueue async resolution + enrichment instead of
@@ -96,7 +96,7 @@ def _sync_add_to_platforms(
 
     Returns True if any platform operation failed.
 
-    NOTE (library-first, AC-D7): no longer called inline from ``handle_add`` —
+    NOTE (library-first, AC-D7): no longer called inline from ``handle_add``,
     the add path is non-blocking and never pushes remotely. This remote-push
     logic is retained here (and covered by ``test_sync_persist_order``) because
     Chunk 4 Task 4.6 relocates it into the plan/apply pipeline; it is not dead

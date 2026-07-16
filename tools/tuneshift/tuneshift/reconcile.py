@@ -132,7 +132,7 @@ def _candidate_blocked(result: TrackResult) -> str | None:
 
     Uses the availability signal we now retain on ``TrackResult`` (``available``
     from Spotify ``is_playable``/Tidal ``allowStreaming``; ``tier_restricted``
-    for premium-only). ``None`` means "available or unknown" — never a guess.
+    for premium-only). ``None`` means "available or unknown", never a guess.
     """
     if getattr(result, "tier_restricted", False):
         return ReasonCode.TIER_RESTRICTED
@@ -143,7 +143,8 @@ def _candidate_blocked(result: TrackResult) -> str | None:
 
 
 def _typed_active_prefs(
-    prefs, resolver: AliasResolver | None = None
+    prefs,
+    resolver: AliasResolver | None = None,  # noqa: ARG001 - optional param accepted for caller compatibility
 ) -> list[ActivePreference]:
     """Bridge free-text audio-format preferences onto the engine's typed criteria.
 
@@ -190,10 +191,10 @@ def _scoped_active_prefs(
     """All active typed preferences for this track+playlist, across every scope.
 
     Reads the general ``(criterion, strength, target)`` model (AC-CLI1) stored at
-    three scopes — global (``schema_meta`` ``criteria``), playlist
+    three scopes, global (``schema_meta`` ``criteria``), playlist
     (``playlists.preferences`` ``criteria``) and per-track
     (``playlist_track_prefs``: playlist-specific rows plus playlist-agnostic
-    NULL-playlist rows) — cascades them most-specific-wins via
+    NULL-playlist rows), cascades them most-specific-wins via
     :func:`resolve_scoped_specs`, and turns them into engine-ready
     :class:`ActivePreference` objects the two-phase engine fires on.
 
@@ -212,7 +213,7 @@ def _scoped_active_prefs(
         playlist_track_rows = db.get_playlist_track_prefs(playlist_id, track_id)
 
     # Playlist-agnostic per-track preferences (NULL playlist) are read
-    # unconditionally — they apply to the track on every playlist and are the
+    # unconditionally - they apply to the track on every playlist and are the
     # folded successor to the retired ``tracks.preferences`` blob (FL3 #4). They
     # live in the most-specific "track" layer alongside the playlist-track rows;
     # a playlist-specific row for the same ``(axis, canonical target)`` wins
@@ -239,7 +240,7 @@ def _legacy_intent(prefs, active: list[ActivePreference]):
     The legacy keyword lists feed the source-aware recording-class / lyric /
     edition scoring (:func:`scoring_intent`). A token that is ALSO expressed as a
     typed criterion (e.g. ``performance avoid live`` and a legacy ``avoid: live``)
-    would otherwise be counted twice — once as a typed soft signal and once as a
+    would otherwise be counted twice, once as a typed soft signal and once as a
     recording-class penalty. Drop such tokens here so the typed criterion is the
     single source of truth. Returns empty sets for default prefs (byte-parity).
     """
@@ -265,10 +266,10 @@ def _criteria_outcomes(
 ) -> list[CriterionOutcome]:
     """Record the active user-preference criteria and how each acted (AC-CLI3).
 
-    A hard (require/forbid) criterion ``fired`` when it eliminated ≥1 candidate
+    A hard (require/forbid) criterion ``fired`` when it eliminated >=1 candidate
     in Phase 1; a soft (prefer/avoid) criterion ``fired`` when it broke the
     winning within-delta tie by precedence. A hard criterion that eliminated
-    nothing is recorded ``fired=False`` — in force, yet inert (the transparency
+    nothing is recorded ``fired=False``, in force, yet inert (the transparency
     behind "mono demoted to soft").
     """
     if not active:
@@ -319,8 +320,8 @@ def _filtered_rejections(
 ) -> list[RejectedCandidate]:
     """Phase-1 eliminations rendered as rejected candidates (AC-CLI5).
 
-    These never appear in the scored list — a candidate that failed a hard filter
-    or is unavailable was dropped before scoring — so the failed-match explain
+    These never appear in the scored list, a candidate that failed a hard filter
+    or is unavailable was dropped before scoring, so the failed-match explain
     surface would otherwise be silent about *why* they were rejected.
     """
     if selection is None:
@@ -372,7 +373,7 @@ def _build_audit(
     When ``selection``/``active`` are supplied (the live reconcile path) the audit
     is enriched with the criteria that fired (hard vs soft), the winner's weighted
     signal breakdown, the precedence tie-break, and the Phase-1 eliminations with
-    per-candidate rejection reasons — the AC-CLI3 / AC-CLI5 explain data. Callers
+    per-candidate rejection reasons, the AC-CLI3 / AC-CLI5 explain data. Callers
     that omit them (direct unit tests) get the unenriched availability verdict.
     """
     untrusted = platform_name in _UNTRUSTED_ABSENCE
@@ -482,7 +483,7 @@ def _build_audit(
     # confidence == "high": clear pick. Distinguish an exact recording from an
     # accepted *substitute* version (e.g. the only available copy is a different
     # but acceptable master) so callers can tell "we got the thing you asked
-    # for" from "we got a stand-in". Metadata only — the chosen match is
+    # for" from "we got a stand-in". Metadata only - the chosen match is
     # identical either way.
     is_substitute = best_signal == "version:substitute"
     return MatchAudit(
@@ -715,7 +716,7 @@ def gather_candidates(
     This is the single candidate-discovery pass shared by ``reconcile_track``
     (which then scores + selects a winner) and the library-first resolver
     (which persists the top-N for later scoring). Keeping one implementation
-    guarantees selection and resolution see the *same* candidate set — a
+    guarantees selection and resolution see the *same* candidate set, a
     prerequisite for AC-X3 (selection reads persisted candidates, not a
     divergent live search) and plan reproducibility (AC-P4).
 
@@ -770,7 +771,7 @@ def _load_persisted_candidates(
     """Rebuild the persisted candidate set for ``(track, platform)``.
 
     Returned in discovery order (``track_candidates.discovery_rank``) so
-    selection's default band-tie behaviour is identical to a live gather — the
+    selection's default band-tie behaviour is identical to a live gather, the
     parity guarantee behind AC-P4.
     """
     rows = db.get_track_candidates(track_id, platform=platform)
@@ -810,11 +811,11 @@ def acquire_candidates(
 ) -> tuple[list[TrackResult], dict[str, str]]:
     """Obtain the candidate set for selection, reading the cache when possible.
 
-    Implements spec §4.1a: for STEADY-STATE selection the live candidate gather
-    is retired in favour of the persisted ``track_candidates`` set (AC-X3 — no
+    Implements spec section 4.1a: for STEADY-STATE selection the live candidate gather
+    is retired in favour of the persisted ``track_candidates`` set (AC-X3, no
     resolution API calls during interactive matching). A live gather runs only
     when there is no persisted set (cold cache) or when the caller explicitly
-    requests a refresh (``force=True`` — e.g. ``explain``/self-heal), and the
+    requests a refresh (``force=True``, e.g. ``explain``/self-heal), and the
     fresh set is persisted so the next run is reproducible with no live search
     (AC-P4).
 
@@ -867,7 +868,7 @@ def _locked_id_alive(client, platform_track_id: str) -> bool | None:
     """Return True/False if the locked id is alive, or None if undeterminable.
 
     Liveness is checked via the platform's ``get_track``; clients that don't
-    expose one (e.g. Spotify) return None, meaning "cannot verify" — the caller
+    expose one (e.g. Spotify) return None, meaning "cannot verify", the caller
     then trusts the lock as-is rather than guessing.
     """
     get_track = getattr(client, "get_track", None)
@@ -893,7 +894,7 @@ def _find_equivalent_candidate(
     Runs the full strategy cascade and returns the first candidate whose
     fingerprint equals ``target_fp`` (ISRC match, or normalized title/artist +
     version class + duration bucket) and that is not explicitly blocked. Returns
-    None when no equivalent recording is available — the lock is then held, never
+    None when no equivalent recording is available, the lock is then held, never
     swapped to a different recording.
     """
     seen: set[str] = set()
@@ -960,7 +961,7 @@ def _live_locked_track(client, platform_track_id: str) -> TrackResult | None:
     Used by the AC-L5 downgrade check: unlike :func:`_locked_id_alive` it returns
     the full live :class:`TrackResult` so its structured fields (``audio_modes``
     ...) can be re-evaluated against active preferences. A missing/blocked id or
-    a client without ``get_track`` yields ``None`` — disappearance is AC-L3's
+    a client without ``get_track`` yields ``None``, disappearance is AC-L3's
     concern, not L5's, so the downgrade check simply stands down.
     """
     get_track = getattr(client, "get_track", None)
@@ -978,7 +979,7 @@ def _live_locked_track(client, platform_track_id: str) -> TrackResult | None:
 
 @dataclass(frozen=True)
 class LockDowngrade:
-    """An active preference the STILL-LIVE locked release no longer satisfies (AC-L5)."""
+    """An active preference the STILL-LIVE locked release no longer satisfies (AC-L5)."""  # noqa: E501
 
     axis: str
     target: str
@@ -996,7 +997,7 @@ def check_lock_downgrade(
     track_id: int,
     client,
     *,
-    platform: str,
+    platform: str,  # noqa: ARG001 - keyword-only arg reserved; passed by callers
     playlist_id: int | None,
     locked_id: str,
 ) -> list[LockDowngrade]:
@@ -1005,7 +1006,7 @@ def check_lock_downgrade(
     Distinct from AC-L3 (disappearance): the locked id still exists, but its
     current metadata may have degraded (e.g. Tidal dropped the Atmos mode) so it
     no longer satisfies an active ``prefer``/``require`` on a structured audio
-    axis. The lock is NEVER changed here — the caller surfaces the returned
+    axis. The lock is NEVER changed here, the caller surfaces the returned
     downgrades in a plan for the user to decide (re-pin or accept). Pure query:
     no writes.
 
@@ -1027,7 +1028,7 @@ def check_lock_downgrade(
     downgrades: list[LockDowngrade] = []
     for pref in active:
         # An absent field can't satisfy a prefer/require, so treat it as an empty
-        # (structured) value — the criterion's verdict routing then flags it.
+        # (structured) value - the criterion's verdict routing then flags it.
         value = pref.criterion.extract(live) or CriterionValue(
             raw=None, tokens=frozenset(), structured=True
         )
@@ -1078,12 +1079,12 @@ def _identity_lock_from_effective(eff: EffectiveLock, track) -> IdentityLock:
 
 
 def _verify_lock(
-    db: Database,
-    track,
+    db: Database,  # noqa: ARG001 - uniform _verify_lock signature
+    track,  # noqa: ARG001 - uniform _verify_lock signature
     client,
     mapping: PlatformMapping,
 ) -> ReconcileResult:
-    """Verify a user lock's liveness WITHOUT mutating anything (AC-L3, §7.1).
+    """Verify a user lock's liveness WITHOUT mutating anything (AC-L3, section 7.1).
 
     - Locked id alive          -> keep it (LOCKED, available).
     - Liveness undeterminable  -> trust the lock as-is (per stored status).
@@ -1091,7 +1092,7 @@ def _verify_lock(
                                   surfaced for review. The actual self-heal
                                   (re-bind to an equivalent recording) is a
                                   ROUTED operation proposed by
-                                  ``planapply.heal.build_heal_plan`` — never a
+                                  ``planapply.heal.build_heal_plan``, never a
                                   silent inline swap.
     """
     alive = _locked_id_alive(client, mapping.platform_track_id)
@@ -1100,12 +1101,12 @@ def _verify_lock(
         return _locked_available_result(mapping, ReasonCode.LOCKED)
 
     if alive is None:
-        # Cannot verify (client has no liveness probe) — honour stored status.
+        # Cannot verify (client has no liveness probe) - honour stored status.
         if mapping.status == "unavailable":
             return _locked_unavailable_result(ReasonCode.LOCKED)
         return _locked_available_result(mapping, ReasonCode.LOCKED)
 
-    # Locked id is dead — hold and surface for a routed heal; never swap inline.
+    # Locked id is dead - hold and surface for a routed heal; never swap inline.
     return _locked_unavailable_result(ReasonCode.LOCK_HELD)
 
 
@@ -1123,13 +1124,13 @@ def reconcile_track(
     When ``playlist_id`` is given, per-playlist version preferences cascade over
     the account-wide defaults and bias candidate ordering. With no configured
     preferences (or ``playlist_id=None``) the cascade resolves to the built-in
-    defaults, which is a strict no-op — identical to the pre-preferences
+    defaults, which is a strict no-op, identical to the pre-preferences
     behaviour.
 
     ``verify_locked`` controls whether a durable user lock is actively checked
     for liveness on this run. Default ``False`` trusts the lock without an API
-    call (fast, no rate-limit pressure). When ``True`` — e.g. a periodic
-    integrity sync — a lock whose platform id has gone dead is self-healed to an
+    call (fast, no rate-limit pressure). When ``True``, e.g. a periodic
+    integrity sync, a lock whose platform id has gone dead is self-healed to an
     equivalent live id for the *same* recording, or held as unavailable if the
     recording is genuinely gone. It is never silently swapped to a different
     recording.
@@ -1146,7 +1147,7 @@ def reconcile_track(
         None,
     )
     # Typed preferences (the general (criterion, strength, target) model) resolved
-    # across every scope — global < playlist < playlist-track. These drive the
+    # across every scope - global < playlist < playlist-track. These drive the
     # two-phase engine's hard filters (require/forbid) and soft precedence.
     active_prefs = _scoped_active_prefs(db, track_id, playlist_id, prefs)
     # Combined scoring intent from the effective prefs: recording classes and
@@ -1166,7 +1167,7 @@ def reconcile_track(
     # Cache/mapping checks
     if not force:
         mapping = cached_mapping or db.get_platform_mapping(track_id, platform_name)
-        # A lock (either scope) is authoritative on every non-forced run — it must
+        # A lock (either scope) is authoritative on every non-forced run - it must
         # be consulted BEFORE the auto-match cache, so a per-playlist override is
         # never shadowed by the global cached mapping.
         if effective_lock is not None:
@@ -1305,11 +1306,11 @@ def reconcile_track(
     if survivors:
         # The engine ranked available survivors by Distance (and any typed/soft
         # preference). When it resolved the winner via a preference or precedence
-        # (decided_by set — e.g. a "prefer atmos" spatial criterion), that choice
+        # (decided_by set - e.g. a "prefer atmos" spatial criterion), that choice
         # is authoritative and must not be second-guessed. Only when the weighted
         # score alone left the top band unresolved (decided_by is None, an
         # effective tie) do the per-playlist free-text keyword bias + the
-        # standard-edition tiebreak decide the pick — the legacy keyword-
+        # standard-edition tiebreak decide the pick - the legacy keyword-
         # preference behaviour. The sort is stable, so a band with no keyword/
         # edition signal keeps the engine's order.
         winner_result = selection.winner
@@ -1341,7 +1342,7 @@ def reconcile_track(
     )
     # The engine refuses to confidently commit a near-tie or an unresolved
     # version mismatch; surface it for review rather than silently guessing
-    # (AC-S3/AC-S4). Never elevate a below-floor not_found — two poor matches
+    # (AC-S3/AC-S4). Never elevate a below-floor not_found - two poor matches
     # are still "not found", not "review these two".
     if confidence != "not_found" and selection.needs_review:
         confidence = "ambiguous"

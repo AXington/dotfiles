@@ -1,4 +1,4 @@
-"""Base scoring criteria — the single, authoritative scoring sequence.
+"""Base scoring criteria, the single, authoritative scoring sequence.
 
 Historically the title/artist/album/isrc/version/duration signal sequence lived
 inline inside :func:`~tuneshift.matching.track.score_track_match`. This module
@@ -7,7 +7,7 @@ the exact :mod:`tuneshift.matching.penalties` builder, so there is one scoring
 sequence rather than two that can silently diverge (``score_track_match`` now
 builds its :class:`~tuneshift.matching.engine.Distance` from :func:`score_signals`).
 
-These base criteria are always active — they are the identity/similarity spine,
+These base criteria are always active, they are the identity/similarity spine,
 distinct from the preference-gated criteria in :mod:`tuneshift.matching.criteria`
 (which emit *nothing* unless a preference references them, per the AC-C5
 winner-parity contract). The ``version`` criterion emits the whole

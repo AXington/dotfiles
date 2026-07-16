@@ -5,8 +5,8 @@ surface is re-exported here unchanged so every existing importer
 (``from tuneshift.matching import ...``) keeps working byte-for-byte while the
 internals are split across focused modules:
 
-- ``normalize`` — string normalization + the shared version-keyword regexes.
-- ``track`` — the legacy track scorers and confidence classifier.
+- ``normalize``, string normalization + the shared version-keyword regexes.
+- ``track``, the legacy track scorers and confidence classifier.
 
 Later chunks add ``similarity``, ``penalties``, ``engine``, ``confidence``,
 ``preferences``, ``album``, ``artist``, ``version``, ``identity`` and

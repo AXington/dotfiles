@@ -242,7 +242,7 @@ def score_artist_separation_transition(a: TrackMetadata, b: TrackMetadata) -> fl
     return 1.0
 
 
-def score_narrative_arc_transition(a: TrackMetadata, b: TrackMetadata) -> float:
+def score_narrative_arc_transition(a: TrackMetadata, b: TrackMetadata) -> float:  # noqa: ARG001 - uniform pairwise-scorer signature (dispatch table)
     """Narrative arc is enforced by chapter hard-breaks, not pairwise scoring."""
     return 0.5
 

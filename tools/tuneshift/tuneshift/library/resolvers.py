@@ -1,8 +1,8 @@
-"""Library-first platform resolver (spec §4.1a, AC-D7, AC-X3).
+"""Library-first platform resolver (spec section 4.1a, AC-D7, AC-X3).
 
 The :class:`ResolutionWorker` is deliberately I/O-free: it delegates the actual
 candidate lookup to an injected ``resolver`` callable. This module provides the
-production resolver — a thin, DRY bridge over the same multi-strategy platform
+production resolver, a thin, DRY bridge over the same multi-strategy platform
 search that ``reconcile`` uses (:func:`tuneshift.reconcile.gather_candidates`),
 converting each :class:`~tuneshift.models.TrackResult` into the worker's
 :class:`~tuneshift.library.worker.ResolvedCandidate` contract.
@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     from tuneshift.db import Database
     from tuneshift.models import Track, TrackResult
 
-# Platform errors that mean "temporarily throttled" — surfaced to the worker as
+# Platform errors that mean "temporarily throttled" - surfaced to the worker as
 # a transient rate-limit so the track is re-queued with backoff, never lost or
 # quarantined (AC-X2).
 _RATE_LIMIT_MARKERS = ("rate limit", "429", "too many requests")

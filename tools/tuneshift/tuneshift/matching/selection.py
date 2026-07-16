@@ -1,17 +1,17 @@
-"""Two-phase per-playlist version selection engine (§6, ACs S1–S5).
+"""Two-phase per-playlist version selection engine (section 6, ACs S1-S5).
 
 This is the single selection engine the reconcile pipeline consolidates onto
 (Chunk 3 Task 3.7), retiring the parallel integer ``score_match_with_version`` /
 ``classify_scores`` path. It runs two ordered phases over an in-memory candidate
 list (decoupled from retrieval):
 
-**Phase 1 — hard filter.** A candidate is eliminated before scoring when it is
+**Phase 1, hard filter.** A candidate is eliminated before scoring when it is
 explicitly unavailable (``available is False``) or fails any *active* hard
 preference (``require``/``forbid``). Availability is the source-of-truth gate
 behind "it said the track doesn't exist / picked a dead ID": a byte-perfect but
 unplayable release must never win over an available one.
 
-**Phase 2 — score survivors.** Each survivor is scored through the single
+**Phase 2, score survivors.** Each survivor is scored through the single
 scoring source (:func:`~tuneshift.matching.base_scoring.score_signals` ->
 :class:`~tuneshift.matching.engine.Distance`); soft preferences (``prefer`` /
 ``avoid``) append their signals and precedence resolves conflicts (Task 3.2).
@@ -132,8 +132,8 @@ class SelectionResult:
 
     ``lock_applied`` is set when an :class:`IdentityLock` short-circuited normal
     selection. ``needs_review`` + ``review_reason`` flag an outcome the engine
-    refuses to guess (a locked release that is unavailable or absent — AC-S2/AC-L3
-    — surfaced instead of silently substituted).
+    refuses to guess (a locked release that is unavailable or absent, AC-S2/AC-L3,
+    surfaced instead of silently substituted).
     """
 
     winner: Any | None
@@ -177,7 +177,7 @@ def _is_unplayable(candidate: object) -> bool:
     (``tier_restricted``). Either state means the release cannot be committed as
     a live match, so it is eliminated in Phase 1 (and excluded from a lock's
     available set) rather than being allowed to win over a playable release.
-    ``available is None`` (unknown) is NOT unplayable — never a guess.
+    ``available is None`` (unknown) is NOT unplayable, never a guess.
     """
     return getattr(candidate, "available", None) is False or bool(
         getattr(candidate, "tier_restricted", False)
@@ -238,7 +238,7 @@ def _owned_residuals(active: list[ActivePreference]) -> frozenset[str]:
     ``radio_edit``/``compilation``/``deluxe``) whose whitelist axis matches an
     active typed criterion's axis is *owned* by that criterion, so the legacy
     default down-rank for that bucket is suppressed and the typed criterion is
-    the single authority for the axis (M7 — otherwise the legacy default fights
+    the single authority for the axis (M7, otherwise the legacy default fights
     an explicit typed ``prefer``). Empty for default prefs, preserving byte-parity.
     """
     if not active:
@@ -292,7 +292,7 @@ def _phase2_score(
 
     Returns ``(candidate, distance, verdict_map)`` triples sorted best (lowest
     distance) first. The :class:`Distance` is the base identity/similarity match
-    quality ONLY — soft preferences are deliberately NOT folded into it, so a
+    quality ONLY, soft preferences are deliberately NOT folded into it, so a
     preference-neutral candidate cannot win merely by dodging every penalty
     (the AC-C7 "candidate neither preference wanted" failure). Instead each soft
     preference's verdict on the candidate is recorded in ``verdict_map`` and used
@@ -331,7 +331,7 @@ def _release_year(cand: object) -> int | None:
     """Earliest ORIGINAL release year of a candidate for the AC-C6 tiebreak.
 
     Prefers ``recording_date`` (when the original recording date is known) then
-    ``release_date``; a remaster year is deliberately NOT used — the tiebreak
+    ``release_date``; a remaster year is deliberately NOT used, the tiebreak
     favours the canonical original over later reissues. Returns ``None`` when no
     date is present (treated as "newest" by the tiebreak so dated originals win).
     """
@@ -365,7 +365,7 @@ def _deterministic_tiebreak(
     Returns ``(winner_index_into_scored, decided_by)`` where ``decided_by`` is
     the tie tier name when a MEANINGFUL tier (earliest-original release-year or
     availability) separated the candidates, or ``None`` when only the arbitrary
-    stable-id fallback did — in which case the caller keeps the near-tie flagged
+    stable-id fallback did, in which case the caller keeps the near-tie flagged
     for review (AC-S3) even though the pick itself is deterministic.
     """
     tie_candidates = [
@@ -380,7 +380,7 @@ def _deterministic_tiebreak(
     if all_tie_on_meaningful_tiers(tie_candidates):
         # Only the arbitrary stable-id tier could separate this band, so
         # tie_break's winner is a purely lexicographic pick. Preserve INSERTION
-        # ORDER — the pre-tiebreak, winner-parity behaviour — rather than let a
+        # ORDER - the pre-tiebreak, winner-parity behaviour - rather than let a
         # lexicographic id silently reorder default (no-preference) selections.
         # ``scored`` is stable-sorted by distance, so ``cluster[0]`` is the
         # first-listed of the tied candidates. Report ``None`` so the near-tie
@@ -406,7 +406,7 @@ def _resolve_winner(
 
     Candidates whose BASE identity distance is within :data:`AMBIGUITY_DELTA` of
     the best form the same-song contention set; within it soft preferences decide
-    by precedence (AC-C7, lexicographic favor — a neutral candidate has favor 0
+    by precedence (AC-C7, lexicographic favor, a neutral candidate has favor 0
     and loses to one a higher-precedence preference wants). When no preference
     (or precedence is exhausted) separates the band, the deterministic AC-C6
     tiebreak (earliest-original release-year -> availability -> stable-id) picks
@@ -602,7 +602,7 @@ def select_version(
 
     # AC-S4: a source-aware version mismatch (live/cover/karaoke/instrumental vs
     # studio-original intent) carries a hard REJECT cap. Such a candidate must
-    # never win confidently over a clean survivor — down-rank all capped rows
+    # never win confidently over a clean survivor - down-rank all capped rows
     # below the clean ones. Only when NO clean survivor exists is a capped row a
     # provisional winner, and then the result is flagged for review, never
     # recorded as a confident match.

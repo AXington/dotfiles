@@ -1,4 +1,4 @@
-"""Routed lock self-heal (AC-L3, §7.1 routing row "Lock self-heal").
+"""Routed lock self-heal (AC-L3, section 7.1 routing row "Lock self-heal").
 
 A durable identity lock must never be silently swapped. When a locked release is
 found to have genuinely disappeared, :func:`build_heal_plan` PROPOSES the outcome
@@ -8,11 +8,11 @@ the mapping inline:
 - locked id alive / undeterminable -> no change,
 - locked id dead + a same-recording equivalent is live -> propose a re-bind
   (surfaced for review; the change touches a locked row, so it applies only under
-  an explicit ``include_locked`` apply — the reviewed "yes, heal it"),
+  an explicit ``include_locked`` apply, the reviewed "yes, heal it"),
 - locked id dead + no equivalent -> propose holding it unavailable (global scope)
   or flag it for human judgement (per-playlist scope, which has no status column).
 
-This is the EXPLICIT exception to §6's "no live search": a dead-lock verification
+This is the EXPLICIT exception to section 6's "no live search": a dead-lock verification
 may fetch fresh candidates to find the same-recording replacement, but the write
 is always routed through plan/apply.
 """
@@ -154,7 +154,7 @@ def _heal_change(
             locked=True,
         )
 
-    # No equivalent recording is live — hold, never swap to a different recording.
+    # No equivalent recording is live - hold, never swap to a different recording.
     if is_playlist:
         # playlist_track_mappings has no availability column; surface for review.
         return PlanChange(

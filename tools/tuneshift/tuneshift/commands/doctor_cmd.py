@@ -243,7 +243,7 @@ def _handle_apply(args, db: Database) -> int:
         )
         would_skip = sum(1 for _, action, _ in preview if action == "skip")
         print(
-            f"\nDRY RUN — {len(items)} item(s), "
+            f"\nDRY RUN - {len(items)} item(s), "
             f"{would_apply} would apply, {would_skip} would skip:\n"
         )
         for item, action, detail in preview:

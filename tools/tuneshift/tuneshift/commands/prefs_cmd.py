@@ -27,9 +27,9 @@ playlist-track.
 Legacy grammar (recording-class / lyric / edition soft intent, retained for
 backward compatibility)::
 
-    tuneshift prefs set   version.<field> <value> [--global | --playlist NAME | --track ID]
-    tuneshift prefs show                           [--global | --playlist NAME | --track ID]
-    tuneshift prefs clear                          [--global | --playlist NAME | --track ID]
+    tuneshift prefs set version.<field> <value> [--global|--playlist NAME|--track ID]
+    tuneshift prefs show                         [--global|--playlist NAME|--track ID]
+    tuneshift prefs clear                        [--global|--playlist NAME|--track ID]
 
 where ``version.<field>`` is ``prefer`` / ``avoid`` / ``tiebreak_order``
 (comma lists), ``duration_tolerance_percent`` (float) or ``min_lead`` (int).
@@ -71,7 +71,7 @@ def _polarity(strength: str) -> str:
 
 
 # --------------------------------------------------------------------------- #
-# Typed (criterion, strength, target) model — the general AC-CLI1 interface.  #
+# Typed (criterion, strength, target) model - the general AC-CLI1 interface.  #
 # --------------------------------------------------------------------------- #
 
 
@@ -84,7 +84,7 @@ def _resolve_typed_scope(args, db: Database):
     * no flags .................. ``global``
     * ``--playlist`` ............ ``playlist``
     * ``--track`` ............... ``track`` (playlist-agnostic per-track; applies
-      to the track on every playlist — stored with a NULL ``playlist_id``)
+      to the track on every playlist, stored with a NULL ``playlist_id``)
     * ``--playlist`` ``--track``  ``playlist-track`` (that track on that playlist,
       most specific)
 
@@ -142,8 +142,8 @@ def _write_criterion(
 ) -> None:
     """Upsert one typed criterion at ``scope``.
 
-    De-duplication is by ``(criterion, canonical target)`` — NOT by criterion
-    alone — so distinct targets on the same axis coexist (``content avoid
+    De-duplication is by ``(criterion, canonical target)``, NOT by criterion
+    alone, so distinct targets on the same axis coexist (``content avoid
     karaoke`` and ``content avoid instrumental``), while a new strength for the
     same canonical target replaces the old entry. Different surface forms of one
     canonical target (``atmos`` / ``Dolby Atmos``) collapse to a single row.
@@ -308,7 +308,7 @@ def _handle_typed_set(
     if criterion in _STRUCTURED_AXES and whitelist.axis(target) is None:
         print(
             f'Warning: "{target}" is not a known {criterion} token '
-            "— it may never match a candidate."
+            " - it may never match a candidate."
         )
 
     _write_criterion(db, scope, pid, tid, criterion, strength, target)
@@ -455,7 +455,7 @@ def _print_preferences(prefs: Preferences) -> None:
     print(f"    avoid                       = {', '.join(prefs.avoid) or '(none)'}")
     print(f"    duration_tolerance_percent  = {prefs.duration_tolerance_percent}")
     print(
-        f"    tiebreak_order              = {', '.join(prefs.tiebreak_order) or '(none)'}"
+        f"    tiebreak_order              = {', '.join(prefs.tiebreak_order) or '(none)'}"  # noqa: E501
     )
     print(f"    min_lead                    = {prefs.min_lead}")
 
@@ -533,7 +533,7 @@ def handle_prefs(args, db: Database) -> int:
     track_flag = getattr(args, "track", None) is not None
 
     if args.action == "show":
-        # The typed cascade is the authoritative model — always show it (this is
+        # The typed cascade is the authoritative model - always show it (this is
         # what the matcher reads, and it renders playlist-track + track scopes,
         # fixing the historical `show --track` gap). For global/playlist we ALSO
         # render any legacy keyword blob for backward compatibility.
@@ -570,7 +570,7 @@ def handle_prefs(args, db: Database) -> int:
     if args.action == "clear":
         if track_flag:
             print(
-                "Per-track 'clear' is retired — use "
+                "Per-track 'clear' is retired - use "
                 "prefs unset <criterion> [<target>] --track ID "
                 "(add --playlist NAME for a playlist-specific override)."
             )

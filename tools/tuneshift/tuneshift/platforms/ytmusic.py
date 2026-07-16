@@ -185,7 +185,7 @@ class YTMusicClient:
         )
         return [self._to_result(item) for item in items if item.get("videoId")]
 
-    def search_isrc(self, isrc: str) -> TrackResult | None:
+    def search_isrc(self, isrc: str) -> TrackResult | None:  # noqa: ARG002 - required by platform search interface
         """YT Music does not support direct ISRC lookup."""
         return None
 

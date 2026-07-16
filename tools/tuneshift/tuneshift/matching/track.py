@@ -3,7 +3,7 @@
 The public functions here are the historical scoring surface. They are now
 *backed by the shared matching engine* (`penalties`, `engine`, `confidence`)
 rather than carrying their own arithmetic, but they preserve byte-for-byte
-parity with the previous implementation — the golden-parity snapshots are the
+parity with the previous implementation, the golden-parity snapshots are the
 contract. ``score_track_match`` is the new engine-native entry point that
 returns a full :class:`~tuneshift.matching.engine.Distance` for callers that
 want the distance, breakdown and recommendation (not just an integer).
@@ -273,7 +273,7 @@ def score_track_match(
     ``source`` and ``candidate`` are track-like objects exposing ``title``,
     ``artist``, ``album``, ``isrc`` and ``duration_seconds``. Returns a
     :class:`Distance` accumulating title/artist/album/isrc/version/duration
-    signals — callers derive ``.total`` (distance), ``.breakdown`` and a
+    signals, callers derive ``.total`` (distance), ``.breakdown`` and a
     recommendation. The version signal is *source-aware* (see
     :func:`source_aware_version_signals`): it compares the candidate's recording
     class to the source's, so a live source matches a live take instead of being

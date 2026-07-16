@@ -2,16 +2,16 @@
 
 Long, ordered libraries produce many tracks that a single run cannot place
 confidently: ambiguous top candidates, or genuine hard failures. Prompting the
-user once per track (the historical ``sync`` flow) does not scale — Alice's
+user once per track (the historical ``sync`` flow) does not scale, Alice's
 libraries are large and the same decision recurs across dozens of tracks by the
 same artist or from the same problematic compilation.
 
 This module turns raw per-track outcomes into:
 
-- **Clusters** — items grouped by *why* they need review and *who* they concern,
+- **Clusters**, items grouped by *why* they need review and *who* they concern,
   so a reviewer makes one decision for a whole group instead of N identical
   prompts.
-- **Review burden** — the headline metrics Alice signs off on: how many tracks
+- **Review burden**, the headline metrics Alice signs off on: how many tracks
   per thousand need a human, and what fraction of playlists sailed through with
   zero intervention.
 
@@ -72,7 +72,7 @@ class ReviewCluster:
 
     @property
     def summary(self) -> str:
-        return f"{self.size} × {self.artist} — {describe_reason(self.reason_code)}"
+        return f"{self.size}x {self.artist} - {describe_reason(self.reason_code)}"
 
 
 @dataclass

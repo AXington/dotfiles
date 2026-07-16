@@ -3,12 +3,12 @@
 Ties that survive filtering and conflict resolution are broken by a fixed,
 documented order so the winner is never a silent arbitrary pick:
 
-1. ``release-year``  — earliest original release-year wins (a missing year is
+1. ``release-year``, earliest original release-year wins (a missing year is
    treated as newest, i.e. sorts last), preferring the canonical original over
    later reissues/remasters.
-2. ``availability``  — higher availability rank wins (a playable release beats a
+2. ``availability``, higher availability rank wins (a playable release beats a
    less-available one).
-3. ``stable-id``     — lexicographically smallest stable id wins; a total order
+3. ``stable-id``, lexicographically smallest stable id wins; a total order
    that guarantees the same winner on every run regardless of input order.
 
 Each tier only decides ties the previous tier left. :func:`tie_break` reports
@@ -66,7 +66,7 @@ def _sort_key(candidate: TieCandidate) -> tuple:
 def tie_break(candidates: list[TieCandidate]) -> TieBreakResult:
     """Return the deterministic winner among tied ``candidates`` and why.
 
-    Raises :class:`ValueError` on an empty list — a tie-break with no candidates
+    Raises :class:`ValueError` on an empty list, a tie-break with no candidates
     is a caller bug, not a silently-swallowed no-op.
     """
 

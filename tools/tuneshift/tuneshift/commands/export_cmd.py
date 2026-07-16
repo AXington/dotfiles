@@ -74,7 +74,7 @@ def _render_text(playlist, tracks, db: Database) -> str:
     return "\n".join(lines)
 
 
-def _render_csv(tracks, db: Database) -> str:
+def _render_csv(tracks, db: Database) -> str:  # noqa: ARG001 - uniform renderer signature (format dispatch)
     """Standard CSV with all metadata."""
     output = io.StringIO()
     writer = csv.writer(output)
@@ -132,7 +132,7 @@ def _render_json(playlist, tracks, db: Database) -> str:
     return json.dumps(data, indent=2, ensure_ascii=False) + "\n"
 
 
-def _render_soundiiz(tracks, db: Database) -> str:
+def _render_soundiiz(tracks, db: Database) -> str:  # noqa: ARG001 - uniform renderer signature (format dispatch)
     """Soundiiz-compatible CSV (Title, Artist, Album, ISRC)."""
     output = io.StringIO()
     writer = csv.writer(output)
@@ -151,7 +151,7 @@ def _render_soundiiz(tracks, db: Database) -> str:
     return output.getvalue()
 
 
-def _render_tunemymusic(tracks, db: Database) -> str:
+def _render_tunemymusic(tracks, db: Database) -> str:  # noqa: ARG001 - uniform renderer signature (format dispatch)
     """TuneMyMusic-compatible CSV (Track Name, Artist Name, Album Name)."""
     output = io.StringIO()
     writer = csv.writer(output)

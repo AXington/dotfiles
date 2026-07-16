@@ -34,7 +34,9 @@ def _word_similarity(word1: str, word2: str) -> float:
 
 
 def score_narrative_fit(
-    track: TrackMetadata, ctx: PlaylistContext, all_tracks: list
+    track: TrackMetadata,
+    ctx: PlaylistContext,
+    all_tracks: list,  # noqa: ARG001 - uniform scorer signature (dispatch table)
 ) -> float:
     """Score how well this track serves the narrative goal."""
     if not ctx.goal and not ctx.narrative_sections:
@@ -83,7 +85,9 @@ def score_narrative_fit(
 
 
 def score_mood_contribution(
-    track: TrackMetadata, ctx: PlaylistContext, all_tracks: list
+    track: TrackMetadata,
+    ctx: PlaylistContext,
+    all_tracks: list,  # noqa: ARG001 - uniform scorer signature (dispatch table)
 ) -> float:
     """Score how well this track contributes to the mood profile."""
     if not ctx.mood_profile:
@@ -103,7 +107,9 @@ def score_mood_contribution(
 
 
 def score_sonic_role(
-    track: TrackMetadata, ctx: PlaylistContext, all_tracks: list
+    track: TrackMetadata,
+    ctx: PlaylistContext,  # noqa: ARG001 - uniform scorer signature (dispatch table)
+    all_tracks: list,
 ) -> float:
     """Score the sonic diversity contribution of this track."""
     if not track.sonic_texture and not track.instruments:
@@ -118,7 +124,9 @@ def score_sonic_role(
 
 
 def score_energy_role(
-    track: TrackMetadata, ctx: PlaylistContext, all_tracks: list
+    track: TrackMetadata,
+    ctx: PlaylistContext,  # noqa: ARG001 - uniform scorer signature (dispatch table)
+    all_tracks: list,  # noqa: ARG001 - uniform scorer signature (dispatch table)
 ) -> float:
     """Score whether this track fills a needed energy niche."""
     if track.energy is None:
@@ -127,7 +135,9 @@ def score_energy_role(
 
 
 def score_uniqueness(
-    track: TrackMetadata, ctx: PlaylistContext, all_tracks: list
+    track: TrackMetadata,
+    ctx: PlaylistContext,  # noqa: ARG001 - uniform scorer signature (dispatch table)
+    all_tracks: list,
 ) -> float:
     """Score how unique this track is relative to the rest of the playlist."""
     if not track.themes and not track.vibes:
@@ -154,7 +164,9 @@ def score_uniqueness(
 
 
 def score_redundancy(
-    track: TrackMetadata, ctx: PlaylistContext, all_tracks: list
+    track: TrackMetadata,
+    ctx: PlaylistContext,  # noqa: ARG001 - uniform scorer signature (dispatch table)
+    all_tracks: list,
 ) -> float:
     """Score redundancy (inverse: high = NOT redundant, low = very redundant)."""
     # This is the inverse of uniqueness from a different angle

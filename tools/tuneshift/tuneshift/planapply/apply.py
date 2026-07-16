@@ -30,7 +30,7 @@ REMOTE_TABLE_PREFIX = "remote:"
 # A remote executor may perform a LOCAL side-effect (linking the local playlist
 # to a find-or-created remote playlist) as part of its push. It reports that
 # write back under this reserved key so apply can journal it as a normal local
-# change — keeping the link inside the apply transaction (atomic on failure) and
+# change - keeping the link inside the apply transaction (atomic on failure) and
 # reversible on rollback, instead of a self-committing write that escapes both.
 LOCAL_SIDE_EFFECT_KEY = "_local_journal"
 
@@ -69,11 +69,11 @@ _TABLE_SPECS: dict[str, _TableSpec] = {
     # NOTE: playlist_track_prefs is intentionally NOT routed through plan/apply.
     # Preferences are configuration set directly via the `prefs` CLI, not a
     # playlist mutation. Its storage now uses a surrogate id PK with a nullable
-    # (playlist_id, target) logical key enforced by a COALESCE unique index —
+    # (playlist_id, target) logical key enforced by a COALESCE unique index -
     # shapes the generic engine's NULL-unsafe `col = ?` WHERE and
     # `ON CONFLICT(raw-columns)` arbiter cannot address. A future task that wants
     # planned pref changes must add NULL-safe key handling before re-listing it.
-    # Global default lock lives on platform_tracks (spec §8, AC-L1). A routed
+    # Global default lock lives on platform_tracks (spec section 8, AC-L1). A routed
     # self-heal (planapply/heal.py, AC-L3) re-binds the locked id and refreshes
     # the same-recording fingerprint, so both are writable through plan/apply.
     "platform_tracks": _TableSpec(
@@ -152,7 +152,7 @@ def _insert_row(db: Database, spec: _TableSpec, proposed: dict[str, Any]) -> Non
 
     Used for op=insert and for restoring a row that was deleted (its prior state
     carries the full set of spec columns). Not safe for partial updates of tables
-    with NOT NULL columns outside the spec (e.g. ``tracks``) — use ``_update_row``.
+    with NOT NULL columns outside the spec (e.g. ``tracks``), use ``_update_row``.
     """
     _validate_columns(spec, proposed)
     cols = [c for c in spec.all_columns if c in proposed]
@@ -326,7 +326,7 @@ def apply_plan(
 
     ``remote_push`` changes are forward-only remote mutations; they require a
     ``remote_executor`` (a closure over the platform client). Rollback of a
-    remote push never un-pushes inline — it yields a compensating plan (AC-P4).
+    remote push never un-pushes inline, it yields a compensating plan (AC-P4).
     """
     report = ApplyReport(plan_id=plan.plan_id)
 

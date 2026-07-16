@@ -93,8 +93,8 @@ def test_explain_renders_criteria_breakdown_and_tie_break(tmp_db: Path, capsys) 
     assert handle_explain(_args(track_id), db) == 0
     out = capsys.readouterr().out
     assert "criteria:" in out
-    assert "[soft] spatial=atmos (prefer) — fired" in out
-    assert "[hard] performance=studio (require) — in force, no effect" in out
+    assert "[soft] spatial=atmos (prefer) - fired" in out
+    assert "[hard] performance=studio (require) - in force, no effect" in out
     assert "weighted breakdown" in out
     assert "duration: 0.12 (weight 2)" in out
     assert "tie-break: resolved by 'spatial' (precedence)" in out

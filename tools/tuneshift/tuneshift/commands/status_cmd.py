@@ -48,7 +48,7 @@ def _show_playlist_status(db, playlist) -> None:
         print("    Platforms: (none linked)")
 
 
-def handle_list(args, db: Database) -> int:
+def handle_list(args, db: Database) -> int:  # noqa: ARG001 - required by CLI subcommand handler signature
     """List all playlists."""
     playlists = db.list_playlists()
     if not playlists:

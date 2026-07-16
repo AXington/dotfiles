@@ -1,14 +1,14 @@
 """Plan builders for the ROUTED map/unmap (lock) and enrichment-overwrite paths.
 
-Per the §7.1 mutation-routing table, these mutations never write inline; they
+Per the section 7.1 mutation-routing table, these mutations never write inline; they
 produce a reviewable, journaled :class:`~tuneshift.planapply.models.Plan` that
 the apply engine executes (and rollback reverses):
 
-- ``map`` / ``unmap`` — create or release a per-playlist identity lock on
-  ``playlist_track_mappings`` (spec §8, AC-L1). Overwriting or releasing an
+- ``map`` / ``unmap``, create or release a per-playlist identity lock on
+  ``playlist_track_mappings`` (spec section 8, AC-L1). Overwriting or releasing an
   already-``user_approved`` mapping is a locked change (AC-P3): it is excluded
   from apply unless the caller explicitly opts in.
-- enrichment overwrite — replace matcher-read fields on ``tracks`` with freshly
+- enrichment overwrite, replace matcher-read fields on ``tracks`` with freshly
   enriched values (routing-table row "Enrichment metadata overwrite"). Only the
   fields the matcher actually reads are writable, and a no-op enrichment (values
   already current) yields an empty plan (AC-P4 idempotency).
@@ -99,7 +99,7 @@ def build_global_lock_plan(
     platform: str,
     platform_track_id: str,
 ) -> Plan:
-    """Plan a GLOBAL (library-wide) identity lock (spec §8, AC-L1).
+    """Plan a GLOBAL (library-wide) identity lock (spec section 8, AC-L1).
 
     The global default lock lives on ``platform_tracks`` (``user_approved=1``);
     a per-playlist override (:func:`build_lock_plan`) wins over it. Locking to
@@ -182,7 +182,7 @@ def build_enrich_plan(db: Database, track_id: int, fields: dict[str, object]) ->
 
     Only fields whose new value differs from the stored value are emitted, so a
     re-run against already-enriched data produces an empty (no-op) plan. Fields
-    outside the matcher-read allowlist are rejected — enrichment must not touch
+    outside the matcher-read allowlist are rejected, enrichment must not touch
     identity columns like ``title``/``artist``.
     """
     spec = _spec_for("tracks")

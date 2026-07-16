@@ -1,9 +1,9 @@
-"""Resolve command: library-first platform resolution (spec §4.1a, AC-D2/D7/X3).
+"""Resolve command: library-first platform resolution (spec section 4.1a, AC-D2/D7/X3).
 
 ``resolve`` drains the resolution queue built by the library-first ``add``/import
 path: for each target track it runs the real multi-strategy platform search
 (shared with reconcile), persists the top-N candidates to ``track_candidates``
-(so selection later scores over a frozen set, not a live search — AC-X3), and
+(so selection later scores over a frozen set, not a live search, AC-X3), and
 hydrates the track's core identity metadata (isrc/duration/album/confidence)
 onto ``tracks`` (AC-D2). Rate limits are transient and re-queued, never lost
 (AC-X2); a track with no platform match is quarantined for review (AC-D6).
@@ -238,7 +238,7 @@ def _print_library_status(db: Database, *, verbose: bool) -> None:
             pct = int(r["pct"] * 100)
             note = _coverage_note(r)
             print(
-                f"    {pct:>3}%  {r['name'][:32]:<32} ({r['playable']}/{r['total']}){note}"
+                f"    {pct:>3}%  {r['name'][:32]:<32} ({r['playable']}/{r['total']}){note}"  # noqa: E501
             )
     if fully:
         print(f"\n  {fully} playlist(s) fully playable.")

@@ -32,7 +32,7 @@ _SCHEMA_VERSION = 22
 _TRACK_EDITABLE_COLUMNS = frozenset({"title", "artist", "album"})
 
 # First-class version-selection metadata columns settable via set_track_fields
-# (spec §4.1). Constrains f-string interpolation in the UPDATE to a safe set.
+# (spec section 4.1). Constrains f-string interpolation in the UPDATE to a safe set.
 _TRACK_FIRST_CLASS_COLUMNS = frozenset(
     {
         "album_artist",
@@ -937,7 +937,7 @@ class Database:
                 )
 
             if current_version < 15:
-                # First-class version-selection metadata columns (spec §4.1,
+                # First-class version-selection metadata columns (spec section 4.1,
                 # AC-D3/D4). These lift audio/version/release fields out of the
                 # opaque metadata JSON so the matching path can read them, plus a
                 # field_provenance JSON column recording (source, timestamp) per
@@ -970,7 +970,7 @@ class Database:
                         )
 
             if current_version < 16:
-                # Playlist-scope match_audits (spec §4.1a item 5, AC-CLI3/CLI5):
+                # Playlist-scope match_audits (spec section 4.1a item 5, AC-CLI3/CLI5):
                 # selection is now playlist-dependent, so an audit is keyed by
                 # (playlist_id, track_id, platform). Rebuild the table (SQLite
                 # cannot alter a PK in place); existing rows land at the global
@@ -1024,7 +1024,7 @@ class Database:
                     )
 
             if current_version < 18:
-                # Plan/apply journal (§7, AC-P4): records every applied write so
+                # Plan/apply journal (section 7, AC-P4): records every applied write so
                 # a LOCAL apply is reversible in one step by reverse-replay.
                 self.conn.execute("""
                     CREATE TABLE IF NOT EXISTS apply_journal (
@@ -1047,7 +1047,7 @@ class Database:
                 # Persisted candidate ORDER matters for winner parity: selection
                 # keeps input order for default band-ties (selection.py stable
                 # sort), so the persisted set must be returned in the same
-                # discovery order reconcile's live gather produced (spec §4.1a /
+                # discovery order reconcile's live gather produced (spec section 4.1a /
                 # AC-X3, AC-P4). Add a rank column; existing rows default to 0.
                 cols = {
                     r[1]
@@ -1214,7 +1214,7 @@ class Database:
                     # belt-and-suspenders, but keeps the merge correct generally).
                     for col in merge_cols:
                         self.conn.execute(
-                            f"UPDATE artists SET {col} = ("  # noqa: S608 - col is from a fixed allowlist
+                            f"UPDATE artists SET {col} = ("  # noqa: S608 - columns from code-controlled allowlist; values parameterized
                             f"    SELECT d.{col} FROM artists d "
                             f"    WHERE d.norm_name = ? AND d.id != ? "
                             f"      AND d.{col} IS NOT NULL ORDER BY d.id LIMIT 1"
@@ -1223,17 +1223,17 @@ class Database:
                         )
                     placeholders = ",".join("?" * len(dupes))
                     self.conn.execute(
-                        f"UPDATE tracks SET artist_id = ? "  # noqa: S608 - placeholders are bound params
+                        f"UPDATE tracks SET artist_id = ? "  # noqa: S608 - placeholders are bound '?' params; values parameterized
                         f"WHERE artist_id IN ({placeholders})",
                         (keeper, *dupes),
                     )
                     self.conn.execute(
-                        f"UPDATE albums SET artist_id = ? "  # noqa: S608 - placeholders are bound params
+                        f"UPDATE albums SET artist_id = ? "  # noqa: S608 - placeholders are bound '?' params; values parameterized
                         f"WHERE artist_id IN ({placeholders})",
                         (keeper, *dupes),
                     )
                     self.conn.execute(
-                        f"DELETE FROM artists WHERE id IN ({placeholders})",  # noqa: S608 - placeholders are bound params
+                        f"DELETE FROM artists WHERE id IN ({placeholders})",  # noqa: S608 - placeholders are bound '?' params; values parameterized
                         tuple(dupes),
                     )
                 self.conn.execute("DROP INDEX IF EXISTS idx_artists_norm")
@@ -1287,7 +1287,7 @@ class Database:
 
         Links the track to the normalized ``artists``/``albums`` tables at insert
         time (get-or-create), so every runtime-added track carries ``artist_id`` and
-        (when an album is present) ``album_id`` — not only tracks touched by the
+        (when an album is present) ``album_id``, not only tracks touched by the
         one-time migration backfill. Gate on AC-D1/AC-D3.
         """
         artist_id: int | None = None
@@ -1370,7 +1370,7 @@ class Database:
 
         with self.conn:
             self.conn.execute(
-                f"UPDATE tracks SET {', '.join(set_clauses)} WHERE id = ?",
+                f"UPDATE tracks SET {', '.join(set_clauses)} WHERE id = ?",  # noqa: S608 - columns from code-controlled allowlist; values parameterized
                 (*params, track_id),
             )
             for field, value in changes.items():
@@ -1480,7 +1480,7 @@ class Database:
                 self.conn.execute(
                     f"""UPDATE evidence
                        SET is_current = 0, superseded_by = ?
-                       WHERE track_id = ? AND is_current = 1 AND id NOT IN ({placeholders})""",
+                       WHERE track_id = ? AND is_current = 1 AND id NOT IN ({placeholders})""",  # noqa: S608 - placeholders are bound '?' params; values parameterized
                     (anchor_id, track_id, *new_evidence_ids),
                 )
 
@@ -1540,7 +1540,7 @@ class Database:
             else:
                 placeholders = ",".join("?" for _ in tiers_below)
                 rows = self.conn.execute(
-                    f"SELECT * FROM tracks WHERE confidence_tier IS NULL OR confidence_tier IN ({placeholders})",
+                    f"SELECT * FROM tracks WHERE confidence_tier IS NULL OR confidence_tier IN ({placeholders})",  # noqa: S608 - placeholders are bound '?' params; values parameterized
                     tiers_below,
                 ).fetchall()
 
@@ -2067,7 +2067,7 @@ class Database:
     ) -> None:
         """Persist the explainable MatchAudit for a (playlist, track, platform).
 
-        Stored for every reconcile outcome — including misses — so ``tuneshift
+        Stored for every reconcile outcome, including misses, so ``tuneshift
         explain`` can explain a decision without re-running a live search. The
         audit is serialized to JSON via ``MatchAudit.to_json``; availability and
         reason_code are also stored as plain columns for cheap filtering.
@@ -2268,7 +2268,7 @@ class Database:
             return {}
         placeholders = ",".join("?" for _ in track_ids)
         rows = self.conn.execute(
-            f"SELECT * FROM platform_tracks WHERE track_id IN ({placeholders}) AND platform = ?",
+            f"SELECT * FROM platform_tracks WHERE track_id IN ({placeholders}) AND platform = ?",  # noqa: S608 - placeholders are bound '?' params; values parameterized
             (*track_ids, platform),
         ).fetchall()
         result: dict[int, PlatformMapping] = {}
@@ -2403,7 +2403,7 @@ class Database:
         set_clauses: list[str] = []
         params: list[Any] = []
         for column, value in fields.items():
-            # column is constrained to the allowlist above — safe to interpolate.
+            # column is constrained to the allowlist above - safe to interpolate.
             set_clauses.append(f"{column} = ?")
             if column in _TRACK_JSON_FIELD_COLUMNS:
                 params.append(json.dumps(value) if value is not None else None)
@@ -2416,11 +2416,11 @@ class Database:
 
         with self.conn:
             self.conn.execute(
-                f"UPDATE tracks SET {', '.join(set_clauses)} WHERE id = ?",
+                f"UPDATE tracks SET {', '.join(set_clauses)} WHERE id = ?",  # noqa: S608 - columns from code-controlled allowlist; values parameterized
                 (*params, track_id),
             )
 
-    # --- resolution_queue (spec §4.1a: resumable enrich/resolve worker) ---
+    # --- resolution_queue (spec section 4.1a: resumable enrich/resolve worker) ---
 
     def enqueue_resolution(
         self, track_id: int, next_attempt_at: str | None = None
@@ -2454,7 +2454,7 @@ class Database:
         track's ``quarantine_state`` (which drives selectability) and the
         ``resolution_queue`` row (which drives coverage). Marking the queue row
         ``resolved`` keeps ``coverage_report`` consistent with
-        ``get_quarantined_tracks`` — an approved track counts as resolved, never
+        ``get_quarantined_tracks``, an approved track counts as resolved, never
         lingering as quarantined.
         """
         with self.conn:
@@ -2512,7 +2512,7 @@ class Database:
 
         ``increment_attempts`` bumps the hard-failure counter that drives the
         quarantine ceiling. ``increment_transient`` bumps a SEPARATE counter used
-        only for rate-limit backoff — transient throttling must never consume the
+        only for rate-limit backoff, transient throttling must never consume the
         quarantine budget (AC-D7).
         """
         set_clauses = ["state = ?", "last_error = ?", "updated_at = datetime('now')"]
@@ -2526,11 +2526,11 @@ class Database:
             set_clauses.append("transient_attempts = transient_attempts + 1")
         with self.conn:
             self.conn.execute(
-                f"UPDATE resolution_queue SET {', '.join(set_clauses)} WHERE track_id = ?",
+                f"UPDATE resolution_queue SET {', '.join(set_clauses)} WHERE track_id = ?",  # noqa: S608 - columns from code-controlled allowlist; values parameterized
                 (*params, track_id),
             )
 
-    # --- track_candidates (spec §4.1a: hydrated top-N platform candidates) ---
+    # --- track_candidates (spec section 4.1a: hydrated top-N platform candidates) ---
 
     def upsert_track_candidate(
         self,
@@ -2544,7 +2544,7 @@ class Database:
 
         ``discovery_rank`` records the candidate's position in the discovery
         order so :meth:`get_track_candidates` can return the set in the same
-        order the live gather produced — selection keeps input order for default
+        order the live gather produced, selection keeps input order for default
         band-ties, so preserving it is what guarantees winner parity (AC-P4).
         """
         payload = (
@@ -2588,7 +2588,7 @@ class Database:
         """Return hydrated candidates for a track, optionally filtered by platform.
 
         Ordered by ``discovery_rank`` (then a stable id tiebreak) so callers see
-        the persisted set in the original discovery order — the ordering
+        the persisted set in the original discovery order, the ordering
         selection relies on for default band-tie parity (AC-P4).
         """
         query = "SELECT * FROM track_candidates WHERE track_id = ?"
@@ -2634,7 +2634,7 @@ class Database:
         This is the single source of truth for turning a "resolved" verdict into
         populated ``tracks`` columns (spec AC-D2). It is deliberately conservative:
 
-        * ``isrc``/``duration_seconds``/``album`` use **fill-NULL** semantics —
+        * ``isrc``/``duration_seconds``/``album`` use **fill-NULL** semantics,
           a field is written only when the track's current value is NULL/empty,
           so a prior user edit or an earlier higher-signal hydration is never
           clobbered. Idempotent: re-running promotes nothing new.
@@ -2702,12 +2702,12 @@ class Database:
 
         with self.conn:
             self.conn.execute(
-                f"UPDATE tracks SET {', '.join(set_clauses)} WHERE id = ?",
+                f"UPDATE tracks SET {', '.join(set_clauses)} WHERE id = ?",  # noqa: S608 - columns from code-controlled allowlist; values parameterized
                 (*params, track_id),
             )
         return written
 
-    # --- apply_journal (spec §7, AC-P4: reversible plan/apply) ---
+    # --- apply_journal (spec section 7, AC-P4: reversible plan/apply) ---
 
     def record_journal_entry(
         self,
@@ -2777,7 +2777,7 @@ class Database:
         with self.conn:
             self.conn.execute("DELETE FROM apply_journal WHERE plan_id = ?", (plan_id,))
 
-    # --- coverage + quarantine surface (spec §4.4; AC-D1, AC-D6) ---
+    # --- coverage + quarantine surface (spec section 4.4; AC-D1, AC-D6) ---
 
     # Key first-class fields whose backfill coverage AC-D1 tracks. Fixed
     # allowlist -> safe to interpolate into the fill-rate query below.
@@ -2795,7 +2795,7 @@ class Database:
         """Return backfill coverage and per-field fill rates.
 
         Coverage uses the AC-D1 denominator ``resolved / (resolved +
-        quarantined)`` — ``pending`` tracks are excluded so an in-progress
+        quarantined)``, ``pending`` tracks are excluded so an in-progress
         backfill does not depress the number, and quarantined tracks stay in the
         denominator so quarantine cannot game the floor.
         """
@@ -2816,7 +2816,7 @@ class Database:
                 fill[column] = 0.0
                 continue
             filled = self.conn.execute(
-                f"SELECT COUNT(*) AS c FROM tracks "
+                f"SELECT COUNT(*) AS c FROM tracks "  # noqa: S608 - columns from code-controlled allowlist; values parameterized
                 f"WHERE {column} IS NOT NULL AND {column} != ''"
             ).fetchone()["c"]
             fill[column] = filled / total
@@ -2966,7 +2966,7 @@ class Database:
         ).fetchall()
         return [row[0] for row in rows]
 
-    # --- playlist_track_mappings (spec §4.1a: per-playlist release override) ---
+    # --- playlist_track_mappings (spec section 4.1a: per-playlist release override) ---
 
     def set_playlist_track_mapping(
         self,
@@ -3022,7 +3022,7 @@ class Database:
             "updated_at": row["updated_at"],
         }
 
-    # --- two-level identity-lock resolution (spec §8, AC-L1/L4) ---
+    # --- two-level identity-lock resolution (spec section 8, AC-L1/L4) ---
 
     def get_effective_lock(
         self, track_id: int, platform: str, playlist_id: int | None = None
@@ -3037,7 +3037,7 @@ class Database:
         after a platform re-ID.
 
         Only an ``user_approved`` mapping is a lock; an auto-matched (unapproved)
-        per-playlist row does NOT shadow a global lock — it falls through to the
+        per-playlist row does NOT shadow a global lock, it falls through to the
         global default.
         """
         track = self.get_track(track_id)
@@ -3136,7 +3136,7 @@ class Database:
             for r in rows
         ]
 
-    # --- playlist_track_prefs (spec §4.1a: most-specific preference scope) ---
+    # --- playlist_track_prefs (spec section 4.1a: most-specific preference scope) ---
 
     def set_playlist_track_pref(
         self,
@@ -3152,8 +3152,8 @@ class Database:
         A ``None`` ``playlist_id`` denotes a playlist-agnostic per-track
         preference (it applies to the track on every playlist). Keying on
         ``target`` (not just ``criterion``) is what lets multiple targets coexist
-        on one axis — e.g. ``content avoid karaoke`` and ``content avoid
-        instrumental`` — instead of the second overwriting the first. Re-setting
+        on one axis, e.g. ``content avoid karaoke`` and ``content avoid
+        instrumental``, instead of the second overwriting the first. Re-setting
         the same ``(scope, criterion, target)`` replaces its strength in place.
 
         Uses a NULL-safe delete-then-insert (``IS`` matches NULL) rather than
@@ -3292,7 +3292,7 @@ class Database:
         if updates:
             params.append(track_id)
             self.conn.execute(
-                f"UPDATE tracks SET {', '.join(updates)} WHERE id = ?",
+                f"UPDATE tracks SET {', '.join(updates)} WHERE id = ?",  # noqa: S608 - columns from code-controlled allowlist; values parameterized
                 params,
             )
             self.conn.commit()
@@ -3507,7 +3507,7 @@ class Database:
         placeholders = ",".join("?" * len(norms))
         with self.conn:
             rows = self.conn.execute(
-                f"SELECT DISTINCT class_id FROM artist_aliases "
+                f"SELECT DISTINCT class_id FROM artist_aliases "  # noqa: S608 - placeholders are bound '?' params; values parameterized
                 f"WHERE norm_member IN ({placeholders})",
                 tuple(norms),
             ).fetchall()
@@ -3687,7 +3687,7 @@ class Database:
             return
         sets.append("updated_at = datetime('now')")
         values.append(artist_id)
-        self.conn.execute(f"UPDATE artists SET {', '.join(sets)} WHERE id = ?", values)
+        self.conn.execute(f"UPDATE artists SET {', '.join(sets)} WHERE id = ?", values)  # noqa: S608 - columns from code-controlled allowlist; values parameterized
         self.conn.commit()
 
     def _row_to_artist(self, row: sqlite3.Row) -> Artist:
@@ -3986,7 +3986,7 @@ class Database:
             sets = ", ".join(f"{k} = ?" for k in fields)
             vals = [*fields.values(), track_id, platform]
             self.conn.execute(
-                f"UPDATE track_platform_metadata SET {sets}, fetched_at = datetime('now') "
+                f"UPDATE track_platform_metadata SET {sets}, fetched_at = datetime('now') "  # noqa: S608 - columns from code-controlled allowlist; values parameterized
                 f"WHERE track_id = ? AND platform = ?",
                 vals,
             )
@@ -3995,7 +3995,7 @@ class Database:
             placeholders = ", ".join("?" * len(cols))
             vals = [track_id, platform, platform_track_id, *fields.values()]
             self.conn.execute(
-                f"INSERT INTO track_platform_metadata ({', '.join(cols)}) VALUES ({placeholders})",
+                f"INSERT INTO track_platform_metadata ({', '.join(cols)}) VALUES ({placeholders})",  # noqa: S608 - columns from code-controlled allowlist; values parameterized
                 vals,
             )
         self.conn.commit()
@@ -4058,7 +4058,7 @@ class Database:
             return []
         placeholders = ", ".join("?" * len(tags))
         rows = self.conn.execute(
-            f"SELECT t.* FROM tracks t "
+            f"SELECT t.* FROM tracks t "  # noqa: S608 - placeholders are bound '?' params; values parameterized
             f"WHERE (SELECT COUNT(*) FROM track_tags tt WHERE tt.track_id = t.id AND tt.tag IN ({placeholders})) = ?",
             [*tags, len(tags)],
         ).fetchall()

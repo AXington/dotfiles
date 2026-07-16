@@ -198,7 +198,7 @@ break_artist_runs = distribute_artists
 
 
 def _place_moments(
-    tracks: list,
+    tracks: list,  # noqa: ARG001 - signature parity with placement helpers
     moments: list[int],
     total: int,
 ) -> dict[int, int]:
@@ -403,7 +403,7 @@ def _greedy_build(
     penalty_overrides: dict[str, float] | None,
     intent: "PlaylistIntent | None" = None,
 ) -> list[TrackMetadata]:
-    """Build sequence using greedy nearest-neighbor with bold jumps and block insertion."""
+    """Build sequence using greedy nearest-neighbor with bold jumps and block insertion."""  # noqa: E501
     context = SequenceContext(
         position=0,
         total=track_count,
@@ -828,7 +828,7 @@ def _two_opt(
 def _optimize_within_section(
     tracks: list[TrackMetadata],
     weights: dict | None,
-    arc: str,
+    arc: str,  # noqa: ARG001 - reserved arc param; signature parity
 ) -> list[TrackMetadata]:
     """Optimize track order within a single narrative section using sonic scoring."""
     if len(tracks) <= 2:
@@ -891,7 +891,7 @@ def _score_track_section_fitness(
 def assign_tracks_to_sections(
     tracks: list[TrackMetadata],
     sections: list[NarrativeSection],
-    goal: str,
+    goal: str,  # noqa: ARG001 - signature parity
 ) -> dict[str, list[TrackMetadata]]:
     """Assign tracks to narrative sections using greedy best-fit algorithm.
 

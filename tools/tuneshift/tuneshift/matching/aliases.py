@@ -1,11 +1,11 @@
 """Artist-alias equivalence classes.
 
-Some artists publish the *same act* under different surface names — a stylized
-glyph ("98\u00b0" / "98\u00ba" / "98 Degrees"), a rebrand ("Ke$ha" -> "Kesha"), and so on.
-Plain normalization cannot bridge every such case: ``normalize_artist`` maps
-"98\u00b0" (U+00B0 degree sign) to "98 degrees", but "98\u00ba" (U+00BA masculine ordinal
-indicator) is a legitimate Spanish/Portuguese ordinal, so it must *not* be
-folded globally. A curated equivalence class bridges the gap safely.
+Some artists publish the *same act* under different surface names, a stylized
+glyph ("98\u00b0" / "98\u00ba" / "98 Degrees"), a rebrand ("Ke$ha" -> "Kesha"),
+and so on. Plain normalization cannot bridge every such case: ``normalize_artist``
+maps "98\u00b0" (U+00B0 degree sign) to "98 degrees", but "98\u00ba" (U+00BA
+masculine ordinal indicator) is a legitimate Spanish/Portuguese ordinal, so it
+must *not* be folded globally. A curated equivalence class bridges the gap safely.
 
 Two representations per class, and they are NOT interchangeable:
 

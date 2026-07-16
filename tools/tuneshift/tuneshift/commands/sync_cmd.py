@@ -1,13 +1,13 @@
 """Sync command: route a playlist's remote push through plan/apply (AC-P1).
 
-Under the terraform-style plan/apply model (spec §7.1) a sync's remote push is
+Under the terraform-style plan/apply model (spec section 7.1) a sync's remote push is
 ROUTED, never performed inline. By default ``sync`` writes a reviewable plan and
 pushes NOTHING (AC-P1); ``--apply`` builds and applies the plan in one step for
 daily use; ``--interactive`` (with ``--apply``) steps through each push before
 applying (AC-P2). Rollback of a pushed plan is forward-only via a compensating
-plan (``plan rollback`` → ``plan apply``, AC-P4).
+plan (``plan rollback`` -> ``plan apply``, AC-P4).
 
-Scope boundary (§7.1): this command owns only the remote push. Local mapping
+Scope boundary (section 7.1): this command owns only the remote push. Local mapping
 reconcile/persist is the ROUTED ``doctor`` / ``plan rematch`` path and durable
 sequencing is the ``order`` command. When a playlist has auto-reorder enabled the
 push honors its arc order (computed read-only here), so the platform still
@@ -27,7 +27,7 @@ from tuneshift.planapply.sync import build_sync_plan, make_sync_executor
 # _apply_sync_plan outcomes.
 _PUSH_APPLIED = 0  # at least one push reached the platform
 _PUSH_FAILED = 1  # a push was attempted and failed
-_PUSH_NOOP = 2  # nothing applied (all changes rejected/skipped) — no push
+_PUSH_NOOP = 2  # nothing applied (all changes rejected/skipped), no push
 
 
 def handle_sync(args, db: Database) -> int:
@@ -127,7 +127,7 @@ def _sync_one(db: Database, playlist, platforms, args) -> int:
         elif rc == _PUSH_APPLIED:
             applied_any = True
             db.mark_playlist_synced(playlist.id, platform_name)
-        # _PUSH_NOOP (nothing applied — e.g. interactively rejected): not a
+        # _PUSH_NOOP (nothing applied - e.g. interactively rejected): not a
         # failure, but the platform did NOT receive the push, so we must NOT
         # record it as synced.
 
@@ -169,7 +169,7 @@ def _apply_sync_plan(
 
     Returns one of ``_PUSH_APPLIED`` (a push reached the platform),
     ``_PUSH_FAILED`` (a push was attempted and failed), or ``_PUSH_NOOP``
-    (nothing was applied — e.g. the user rejected every push interactively).
+    (nothing was applied, e.g. the user rejected every push interactively).
     The caller must distinguish these so a rejected push is never recorded as
     synced.
     """

@@ -22,7 +22,7 @@ def _session_is_valid(client) -> bool:
     return True
 
 
-def handle_login(args, db) -> int:
+def handle_login(args, db) -> int:  # noqa: ARG001 - required by CLI subcommand handler signature
     """Authenticate with a streaming platform."""
     from tuneshift.commands.ingest_cmd import _load_client
 
@@ -31,7 +31,7 @@ def handle_login(args, db) -> int:
         print(f"Unknown platform: {args.platform}", file=sys.stderr)
         return 1
 
-    # Check if already logged in — load_session() only confirms a token file
+    # Check if already logged in - load_session() only confirms a token file
     # loads structurally, so validate the session is actually usable before
     # short-circuiting. An expired/revoked session falls through to re-auth.
     if client.load_session():

@@ -55,7 +55,7 @@ def handle_enrich(args, db: Database) -> int:
 
         if not client.load_session():
             print(
-                f"Not logged in to {platform_name}. Run: tuneshift login {platform_name}",
+                f"Not logged in to {platform_name}. Run: tuneshift login {platform_name}",  # noqa: E501
                 file=sys.stderr,
             )
             return 1
@@ -90,7 +90,7 @@ def handle_enrich(args, db: Database) -> int:
                     continue
 
             print(
-                f'Enriched "{playlist.name}": {enriched} tracks updated, {skipped} already had metadata'
+                f'Enriched "{playlist.name}": {enriched} tracks updated, {skipped} already had metadata'  # noqa: E501
             )
 
     # Catalog metadata (Atmos, release year, genres, quality tiers) from Tidal,
@@ -153,7 +153,7 @@ def _run_classification(
     if not classifier.available:
         print(
             "No LLM backend available for classification. Set one of:\n"
-            "  ANTHROPIC_API_KEY, OPENAI_API_KEY, TUNESHIFT_LLM_BASE_URL, or OLLAMA_HOST\n"
+            "  ANTHROPIC_API_KEY, OPENAI_API_KEY, TUNESHIFT_LLM_BASE_URL, or OLLAMA_HOST\n"  # noqa: E501
             "  (or TUNESHIFT_LLM_BACKEND to select explicitly)",
             file=sys.stderr,
         )
@@ -194,7 +194,7 @@ def _run_classification(
     )
 
     classified = 0
-    # Build lookup map to match results by title/artist (guards against LLM reordering/dropping)
+    # Build lookup map to match results by title/artist (guards against LLM reordering/dropping)  # noqa: E501
     track_lookup: dict[tuple[str, str], dict] = {}
     for t in to_classify:
         key = (t["title"].lower().strip(), t["artist"].lower().strip())

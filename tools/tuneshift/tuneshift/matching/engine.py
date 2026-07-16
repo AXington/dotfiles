@@ -4,9 +4,9 @@
 :class:`~tuneshift.matching.penalties.SignalPenalty` objects and exposes two
 projections of the same evidence.
 
-* ``total`` — normalized weighted distance in [0.0, 1.0]; 0.0 = perfect match,
-  higher = worse. ``total = Σ(clamp(penalty)·weight) / Σweight``.
-* ``points`` — the raw signed legacy point sum, used by the byte-parity track
+* ``total``, normalized weighted distance in [0.0, 1.0]; 0.0 = perfect match,
+  higher = worse. ``total = sum(clamp(penalty)*weight) / sum(weight)``.
+* ``points``, the raw signed legacy point sum, used by the byte-parity track
   scorer (which applies the historical staged clamping itself).
 
 ``recommend`` turns a candidate's distance (optionally with the runner-up's

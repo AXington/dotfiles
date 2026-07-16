@@ -44,7 +44,7 @@ def handle_import_text(args, db: Database) -> int:
         playlist_id = existing.id
         if not getattr(args, "force", False):
             print(
-                f'Playlist "{playlist_name}" already exists ({len(db.get_playlist_tracks(playlist_id))} tracks).'
+                f'Playlist "{playlist_name}" already exists ({len(db.get_playlist_tracks(playlist_id))} tracks).'  # noqa: E501
             )
             print("Use --force to overwrite.")
             return 1
@@ -79,7 +79,7 @@ def handle_import_text(args, db: Database) -> int:
 def _parse_playlist_file(
     lines: list[str],
 ) -> tuple[str | None, str | None, list[tuple[str, str, str | None]]]:
-    """Parse a playlist text file. Returns (name, tidal_id, [(title, artist, album)])."""
+    """Parse a playlist text file. Returns (name, tidal_id, [(title, artist, album)])."""  # noqa: E501
     name = None
     tidal_id = None
     tracks: list[tuple[str, str, str | None]] = []

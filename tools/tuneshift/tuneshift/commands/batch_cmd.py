@@ -334,7 +334,7 @@ def plan_sweep_banned(
     return results
 
 
-def match_filter(track, filter_str: str, db: Database | None = None) -> bool:
+def match_filter(track, filter_str: str, db: Database | None = None) -> bool:  # noqa: ARG001 - reserved for filters that query the db; shared filter signature
     """Check if a track matches a filter expression.
 
     Filter types:

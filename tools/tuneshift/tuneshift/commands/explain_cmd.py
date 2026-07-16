@@ -9,8 +9,8 @@ written by sync / doctor / add; ``--live`` forces a fresh reconcile (needs auth)
 and re-persists.
 
 ``explain`` renders the full decision (AC-CLI3): the criteria that fired (hard vs
-soft), the winner's weighted signal breakdown, the precedence tie-break, and —
-for a miss (AC-CLI5) — every rejected candidate with its per-candidate rejection
+soft), the winner's weighted signal breakdown, the precedence tie-break, and,
+for a miss (AC-CLI5), every rejected candidate with its per-candidate rejection
 reason. ``why`` is a deprecated alias kept for one release.
 """
 
@@ -36,7 +36,7 @@ def _resolve_playlist(args, db: Database) -> tuple[int, str | None, int | None]:
 
     Returns ``(playlist_id, label, None)`` on success, or ``(0, None, exit_code)``
     when a named playlist could not be found. A missing argument scopes to the
-    global sentinel (``0``) — the pre-playlist ``why`` behaviour.
+    global sentinel (``0``), the pre-playlist ``why`` behaviour.
     """
     name = getattr(args, "playlist", None)
     if not name:
@@ -60,7 +60,7 @@ def handle_explain(args, db: Database) -> int:
         return err
 
     album = f" [{track.album}]" if track.album else ""
-    print(f"Track #{track.id}: {track.title} — {track.artist}{album}")
+    print(f"Track #{track.id}: {track.title} - {track.artist}{album}")
     if track.isrc:
         print(f"  ISRC: {track.isrc}")
     if playlist_label is not None:
@@ -112,7 +112,7 @@ def _explain_live(db: Database, track, platforms: list[str], playlist_id: int) -
             continue
         if not client.load_session():
             print(
-                f"{platform}: not logged in (run `tuneshift login {platform}`), skipped",
+                f"{platform}: not logged in (run `tuneshift login {platform}`), skipped",  # noqa: E501
                 file=sys.stderr,
             )
             continue
@@ -164,7 +164,7 @@ def _print_criteria(audit) -> None:
     for c in criteria:
         target = f"={c.target}" if c.target else ""
         status = "fired" if c.fired else "in force, no effect"
-        print(f"      [{c.kind}] {c.criterion}{target} ({c.strength}) — {status}")
+        print(f"      [{c.kind}] {c.criterion}{target} ({c.strength}) - {status}")
 
 
 def _print_breakdown(audit) -> None:
@@ -188,4 +188,4 @@ def _format_rejected(cand) -> str:
         why = cand.decisive_signal
     else:
         why = "not chosen"
-    return f"[{cand.score}] {cand.title} — {cand.artist} ({cand.album}) — {why}"
+    return f"[{cand.score}] {cand.title} - {cand.artist} ({cand.album}) - {why}"

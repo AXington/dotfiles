@@ -1,12 +1,12 @@
-"""Configurable named penalties — the beets-style scoring primitives.
+"""Configurable named penalties, the beets-style scoring primitives.
 
 Each scoring signal (title, artist, album, isrc, version keywords, duration)
 is expressed as a :class:`SignalPenalty` carrying two projections of the same
 judgement:
 
-* ``penalty`` (0.0-1.0) and ``weight`` — the *distance* view: 0.0 = perfect,
-  1.0 = worst; distance = Σ(penalty·weight) / Σweight (see ``engine.py``).
-* ``points`` — the *legacy-score* view: the exact signed integer this signal
+* ``penalty`` (0.0-1.0) and ``weight``, the *distance* view: 0.0 = perfect,
+  1.0 = worst; distance = sum(penalty*weight) / sum(weight) (see ``engine.py``).
+* ``points``, the *legacy-score* view: the exact signed integer this signal
   contributed under the historical additive scorer, so the split preserves
   byte-for-byte parity with ``score_match`` / ``score_match_with_version``.
 
@@ -329,14 +329,14 @@ def _residual_version_signals(
     edition bucket names produced by
     :func:`tuneshift.matching.preferences.scoring_intent`):
 
-    * **avoided** — the candidate carries an edition the playlist wants to steer
+    * **avoided**, the candidate carries an edition the playlist wants to steer
       away from: down-rank it (substitute-grade) so a cleaner alternative wins,
       while keeping it findable when it is the only option.
-    * **preferred** — the playlist wants this edition: candidates *lacking* it
+    * **preferred**, the playlist wants this edition: candidates *lacking* it
       are treated as a substitute for the intent (substitute-grade penalty), so
       the preferred edition wins even at the score ceiling; the edition-bearing
       candidate keeps its full score.
-    * **default** (neither preferred nor avoided) — the historical asymmetric
+    * **default** (neither preferred nor avoided), the historical asymmetric
       minor down-rank: penalise only when the candidate carries the marker and
       the source does not. With no configured preferences every bucket falls
       here, preserving byte-for-byte parity.
@@ -344,7 +344,7 @@ def _residual_version_signals(
     ``owned`` names buckets whose axis is governed by an active *typed* criterion
     (e.g. the ``edit`` axis owns ``radio_edit``). Those buckets are skipped
     entirely so the typed criterion is the single source of truth for that axis
-    and its default down-rank cannot double-count against — or fight — an
+    and its default down-rank cannot double-count against, or fight, an
     explicit typed preference (M7). ``owned`` is empty for default prefs, so
     byte-parity is preserved.
     """

@@ -241,7 +241,8 @@ class OllamaBackend:
 def detect_backend() -> tuple[str, LLMBackend] | tuple[None, None]:
     """Auto-detect available LLM backend from environment.
 
-    Priority: explicit TUNESHIFT_LLM_BACKEND > ANTHROPIC_API_KEY > OPENAI_API_KEY > Ollama.
+    Priority: explicit TUNESHIFT_LLM_BACKEND > ANTHROPIC_API_KEY > OPENAI_API_KEY
+    > Ollama.
     """
     explicit = os.environ.get("TUNESHIFT_LLM_BACKEND", "").lower()
 

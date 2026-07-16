@@ -17,7 +17,7 @@ class GapReport:
 def analyze_gaps(
     tracks: list[TrackMetadata],
     sections: list[dict],
-    goal: str,
+    goal: str,  # noqa: ARG001 - analyzer signature parity
 ) -> list[GapReport]:
     """Analyze playlist for narrative and compositional gaps.
 
@@ -45,9 +45,9 @@ def analyze_gaps(
                 GapReport(
                     gap_type="thin_section",
                     section_name=section["name"],
-                    description=f"{section['name']} needs ~{capacity} tracks but playlist only has ~{allocated_tracks:.0f} allocated",
+                    description=f"{section['name']} needs ~{capacity} tracks but playlist only has ~{allocated_tracks:.0f} allocated",  # noqa: E501
                     severity=min(1.0, (capacity - allocated_tracks) / max(capacity, 1)),
-                    suggestion=f"Add {int(capacity - allocated_tracks)} tracks matching: {section.get('description', '')}",
+                    suggestion=f"Add {int(capacity - allocated_tracks)} tracks matching: {section.get('description', '')}",  # noqa: E501
                 )
             )
 
@@ -86,9 +86,9 @@ def analyze_gaps(
                     GapReport(
                         gap_type="missing_transition",
                         section_name=f"{curr_section['name']}->{next_section['name']}",
-                        description=f"Abrupt intensity jump ({intensity_jump:.1f}) between {curr_section['name']} and {next_section['name']}",
+                        description=f"Abrupt intensity jump ({intensity_jump:.1f}) between {curr_section['name']} and {next_section['name']}",  # noqa: E501
                         severity=min(1.0, intensity_jump),
-                        suggestion=f"Add a transitional track (intensity ~{(curr_intensity + next_intensity) / 2:.1f}) between sections",
+                        suggestion=f"Add a transitional track (intensity ~{(curr_intensity + next_intensity) / 2:.1f}) between sections",  # noqa: E501
                     )
                 )
 

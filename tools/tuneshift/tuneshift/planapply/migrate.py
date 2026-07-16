@@ -1,15 +1,15 @@
 """Migration of stale/abandoned global mappings as a plan (AC-P5).
 
 The ~254 abandoned/stale ``platform_tracks`` mappings are migrated through the
-SAME plan/apply engine as everything else — no separate clobbering path. The
+SAME plan/apply engine as everything else, no separate clobbering path. The
 plan carries, per track, ``current -> proposed`` with a reason and a
 :attr:`~tuneshift.planapply.models.PlanChange.classification`:
 
-- ``improved`` — the engine re-resolves the track confidently to a DIFFERENT
+- ``improved``, the engine re-resolves the track confidently to a DIFFERENT
   release. This is the only actionable change; nothing else is ever applied.
-- ``unchanged`` — re-resolves to the same id (a no-op), or the row is
+- ``unchanged``, re-resolves to the same id (a no-op), or the row is
   ``user_approved`` and therefore bypassed for guaranteed zero regressions.
-- ``needs-human-judgment`` — the engine cannot confidently improve the mapping,
+- ``needs-human-judgment``, the engine cannot confidently improve the mapping,
   so it is left as-is for the triage surface rather than silently rewritten.
 
 Success is not "zero changes" or an automatic threshold: it is

@@ -107,7 +107,7 @@ def _review_section_integrity(
                     ReviewFinding(
                         category="section_integrity",
                         description=(
-                            f'{section.name} does not contain required track "{required_title}" '
+                            f'{section.name} does not contain required track "{required_title}" '  # noqa: E501
                             "in its assignment."
                         ),
                         severity=1.0,
@@ -125,7 +125,7 @@ def _review_section_integrity(
                 findings.append(
                     ReviewFinding(
                         category="section_integrity",
-                        description=f'{section.name} is missing required track "{required_title}".',
+                        description=f'{section.name} is missing required track "{required_title}".',  # noqa: E501
                         severity=1.0,
                         section_name=section.name,
                     )
@@ -141,7 +141,7 @@ def _review_section_integrity(
                     ReviewFinding(
                         category="section_integrity",
                         description=(
-                            f'"{required_title}" falls outside the declared {section.name} '
+                            f'"{required_title}" falls outside the declared {section.name} '  # noqa: E501
                             "section range."
                         ),
                         severity=0.8,
@@ -187,7 +187,7 @@ def _review_transition_quality(
 
 
 def _check_rule_against_artist(rule: str, artist: Artist) -> bool | None:
-    """Check if an artist satisfies a rule. Returns True/False/None (can't determine)."""
+    """Check if an artist satisfies a rule. Returns True/False/None (can't determine)."""  # noqa: E501
     match = _ARTIST_MUST_BE_RE.match(rule)
     if match:
         required_tag = match.group(1).casefold()
@@ -260,7 +260,7 @@ def _enforce_artist_tag(
                     description=(
                         f'HARD: "{track.title}" by {track.artist} - '
                         f'Rule: "{rule}" - FAILS '
-                        f"(tags: {artist.tags}, confidence: {artist.identity_confidence})"
+                        f"(tags: {artist.tags}, confidence: {artist.identity_confidence})"  # noqa: E501
                     ),
                     severity=1.0,
                     section_name=None,
@@ -326,7 +326,7 @@ def _enforce_era(
 
 def _enforce_thematic_unavailable(
     rule: str,
-    tracks: list[TrackMetadata],
+    tracks: list[TrackMetadata],  # noqa: ARG001 - rule-handler signature; emits once per rule
 ) -> list[ReviewFinding]:
     """Placeholder for a thematic rule with no LLM judge (replaced in Chunk 2).
 
@@ -541,7 +541,7 @@ def _review_section_fitness(
                             f'"{track.title}" by {track.artist} - '
                             f"fitness {fitness:.2f} in {section.name} "
                             f"(section wants: {section.implied_stance or 'any'} / "
-                            f"{', '.join(section.mood) if section.mood else 'any mood'})"
+                            f"{', '.join(section.mood) if section.mood else 'any mood'})"  # noqa: E501
                         ),
                         severity=0.7,
                         section_name=section.name,
@@ -804,7 +804,7 @@ def _review_vibe_outliers(tracks: list[TrackMetadata]) -> list[ReviewFinding]:
                         f"vibes [{', '.join(sorted(track.vibes)[:4])}] "
                         f"(categories: {', '.join(sorted(track_cats))}) "
                         f"do not match playlist profile "
-                        f"(dominant: {', '.join(sorted(dominant_cats or present_cats))})"
+                        f"(dominant: {', '.join(sorted(dominant_cats or present_cats))})"  # noqa: E501
                     ),
                     severity=0.7,
                     section_name=None,

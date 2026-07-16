@@ -144,7 +144,7 @@ def _audit_mappings(db: Database, playlist) -> list[str]:
             elif artist_ratio < 0.5:
                 findings.append(
                     f'[MAPPING] {platform}: "{track.title}" -> artist mismatch: '
-                    f'expected "{track.artist}", got "{p_artist}" (ratio: {artist_ratio:.2f})'
+                    f'expected "{track.artist}", got "{p_artist}" (ratio: {artist_ratio:.2f})'  # noqa: E501
                 )
 
     return findings
@@ -190,8 +190,8 @@ def _audit_concept(db: Database, playlist, llm_judge=None) -> list[str]:
 
     if unverifiable:
         findings.append(
-            f"[UNVERIFIED] {unverifiable} track(s) cannot be verified against concept rules "
-            f'(artists not enriched). Run: tuneshift enrich "{playlist.name}" --classify'
+            f"[UNVERIFIED] {unverifiable} track(s) cannot be verified against concept rules "  # noqa: E501
+            f'(artists not enriched). Run: tuneshift enrich "{playlist.name}" --classify'  # noqa: E501
         )
 
     return findings

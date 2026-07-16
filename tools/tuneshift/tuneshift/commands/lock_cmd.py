@@ -1,19 +1,19 @@
 """The ``lock`` / ``unlock`` commands: identity locks at global + per-playlist scope.
 
 An IdentityLock pins a track to a specific platform release so it survives a
-re-doctor (spec §8, AC-L1/AC-L2). Two levels exist and are both exposed here:
+re-doctor (spec section 8, AC-L1/AC-L2). Two levels exist and are both exposed here:
 
 - **global** (default): the library-wide default lock on ``platform_tracks``.
 - **per-playlist** (``--playlist NAME``): an override lock on
   ``playlist_track_mappings`` that wins over the global lock for that playlist.
 
-Per the §7.1 mutation-routing table a lock change is ROUTED: it produces a
+Per the section 7.1 mutation-routing table a lock change is ROUTED: it produces a
 reviewable, journaled plan rather than mutating inline. By default these verbs
 WRITE A PLAN and apply nothing (AC-P1); ``--apply`` is the one-step
 plan-then-apply convenience for daily use, and ``--interactive`` steps through
 the change before applying. Because the user explicitly issued ``lock``/
 ``unlock``, ``--apply`` applies the (locked-row) change without a second
-``--include-locked`` opt-in — the intent is already unambiguous.
+``--include-locked`` opt-in, the intent is already unambiguous.
 """
 
 from __future__ import annotations
@@ -84,7 +84,7 @@ def _print_lock_layer(title: str, locks: list[dict], *, overridden: set) -> None
         marker = " " if shadowed else "*"
         note = "  (overridden)" if shadowed else ""
         print(
-            f"    {marker} #{lock['track_id']} {lock['title']} — {lock['artist']}: "
+            f"    {marker} #{lock['track_id']} {lock['title']} - {lock['artist']}: "
             f"{lock['platform']}:{lock['platform_track_id']}{note}"
         )
 

@@ -9,7 +9,7 @@ Conflict resolution is *lexicographic*, never a weighted average: walking the
 precedence order from highest to lowest, the first criterion on which the
 surviving contenders disagree eliminates the disfavoured ones. This guarantees
 the higher-precedence preference dominates and that the winner is always a
-candidate some preference actually wanted — a plain weighted sum could let a
+candidate some preference actually wanted, a plain weighted sum could let a
 large-weight low-precedence preference win, or let a candidate neither
 preference favoured slip through. Every elimination step is recorded in a trace
 so ``explain`` (AC-CLI3) can show which preference won and over whom.
@@ -124,7 +124,7 @@ def resolve_conflict(
 
     ``candidate_verdicts`` maps each candidate to the verdict *each active
     preference* assigned it, keyed by the :class:`PreferenceRef` itself (NOT by
-    criterion name — two preferences may reference the same criterion at
+    criterion name, two preferences may reference the same criterion at
     different scopes/targets, e.g. a track override of a global default, and
     those must stay distinct). Walking ``precedence`` highest-first, each
     preference keeps only the contenders it favours most; the first preference

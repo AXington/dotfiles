@@ -2,7 +2,7 @@
 
 Plans are JSON documents under ``.tuneshift/plans/<plan_id>.json`` beside the
 database (so separate databases never share plans). The plan file is the durable
-default — a mutating command writes a plan and applies nothing until
+default, a mutating command writes a plan and applies nothing until
 :func:`~tuneshift.planapply.apply.apply_plan` runs it. Between the two, the plan
 can be edited/pruned: :func:`reject_change` drops an individual change (AC-P2).
 """

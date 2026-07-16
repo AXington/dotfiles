@@ -6,7 +6,7 @@ blocking the add path on MusicBrainz/LLM calls, so this work is deferred: the
 resolution worker calls :func:`enrich_track` after a track resolves, out of the
 interactive path.
 
-Scope note (spec §14 ownership): this is *sequencer classification + artist
+Scope note (spec section 14 ownership): this is *sequencer classification + artist
 genre* enrichment, already owned by this codebase. It is distinct from the
 enrichment spec's ``get_track_metadata``/``derive_tags`` capture, which remains
 that spec's concern.

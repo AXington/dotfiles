@@ -54,7 +54,7 @@ _PUNCT_NORMALIZE = str.maketrans(
         "\u2014": "-",
         "\u2015": "-",  # en/em/horizontal dashes
         "\u00a0": " ",  # non-breaking space
-        "\u00b0": " degrees ",  # degree sign: "98°" -> "98 degrees" (band names)
+        "\u00b0": " degrees ",  # degree sign: e.g. "98 deg" -> "98 degrees" (band names)  # noqa: E501
     }
 )
 _WHITESPACE_RE = re.compile(r"\s+")
@@ -79,7 +79,7 @@ _STANDALONE_PUNCT_RE = re.compile(
 )  # Standalone punctuation between words
 # The FEATURED-credit boundary: everything after an explicit feat/ft/featuring
 # marker is a featured artist, not a main one (M5). Deliberately does NOT include
-# "with"/"&"/","/"x" — those join co-billed MAIN artists and stay in the main set.
+# "with"/"&"/","/"x" - those join co-billed MAIN artists and stay in the main set.
 _FEAT_ROLE_SPLIT_RE = re.compile(
     r"\s+(?:feat\.?|ft\.?|featuring)\s+",
     re.IGNORECASE,
@@ -90,10 +90,10 @@ def fold_accents(text: str) -> str:
     """Strip Latin diacritics while leaving non-Latin scripts intact.
 
     Decomposes to NFD, removes only the Latin combining-mark range
-    (U+0300-U+036F), and recomposes. "Beyoncé" -> "Beyonce" and "Motörhead" ->
-    "Motorhead", but CJK, kana (including dakuten-bearing characters like "が"),
-    and Hangul pass through unchanged — we never transliterate or romanize a
-    non-Latin script.
+    (U+0300-U+036F), and recomposes. "Beyonce" (e-acute) -> "Beyonce" and
+    "Motorhead" (o-umlaut) -> "Motorhead", but CJK, kana (including
+    dakuten-bearing kana such as GA), and Hangul pass through unchanged: we
+    never transliterate or romanize a non-Latin script.
     """
     if not text:
         return ""
@@ -153,14 +153,14 @@ def split_artist_roles(
 
     The portion before an explicit ``feat.``/``ft.``/``featuring`` marker is the
     MAIN credit; everything after is FEATURED. Co-billed main artists joined by
-    ``&``/``and``/``,``/``x``/``with`` stay together in the main set — only the
+    ``&``/``and``/``,``/``x``/``with`` stay together in the main set, only the
     feat marker separates roles. Each side is normalized/alias-canonicalized via
     :func:`split_artists` so role sets compare on the same basis as the flat
     overlap. A credit with no feat marker has an empty featured set.
 
-    KNOWN COVERAGE GAP (spec §11 M5): reliable role data ultimately wants the
+    KNOWN COVERAGE GAP (spec section 11 M5): reliable role data ultimately wants the
     MusicBrainz artist-credit ``joinphrase``/role fields, which are inconsistent
-    across releases — many carry flat artist strings with no role breakdown. This
+    across releases, many carry flat artist strings with no role breakdown. This
     string-marker heuristic is the best signal available from the platform credit
     alone; a low fire-rate on role distinctions is expected, not a bug.
     """
@@ -333,7 +333,7 @@ _SPED_UP_RE = re.compile(
     r"\b(sped[\s-]?up|slowed(?:\s+down)?|nightcore|daycore)\b",
     re.IGNORECASE,
 )
-# M1 — DJ/continuous-mix markers safe to read from FREE TEXT (title/album):
+# M1 - DJ/continuous-mix markers safe to read from FREE TEXT (title/album):
 # only unambiguous phrases, never a bare "mixed" (which is a song word, e.g.
 # "Mixed Emotions"). A crossfaded/beatmatched mix track ruins standalone
 # playback, so it is a distinct recording that must be avoided by default.
@@ -345,7 +345,7 @@ _CONTINUOUS_MIX_RE = re.compile(
 # The Tidal `version` field is a controlled vocabulary where a bare "Mixed" or
 # "Continuous" denotes a continuous DJ mix. It is a STRUCTURED field, so these
 # broader tokens are trusted from it (but never inferred from a free-text
-# title/album — see ``infer_version``).
+# title/album - see ``infer_version``).
 _CONTINUOUS_MIX_VERSION_RE = re.compile(
     r"\b(mixed|continuous|dj\s+mix|non[\s-]?stop|mega\s?mix|gapless)\b",
     re.IGNORECASE,
@@ -414,8 +414,8 @@ def base_title(title: str) -> str:
     this does not gate on known markers.
 
     Only *trailing* groups are removed: leading or embedded parentheticals that
-    are integral to the song name — "(You Drive Me) Crazy", "(Sittin' On) The
-    Dock of the Bay" — are preserved. Returns the original title if stripping
+    are integral to the song name, "(You Drive Me) Crazy", "(Sittin' On) The
+    Dock of the Bay", are preserved. Returns the original title if stripping
     would empty it.
 
     Used only by the version-aware scorers as the second leg of a blended title

@@ -29,6 +29,6 @@ def handle_goal(args, db: Database) -> int:
         print(f'Goal for "{args.playlist}":\n\n{goal}')
     else:
         print(
-            f'No goal set for "{args.playlist}". Set one with: tuneshift goal "{args.playlist}" "<text>"'
+            f'No goal set for "{args.playlist}". Set one with: tuneshift goal "{args.playlist}" "<text>"'  # noqa: E501
         )
     return 0

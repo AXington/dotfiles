@@ -1,21 +1,21 @@
-"""Typed criterion registry — the general metadata-driven matching model (§5).
+"""Typed criterion registry, the general metadata-driven matching model (section 5).
 
 This module replaces the ad-hoc two-string-list (`prefer`/`avoid`) mechanism
 with a registry of typed criteria. Each criterion is a self-contained unit:
 
-* ``extract(meta)``   — pull a typed :class:`CriterionValue` from a track-like
+* ``extract(meta)``, pull a typed :class:`CriterionValue` from a track-like
   metadata object (or ``None`` when the field is absent).
-* ``compare(source, candidate, strength)`` — given the active preference
+* ``compare(source, candidate, strength)``, given the active preference
   strength (or ``None`` when no preference references this criterion), return a
   :class:`Verdict`.
-* ``to_signal(verdict)`` — project a *soft* verdict into the existing
+* ``to_signal(verdict)``, project a *soft* verdict into the existing
   :class:`~tuneshift.matching.penalties.SignalPenalty` consumed by
   :class:`~tuneshift.matching.engine.Distance`, or ``None``.
-* ``hard_cap``        — how a *hard* verdict caps the recommendation.
+* ``hard_cap``, how a *hard* verdict caps the recommendation.
 
 **Parity-critical contract (AC-C1 / AC-C5 winner-parity):** a criterion that is
 NOT referenced by an active preference returns :attr:`Verdict.NO_VERDICT`, and
-``to_signal`` returns ``None`` for it — it contributes NOTHING to the
+``to_signal`` returns ``None`` for it, it contributes NOTHING to the
 ``Distance`` (not a zero-weight signal, literally no signal object). Only
 criteria referenced by an active preference (at any scope) may emit a signal.
 Adding a new criterion is therefore registration + config, never bespoke
@@ -107,7 +107,7 @@ class CriterionValue:
     ``raw`` is the underlying value (str, int, list, ...). ``tokens`` is an
     optional normalized token set for token-based criteria (audio-mode,
     recording-class, edition ...). ``structured`` marks the value as coming from
-    a structured metadata field rather than a parsed title token — this drives
+    a structured metadata field rather than a parsed title token, this drives
     the AC-C3 confidence gate (only structured or whitelisted-token values may
     drive a *hard* filter).
     """
@@ -142,7 +142,7 @@ def resolve_strength_verdict(strength: Strength | None, *, satisfied: bool) -> V
     ``satisfied`` means "the candidate has the property the preference is about"
     (e.g. it carries the atmos token for a ``spatial=atmos`` preference). This is
     the single routing table every criterion shares, so a new criterion needs
-    only supply extraction + a satisfaction test — never bespoke verdict logic.
+    only supply extraction + a satisfaction test, never bespoke verdict logic.
     """
 
     if strength is None:
@@ -301,7 +301,7 @@ class TokenCriterion:
 
     def compare(
         self,
-        source: CriterionValue,
+        source: CriterionValue,  # noqa: ARG002 - required by Criterion.compare interface
         candidate: CriterionValue,
         strength: Strength | None,
     ) -> Verdict:
@@ -345,7 +345,7 @@ class TitleTokenCriterion:
 
     def compare(
         self,
-        source: CriterionValue,
+        source: CriterionValue,  # noqa: ARG002 - required by Criterion.compare interface
         candidate: CriterionValue,
         strength: Strength | None,
     ) -> Verdict:
@@ -432,7 +432,7 @@ class EditAxisCriterion:
 
     def compare(
         self,
-        source: CriterionValue,
+        source: CriterionValue,  # noqa: ARG002 - required by Criterion.compare interface
         candidate: CriterionValue,
         strength: Strength | None,
     ) -> Verdict:
@@ -460,12 +460,12 @@ class DateCriterion:
     year (``remaster_year``) or an ISO date string (``release_date`` /
     ``recording_date``), from which the four-digit year is parsed. ``target`` is
     either a four-digit year (exact-year match) or the literal ``"original"``,
-    which is satisfied only when the field is ABSENT — i.e. the un-remastered /
+    which is satisfied only when the field is ABSENT, i.e. the un-remastered /
     un-dated original form.
 
     Dates are structured metadata, so a verdict is confident (a ``require`` may
-    hard-filter). An absent field yields no value → NO_VERDICT → no signal, per
-    the parity rule (§5.1): a criterion with nothing to read never perturbs the
+    hard-filter). An absent field yields no value -> NO_VERDICT -> no signal, per
+    the parity rule (section 5.1): a criterion with nothing to read never perturbs the
     score.
     """
 
@@ -490,7 +490,7 @@ class DateCriterion:
         raw = getattr(meta, self.date_field, None)
         if raw is None:
             # ``original`` keys on ABSENCE, but an absent field is still "no
-            # evidence to compare years" — represent absence with an explicit
+            # evidence to compare years" - represent absence with an explicit
             # marker value so the comparator can distinguish it from "unknown".
             if self.target.strip().lower() == self._ORIGINAL:
                 return CriterionValue(
@@ -504,7 +504,7 @@ class DateCriterion:
 
     def compare(
         self,
-        source: CriterionValue,
+        source: CriterionValue,  # noqa: ARG002 - required by Criterion.compare interface
         candidate: CriterionValue,
         strength: Strength | None,
     ) -> Verdict:
@@ -529,14 +529,14 @@ class DurationCriterion:
     playlist, this criterion compares the CANDIDATE's length against the SOURCE's
     within a configurable tolerance. ``target`` is the tolerance:
 
-    - ``"5%"`` — relative: within 5% of the source duration.
-    - ``"3s"`` / ``"3"`` — absolute: within 3 seconds of the source duration.
+    - ``"5%"``, relative: within 5% of the source duration.
+    - ``"3s"`` / ``"3"``, absolute: within 3 seconds of the source duration.
 
     A ``require`` tolerance hard-filters candidates outside the band (the "reject
     an extended mix a lenient global band would accept" case); a ``prefer`` nudges
     the score. Duration is structured numeric metadata, so the verdict is
-    confident and a hard verdict stays hard. Either side missing a duration →
-    NO_VERDICT → no signal (parity rule §5.1) — a criterion with nothing to
+    confident and a hard verdict stays hard. Either side missing a duration ->
+    NO_VERDICT -> no signal (parity rule section 5.1), a criterion with nothing to
     measure never perturbs the outcome.
     """
 
@@ -612,7 +612,7 @@ class DurationCriterion:
         if tolerance is None:
             # A malformed tolerance target (a typo past validation, or a legacy
             # row) yields no measurable band -> no signal, rather than crashing
-            # selection (parity rule §5.1).
+            # selection (parity rule section 5.1).
             return Verdict.NO_VERDICT
         satisfied = abs(float(candidate.raw) - float(source.raw)) <= tolerance
         # Numeric/structured -> confident; a hard verdict stays hard.
@@ -629,16 +629,17 @@ class ArtistRoleCriterion:
     Distinguishes MAIN artists from FEATURED ones so a ``feat. X`` variant of the
     same recording still matches on its main artist, while a candidate on which
     the source artist is merely *featured* (a different main artist) is rejected.
-    ``target`` selects the role compared; only ``"main"`` is meaningful today —
+    ``target`` selects the role compared; only ``"main"`` is meaningful today,
     the main-artist set of the source must be a subset of the candidate's main
     set. Featured artists are carried but never gate the match.
 
     The credit string is structured metadata, so the verdict is confident and a
     ``require`` may hard-filter. Either side missing an artist credit -> NO_VERDICT
-    -> no signal. KNOWN COVERAGE GAP (spec §11): precise roles ultimately want the
-    MusicBrainz artist-credit ``joinphrase``/role fields, which are inconsistent;
-    this reads the platform credit's feat/ft markers, so role distinctions fire
-    only where the credit carries them — a low fire-rate is expected, not a bug.
+    -> no signal. KNOWN COVERAGE GAP (spec section 11): precise roles ultimately
+    want the MusicBrainz artist-credit ``joinphrase``/role fields, which are
+    inconsistent; this reads the platform credit's feat/ft markers, so role
+    distinctions fire only where the credit carries them, a low fire-rate is
+    expected, not a bug.
     """
 
     name: str
@@ -687,17 +688,19 @@ class ComposerCriterion:
 
     Differentiates same-title, different-WORK recordings by comparing the
     SOURCE's composer set against the CANDIDATE's: satisfied when every source
-    composer is also credited on the candidate (source ⊆ candidate). A multi-name
-    composer credit (``"Lennon, McCartney"``) is split like an artist credit so
-    order and packaging do not matter. ``target`` is a mode selector (``"match"``)
-    — the comparison is always source-vs-candidate, not against a fixed name.
+    composer is also credited on the candidate (source is a subset of
+    candidate). A multi-name composer credit (``"Lennon, McCartney"``) is split
+    like an artist credit so
+    order and packaging do not matter. ``target`` is a mode selector (``"match"``),
+    the comparison is always source-vs-candidate, not against a fixed name.
 
     Composer is structured metadata (from the MB WORK relations) so the verdict
     is confident and a ``require`` may hard-filter. Either side missing a composer
-    -> NO_VERDICT -> no signal (parity rule §5.1). KNOWN COVERAGE GAP (spec §11):
-    MB WORK-relation composer data is inconsistent and platform search results
+    -> NO_VERDICT -> no signal (parity rule section 5.1). KNOWN COVERAGE GAP
+    (spec section 11): MB WORK-relation composer data is inconsistent and platform
+    search results
     rarely expose it, so this criterion fires only where both sides carry a
-    composer — a low fire-rate is expected, not a bug.
+    composer, a low fire-rate is expected, not a bug.
     """
 
     name: str
@@ -746,24 +749,24 @@ class WorkCriterion:
     deliberate re-recordings by the MB *work* identity, not by fuzzy strings.
     Two aspects are compared:
 
-    * **Work identity** — the MB ``mb_work_id`` ties a recording to its
+    * **Work identity**, the MB ``mb_work_id`` ties a recording to its
       composition. A same-titled candidate with a DIFFERENT work-id is a
       different song, not a cover; ``target="original"`` requires the candidate
       to share the source's work-id.
-    * **Re-recording marker** — a canonical marker parsed from the RAW title
+    * **Re-recording marker**, a canonical marker parsed from the RAW title
       (``"taylors version"`` / ``"re-recorded"``) via
       :func:`normalize.extract_rerecording_marker`, captured before the edition
       strip removes the parenthetical. ``target="original"`` is satisfied only
       when the candidate carries NO re-recording marker; a specific target such
       as ``"taylors version"`` is satisfied only when the candidate carries that
-      marker — so a playlist can prefer the re-recording over the original.
+      marker, so a playlist can prefer the re-recording over the original.
 
     Work identity is structured, so a verdict is confident and a ``require`` may
     hard-filter. When neither side exposes a work-id nor a marker there is
-    nothing to compare -> NO_VERDICT -> no signal (parity rule §5.1). KNOWN
-    COVERAGE GAP (spec §11): MB work-ids are populated on identity-resolved
+    nothing to compare -> NO_VERDICT -> no signal (parity rule section 5.1). KNOWN
+    COVERAGE GAP (spec section 11): MB work-ids are populated on identity-resolved
     candidates; raw platform search results seldom carry them, so this fires
-    where the candidate has been hydrated with MB data — a low fire-rate on
+    where the candidate has been hydrated with MB data, a low fire-rate on
     un-hydrated candidates is expected, not a bug.
     """
 
@@ -805,7 +808,7 @@ class WorkCriterion:
             satisfied = src_work == cand_work and cand_marker is None
         else:
             # A specific re-recording (e.g. "taylors version"): the candidate
-            # must carry that marker, and — when both work-ids are known — be the
+            # must carry that marker, and - when both work-ids are known - be the
             # same composition (a re-recording of a DIFFERENT work is rejected).
             if src_work is not None and cand_work is not None and src_work != cand_work:
                 satisfied = False

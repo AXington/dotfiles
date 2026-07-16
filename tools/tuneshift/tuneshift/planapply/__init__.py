@@ -5,7 +5,7 @@ change, enrichment overwrite) produces a :class:`~tuneshift.planapply.models.Pla
 of :class:`~tuneshift.planapply.models.PlanChange` items and applies nothing on
 its own. The plan is reviewable and editable; :mod:`tuneshift.planapply.apply`
 executes exactly the resolved plan, journaling every write so a LOCAL apply is
-reversible in one step (§7, ACs P1-P5).
+reversible in one step (section 7, ACs P1-P5).
 """
 
 from __future__ import annotations

@@ -81,7 +81,7 @@ def resolve_playlist(
     results: list[ResolutionResult] = []
     interrupted = False
 
-    def _handle_sigint(signum, frame):
+    def _handle_sigint(signum, frame):  # noqa: ARG001 - signal handler callback signature
         nonlocal interrupted
         interrupted = True
 

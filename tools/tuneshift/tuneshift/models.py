@@ -86,7 +86,7 @@ class TrackResult:
     platform exposes (Spotify ``is_playable``/``available_markets``; Tidal
     ``allowStreaming``/``premium_streaming_only``). They are optional so call
     sites that don't need availability are unaffected: ``available=None`` means
-    "unknown", never "blocked" — only an explicit ``False`` denotes blocked.
+    "unknown", never "blocked", only an explicit ``False`` denotes blocked.
     """
 
     platform_id: str
@@ -145,7 +145,7 @@ def capture_candidate_metadata(result: "TrackResult") -> dict[str, Any]:
 
     Persisted as ``track_candidates.captured_metadata`` so a later scoring pass
     can reconstruct the candidate without another live search (AC-X3/AC-P4).
-    ``platform_id`` is intentionally excluded — it is stored in its own column.
+    ``platform_id`` is intentionally excluded, it is stored in its own column.
     """
     return {name: getattr(result, name) for name in _CANDIDATE_METADATA_FIELDS}
 

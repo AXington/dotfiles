@@ -1,4 +1,4 @@
-"""Resumable resolution/enrichment worker (spec §4.1a, §4.3; AC-D7, AC-X2).
+"""Resumable resolution/enrichment worker (spec sections 4.1a, 4.3; AC-D7, AC-X2).
 
 Library-first add lands tracks immediately and defers the (rate-limited,
 network-bound) work of resolving a track to platform candidates. This worker is
@@ -70,7 +70,7 @@ def cand_platform(candidates: Sequence[ResolvedCandidate]) -> str | None:
 
 
 def _best_candidate(candidates: Sequence[ResolvedCandidate]) -> ResolvedCandidate:
-    """The highest ``match_score`` candidate — the strongest identity match.
+    """The highest ``match_score`` candidate, the strongest identity match.
 
     Candidates are persisted in discovery order (for selection parity), so the
     best hydration source is chosen by score here rather than by position.
@@ -133,7 +133,7 @@ class ResolutionWorker:
         or ``resolve --track`` never touches unrelated queued work. Each track is
         (re-)enqueued first so a prior quarantine is reopened (a user asking to
         resolve is a retry signal), then resolved immediately regardless of
-        backoff — the backoff timer only governs the unattended drain loop.
+        backoff, the backoff timer only governs the unattended drain loop.
 
         Already-``resolved`` tracks are skipped unless ``force`` is set, so a
         routine re-run is cheap and never needlessly re-hits the network.
@@ -351,7 +351,7 @@ class ResolutionWorker:
         counter = "transient_attempts" if transient else "attempts"
         if attempts is None:
             row = self._db.conn.execute(
-                f"SELECT {counter} AS n FROM resolution_queue WHERE track_id = ?",
+                f"SELECT {counter} AS n FROM resolution_queue WHERE track_id = ?",  # noqa: S608 - counter is a code-controlled literal; value parameterized
                 (track_id,),
             ).fetchone()
             attempts = (row["n"] if row else 0) + 1

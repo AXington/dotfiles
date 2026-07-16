@@ -28,7 +28,7 @@ def normalize_title_for_search(title: str) -> str:
 
 
 def normalize_artist_for_search(artist: str) -> str:
-    """Normalize an artist name for external-API search queries (preserves surface form)."""
+    """Normalize an artist name for external-API search queries (preserves surface form)."""  # noqa: E501
     cleaned = _THE_PREFIX_RE.sub("", artist)
     return cleaned.strip()
 

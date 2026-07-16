@@ -76,7 +76,7 @@ def _remove_and_sync(db: Database, playlist, track, position: int) -> bool:
     stored_position = ordered[position - 1]["position"]
     db.remove_playlist_track_by_position(playlist.id, stored_position)
     print(
-        f'Removed "{track.title} - {track.artist}" (position {position}) from "{playlist.name}"'
+        f'Removed "{track.title} - {track.artist}" (position {position}) from "{playlist.name}"'  # noqa: E501
     )
 
     # Auto-reorder if enabled

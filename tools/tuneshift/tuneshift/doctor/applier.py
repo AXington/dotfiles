@@ -1,7 +1,7 @@
 """Doctor applier: apply a saved plan transactionally.
 
 Each plan item is applied in its own transaction. If one item fails, its
-changes roll back but previously applied items remain committed — partial
+changes roll back but previously applied items remain committed, partial
 success is the expected outcome and is reflected in the plan file.
 
 After the database changes, affected tracks are re-enriched and affected
@@ -88,7 +88,7 @@ def _apply_override(item: PlanItem, override: str) -> None:
         group = [item.keep_track_id, *item.merge_track_ids]
         if new_keep not in group:
             raise ApplyError(
-                f"override keep id {new_keep} is not part of the duplicate group {group}"
+                f"override keep id {new_keep} is not part of the duplicate group {group}"  # noqa: E501
             )
         item.keep_track_id = new_keep
         item.merge_track_ids = [t for t in group if t != new_keep]
@@ -223,7 +223,7 @@ def _sync_playlist(db: Database, name: str) -> bool:
 
 def apply_plan(
     db: Database,
-    plan: DoctorPlan,
+    plan: DoctorPlan,  # noqa: ARG001 - part of public apply_plan signature
     items: list[PlanItem],
     *,
     overrides: dict[int, str] | None = None,

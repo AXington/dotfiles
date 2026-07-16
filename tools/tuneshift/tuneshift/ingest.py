@@ -212,6 +212,6 @@ def _auto_classify_batch(
     if classified:
         db.conn.commit()
         print(
-            f"  Classified {classified}/{len(track_ids_to_enrich)} tracks (search-grounded)",
+            f"  Classified {classified}/{len(track_ids_to_enrich)} tracks (search-grounded)",  # noqa: E501
             file=sys.stderr,
         )

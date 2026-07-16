@@ -53,7 +53,7 @@ def enrich_playlist_from_tidal(
     db: Database,
     playlist_id: int,
     refresh: bool = False,
-    stale_days: int = 30,
+    stale_days: int = 30,  # noqa: ARG001 - public API parameter accepted for compatibility
     *,
     max_retries: int = 3,
     stats: RetryStats | None = None,

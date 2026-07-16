@@ -80,7 +80,7 @@ def _change_for_track(
     elif global_mapping is not None:
         current_id = global_mapping.platform_track_id
 
-    # The authoritative lock is the two-level EFFECTIVE lock — never raw row
+    # The authoritative lock is the two-level EFFECTIVE lock - never raw row
     # precedence. An unapproved auto-matched playlist row does NOT shadow a global
     # lock (it falls through to the global default), so deriving "locked" from raw
     # rows would re-affirm the wrong release. ``locked_id`` is the release the lock
@@ -114,7 +114,7 @@ def _change_for_track(
         )
         # AC-L5: the locked id still exists but its metadata may have degraded so
         # it no longer satisfies an active preference (e.g. Tidal dropped Atmos).
-        # Flag it for the user — the lock is HELD, never silently broken nor
+        # Flag it for the user - the lock is HELD, never silently broken nor
         # silently accepted-as-degraded.
         downgrades = (
             check_lock_downgrade(
@@ -147,7 +147,7 @@ def _change_for_track(
             row_key=row_key,
             current=current_state,
             proposed=proposed,
-            reason="locked — protected from re-match (AC-L2)",
+            reason="locked, protected from re-match (AC-L2)",
             provenance="effective_lock",
             classification="locked",
             locked=True,

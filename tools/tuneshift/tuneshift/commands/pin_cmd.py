@@ -35,7 +35,7 @@ def handle_pin(args, db: Database) -> int:
         return _set_moment_pin(db, playlist, args.moment)
 
     print(
-        "Specify --opener, --closer, --position, --adjacent, --moment, --remove, or --list.",
+        "Specify --opener, --closer, --position, --adjacent, --moment, --remove, or --list.",  # noqa: E501
         file=sys.stderr,
     )
     return 1
@@ -117,7 +117,7 @@ def _set_index_pin(db: Database, playlist, title: str, position: int) -> int:
             db.set_pin(playlist.id, member.track_id, "position", group_order=target_pos)
 
         group_desc = ", ".join(
-            f'"{db.conn.execute("SELECT title FROM tracks WHERE id = ?", (m.track_id,)).fetchone()[0]}" at {base_position + i}'
+            f'"{db.conn.execute("SELECT title FROM tracks WHERE id = ?", (m.track_id,)).fetchone()[0]}" at {base_position + i}'  # noqa: E501, S608 - builds display text, not SQL; inner query is parameterized
             for i, m in enumerate(group_members)
         )
         print(f'Promoted group "{track_pin.group_id}" to positions: {group_desc}')

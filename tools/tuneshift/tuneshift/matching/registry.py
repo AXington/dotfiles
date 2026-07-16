@@ -5,7 +5,7 @@ The GOVERNING requirement is a single general model: a preference is
 the matcher builds confidence from every available field. This module is the
 seam that turns a stored typed preference into the concrete
 :class:`~tuneshift.matching.criteria.Criterion` the two-phase selection engine
-fires on — so a user's ``prefer spatial=atmos`` actually selects the Atmos
+fires on, so a user's ``prefer spatial=atmos`` actually selects the Atmos
 release, rather than the axis being handled by bespoke one-off code (the
 per-axis build-and-abandon pattern this design exists to end).
 
@@ -40,7 +40,7 @@ from tuneshift.matching.precedence import PreferenceRef
 from tuneshift.matching.selection import ActivePreference
 
 #: Whitelist axes backed by a STRUCTURED list field on the candidate metadata
-#: (populated from the platform search — Tidal ``audio_modes`` covers both the
+#: (populated from the platform search - Tidal ``audio_modes`` covers both the
 #: spatial mix and the mono/stereo channel layout; ``media_metadata_tags``
 #: carries the encoding-fidelity tier).
 STRUCTURED_AXIS_FIELDS: dict[str, str] = {
@@ -102,7 +102,7 @@ def criterion_for(
         )
     if axis == "duration":
         # The duration axis target is a tolerance (e.g. "3s" / "5%"), not a
-        # whitelist token — pass the raw target through unfolded (M4).
+        # whitelist token - pass the raw target through unfolded (M4).
         return DurationCriterion(name=axis, target=target)
     if axis == "artist_role":
         # Role-aware artist-set match; target selects the role ("main"). Raw
@@ -131,7 +131,7 @@ def criterion_for(
         )
     if axis == "edit":
         # M7: dual-source (title + structured version) with album_version as the
-        # unmarked default — a plain album track carries no "album version" text.
+        # unmarked default - a plain album track carries no "album version" text.
         return EditAxisCriterion(whitelist=wl, target=canonical)
     if axis in TITLE_AXES:
         return TitleTokenCriterion(name=axis, target=canonical, whitelist=wl)
@@ -164,7 +164,7 @@ def resolve_scoped_specs(
 
     Each input is a list of ``{"criterion", "strength", "target"}`` dicts read
     from a storage layer (``criterion`` names the axis; ``target`` a token in any
-    surface form). Precedence is ``global < playlist < playlist-track`` — the
+    surface form). Precedence is ``global < playlist < playlist-track``, the
     most specific scope wins (AC-CLI1). Two preferences that address the *same*
     ``(axis, canonical-target)`` collapse to the most-specific scope's entry, so
     a per-playlist-track ``spatial require atmos`` overrides a global ``spatial

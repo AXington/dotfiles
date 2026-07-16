@@ -2,7 +2,7 @@
 
 Artist selection used to be a blind ``artists[0]`` off the platform's search
 ranking. This module scores candidates so the *right* artist is chosen by name,
-corroborated (never overridden) by enrichment — genres, popularity, followers.
+corroborated (never overridden) by enrichment, genres, popularity, followers.
 
 Missing enrichment is always neutral: a platform that returns no genres or
 popularity for an artist must not be penalized relative to one that does. Name

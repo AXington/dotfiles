@@ -4,7 +4,7 @@ A *fingerprint* is a stable identity signature for a canonical track that
 survives a platform re-issuing or delisting a specific track id. When a user
 locks a mapping (approves it), we store the fingerprint alongside it. On a later
 re-sync, if the locked platform id has gone dead, the fingerprint lets us
-re-find *the same recording* — not merely a same-titled substitute — and heal
+re-find *the same recording*, not merely a same-titled substitute, and heal
 the lock in place, or hold it as ``exact_unavailable`` if the recording is
 genuinely gone. It must never silently drift to a different recording.
 
@@ -14,7 +14,7 @@ Two fingerprints are considered equal when they identify the same recording:
 - Otherwise, normalized title and artist must match, the recording/version class
   must match, and durations must fall in the same tolerance bucket.
 
-Duration is compared in a bucket (default ±2s, configurable) so that trivial
+Duration is compared in a bucket (default +/-2s, configurable) so that trivial
 metadata jitter between platforms does not defeat a genuine re-match.
 """
 
@@ -97,7 +97,7 @@ def build_fingerprint(
 
 
 def _duration_matches(a: int | None, b: int | None, bucket: int) -> bool:
-    # Unknown duration on either side is not evidence of a mismatch — a locked
+    # Unknown duration on either side is not evidence of a mismatch - a locked
     # user track may have no duration. Only reject when both are known and far.
     if a is None or b is None:
         return True

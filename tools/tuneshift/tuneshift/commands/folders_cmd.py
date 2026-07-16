@@ -97,7 +97,7 @@ def handle_folders(args, db: Database) -> int:
         return _folders_status(db)
     else:
         print(
-            "Usage: tuneshift folders <list|import|create|rename|delete|move|unassign|sync|pull|status>",
+            "Usage: tuneshift folders <list|import|create|rename|delete|move|unassign|sync|pull|status>",  # noqa: E501
             file=sys.stderr,
         )
         return 1
@@ -380,7 +380,7 @@ def _folders_move(db: Database, playlist_name: str, folder_name: str) -> int:
 
     db.set_playlist_tidal_folder(playlist.id, folder["tidal_id"])
     print(
-        f'Assigned "{playlist.name}" to folder "{folder_name}". Run: tuneshift folders sync'
+        f'Assigned "{playlist.name}" to folder "{folder_name}". Run: tuneshift folders sync'  # noqa: E501
     )
     return 0
 
