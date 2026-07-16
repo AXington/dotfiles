@@ -8,7 +8,7 @@ from typing import Any
 import ytmusicapi
 from ytmusicapi import YTMusic
 
-from tuneshift.models import PlaylistInfo, TrackResult
+from tuneshift.models import AlbumResult, ArtistResult, PlaylistInfo, TrackResult
 from tuneshift.platforms.auth import validate_no_symlink
 from tuneshift.platforms.rate_limiter import RateLimiter
 
@@ -157,9 +157,8 @@ class YTMusicClient:
         """YT Music does not support direct ISRC lookup."""
         return None
 
-    def search_album(self, query: str, limit: int = 5) -> list["AlbumResult"]:
+    def search_album(self, query: str, limit: int = 5) -> list[AlbumResult]:
         """Search for albums on YouTube Music."""
-        from tuneshift.models import AlbumResult
         ytmusic = self._ensure_session()
         items = self._call_api(lambda: ytmusic.search(query, filter="albums", limit=limit))
         results: list[AlbumResult] = []
@@ -185,9 +184,8 @@ class YTMusicClient:
         tracks = album.get("tracks", [])
         return [self._to_result(t) for t in tracks if t.get("videoId")]
 
-    def search_artist(self, query: str, limit: int = 3) -> list["ArtistResult"]:
+    def search_artist(self, query: str, limit: int = 3) -> list[ArtistResult]:
         """Search for artists on YouTube Music."""
-        from tuneshift.models import ArtistResult
         ytmusic = self._ensure_session()
         items = self._call_api(lambda: ytmusic.search(query, filter="artists", limit=limit))
         results: list[ArtistResult] = []
@@ -201,9 +199,8 @@ class YTMusicClient:
             ))
         return results
 
-    def get_artist_albums(self, artist_id: str, limit: int = 20) -> list["AlbumResult"]:
+    def get_artist_albums(self, artist_id: str, limit: int = 20) -> list[AlbumResult]:
         """Get albums for a YouTube Music artist."""
-        from tuneshift.models import AlbumResult
         ytmusic = self._ensure_session()
         artist_data = self._call_api(lambda: ytmusic.get_artist(artist_id))
         albums_section = artist_data.get("albums", {})
