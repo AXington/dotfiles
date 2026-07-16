@@ -65,3 +65,18 @@ select = ["E", "F", "I", "B", "ARG", "RUF", "UP", "S608"]
 
 [tool.ruff.format]
 line-ending = "lf"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+warn_unused_ignores = true
+# Strict enforcement (disallow_untyped_defs, etc.) is deferred to Phase 4.4 to
+# avoid blocking CI on a large initial error count; the CI mypy step is
+# continue-on-error until then.
