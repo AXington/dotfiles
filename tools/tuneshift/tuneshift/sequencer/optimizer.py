@@ -485,6 +485,57 @@ def _greedy_build(
     return sequence
 
 
+def sequence_score(
+    sequence: list[TrackMetadata],
+    weights: dict[str, float],
+    arc: str,
+    *,
+    penalty_overrides: dict[str, float] | None = None,
+    intent: "PlaylistIntent | None" = None,
+    narrative_mode: str = "river",
+    context_window: int = 5,
+) -> float:
+    """Single global objective for a full sequence (SEQ-A1).
+
+    Sums, over every adjacent transition, the same arc-fit x context-modified
+    pairwise score that ``_greedy_build`` optimizes position-by-position. The
+    greedy builder and the local search (``_two_opt``) both optimize this one
+    function, so local search can no longer improve raw pairwise continuity at
+    the expense of arc fit or context (artist spacing, variety, monotony, ...).
+
+    Higher is better. Returns 0.0 for sequences shorter than two tracks.
+    """
+    total_tracks = len(sequence)
+    if total_tracks < 2:
+        return 0.0
+
+    context = SequenceContext(
+        position=0,
+        total=total_tracks,
+        narrative_mode=narrative_mode,
+        context_window=context_window,
+    )
+    context.advance(sequence[0])
+
+    total = 0.0
+    for position in range(1, total_tracks):
+        current = sequence[position - 1]
+        candidate = sequence[position]
+        base = score_pair(current, candidate, weights)
+        arc_mult = _arc_fit_multiplier(candidate, position, total_tracks, arc)
+        total += score_candidate(
+            candidate,
+            current,
+            context,
+            base * arc_mult,
+            penalty_overrides,
+            intent,
+        )
+        context.advance(candidate)
+
+    return total
+
+
 def optimize_sequence(
     tracks: list[TrackMetadata],
     weights: dict[str, float],
@@ -645,7 +696,15 @@ def optimize_sequence(
         if target_idx < len(sequence):
             pinned_positions.add(target_idx)
     sequence = _two_opt(
-        sequence, weights, max_iterations=100, protected=pinned_positions
+        sequence,
+        weights,
+        arc,
+        max_iterations=100,
+        protected=pinned_positions,
+        penalty_overrides=penalty_overrides,
+        intent=intent,
+        narrative_mode=narrative_mode,
+        context_window=context_window,
     )
     sequence = distribute_artists(
         sequence, min_separation=artist_min_separation, protected=pinned_positions
@@ -775,10 +834,22 @@ def sequence_playlist(
 def _two_opt(
     sequence: list[TrackMetadata],
     weights: dict[str, float],
+    arc: str = "free",
+    *,
     max_iterations: int = 100,
     protected: set[int] | None = None,
+    penalty_overrides: dict[str, float] | None = None,
+    intent: "PlaylistIntent | None" = None,
+    narrative_mode: str = "river",
+    context_window: int = 5,
 ) -> list[TrackMetadata]:
-    """2-opt local search: swap non-adjacent pairs to improve total score."""
+    """Swap-neighborhood local search against the global objective (SEQ-A1/A2).
+
+    Accepts a swap only when it does not reduce ``sequence_score`` (arc fit,
+    context modifiers, and artist spacing included), so local search optimizes
+    the same objective the greedy builder targeted instead of a myopic
+    pairwise-continuity score.
+    """
     track_count = len(sequence)
     if track_count <= 3:
         return sequence
@@ -787,19 +858,18 @@ def _two_opt(
     result = list(sequence)
     no_improvement_count = 0
 
-    def _local_score(idx: int) -> float:
-        score = 0.0
-        if idx > 0:
-            pair_score = score_pair(result[idx - 1], result[idx], weights)
-            if result[idx - 1].artist == result[idx].artist:
-                pair_score *= 0.3
-            score += pair_score
-        if idx < track_count - 1:
-            pair_score = score_pair(result[idx], result[idx + 1], weights)
-            if result[idx].artist == result[idx + 1].artist:
-                pair_score *= 0.3
-            score += pair_score
-        return score
+    def _objective(seq: list[TrackMetadata]) -> float:
+        return sequence_score(
+            seq,
+            weights,
+            arc,
+            penalty_overrides=penalty_overrides,
+            intent=intent,
+            narrative_mode=narrative_mode,
+            context_window=context_window,
+        )
+
+    current_objective = _objective(result)
 
     for _ in range(max_iterations):
         improved = False
@@ -809,15 +879,15 @@ def _two_opt(
             for right_index in range(left_index + 2, track_count - 1):
                 if right_index in protected:
                     continue
-                current_score = _local_score(left_index) + _local_score(right_index)
 
                 result[left_index], result[right_index] = (
                     result[right_index],
                     result[left_index],
                 )
-                new_score = _local_score(left_index) + _local_score(right_index)
+                new_objective = _objective(result)
 
-                if new_score > current_score + 0.001:
+                if new_objective > current_objective + 1e-6:
+                    current_objective = new_objective
                     improved = True
                 else:
                     result[left_index], result[right_index] = (
