@@ -720,7 +720,7 @@ def sequence_playlist(
 
     if len(metadata_tracks) == 1:
         placed = {metadata_tracks[0].track_id}
-        return [metadata_tracks[0].track_id] + _tail(placed)
+        return [metadata_tracks[0].track_id, *_tail(placed)]
 
     from tuneshift.models import PlaylistPin
 
@@ -918,7 +918,7 @@ def assign_tracks_to_sections(
     section_counts: dict[str, int] = {s.name: 0 for s in sections}
     section_caps: dict[str, int] = {s.name: s.capacity for s in sections}
 
-    for fitness, track, section in scores:
+    for _fitness, track, section in scores:
         if track.track_id in assigned_tracks:
             continue
         if section_counts[section.name] >= section_caps[section.name]:

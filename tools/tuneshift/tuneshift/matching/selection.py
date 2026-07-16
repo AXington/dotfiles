@@ -390,7 +390,9 @@ def _deterministic_tiebreak(
     # the band, so tie_break's winner is the correct AC-C6 pick even if a
     # stable-id sub-tie among the co-leaders left ``decided_by == "stable-id"``.
     winner_pos = next(
-        idx for idx, tc in zip(cluster, tie_candidates) if tc.id == result.winner
+        idx
+        for idx, tc in zip(cluster, tie_candidates, strict=True)
+        if tc.id == result.winner
     )
     decided_by = result.decided_by if result.decided_by != "stable-id" else None
     return winner_pos, decided_by

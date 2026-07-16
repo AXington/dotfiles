@@ -107,7 +107,7 @@ def _audit_mappings(db: Database, playlist) -> list[str]:
         ).fetchall()
 
         for row in rows:
-            mapping = dict(zip(cols, row))
+            mapping = dict(zip(cols, row, strict=True))
             platform = mapping["platform"]
             p_title = mapping.get("platform_title") or ""
             p_artist = mapping.get("platform_artist") or ""

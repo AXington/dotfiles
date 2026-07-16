@@ -37,7 +37,7 @@ ARTIST_THRESHOLDS = RecommendationThresholds(
 
 
 def _signed_points(penalty: float, weight: int) -> int:
-    return -int(round(penalty * weight))
+    return -round(penalty * weight)
 
 
 def _name_signal(source_name: str, candidate_name: str) -> SignalPenalty:

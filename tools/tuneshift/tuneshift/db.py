@@ -3984,16 +3984,16 @@ class Database:
 
         if existing:
             sets = ", ".join(f"{k} = ?" for k in fields)
-            vals = list(fields.values()) + [track_id, platform]
+            vals = [*fields.values(), track_id, platform]
             self.conn.execute(
                 f"UPDATE track_platform_metadata SET {sets}, fetched_at = datetime('now') "
                 f"WHERE track_id = ? AND platform = ?",
                 vals,
             )
         else:
-            cols = ["track_id", "platform", "platform_track_id"] + list(fields.keys())
+            cols = ["track_id", "platform", "platform_track_id", *fields.keys()]
             placeholders = ", ".join("?" * len(cols))
-            vals = [track_id, platform, platform_track_id] + list(fields.values())
+            vals = [track_id, platform, platform_track_id, *fields.values()]
             self.conn.execute(
                 f"INSERT INTO track_platform_metadata ({', '.join(cols)}) VALUES ({placeholders})",
                 vals,
@@ -4016,7 +4016,7 @@ class Database:
                 "PRAGMA table_info(track_platform_metadata)"
             ).fetchall()
         ]
-        result = dict(zip(cols, row))
+        result = dict(zip(cols, row, strict=True))
         for key in ("genres", "audio_qualities", "raw_metadata"):
             if result.get(key) and isinstance(result[key], str):
                 try:
@@ -4060,7 +4060,7 @@ class Database:
         rows = self.conn.execute(
             f"SELECT t.* FROM tracks t "
             f"WHERE (SELECT COUNT(*) FROM track_tags tt WHERE tt.track_id = t.id AND tt.tag IN ({placeholders})) = ?",
-            list(tags) + [len(tags)],
+            [*tags, len(tags)],
         ).fetchall()
         return [self._row_to_track(r) for r in rows]
 

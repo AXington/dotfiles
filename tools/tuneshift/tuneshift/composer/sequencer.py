@@ -256,7 +256,7 @@ def _apply_pins(
 
     # Apply adjacent groups: keep group members together in their specified order.
     # Find the earliest current position of any group member and place the group there.
-    for group_id, members in adjacent_groups.items():
+    for _group_id, members in adjacent_groups.items():
         members.sort(key=lambda pair: pair[0])
         member_ids = {tid for _, tid in members}
         member_tracks = [track_by_id[tid] for _, tid in members if tid in track_by_id]
@@ -303,7 +303,7 @@ def _apply_pins(
     # Re-apply adjacent groups that include opener/closer to preserve group order
     # (opener pin may have pulled a group member to position 0 while the group
     # wants them together)
-    for group_id, members in adjacent_groups.items():
+    for _group_id, members in adjacent_groups.items():
         members.sort(key=lambda pair: pair[0])
         member_ids = [tid for _, tid in members]
         # Check if opener is in this group

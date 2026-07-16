@@ -150,7 +150,7 @@ def _select_single_track(db: Database, title: str, artist: str) -> Track | None:
         return matches[int(choice) - 1]
     except (ValueError, IndexError):
         print("Invalid selection.", file=sys.stderr)
-        raise SystemExit(1)
+        raise SystemExit(1) from None
 
 
 def _print_result(track: Track, db: Database) -> None:

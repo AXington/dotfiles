@@ -827,7 +827,7 @@ def _interactive_dedupe(
         entries.sort(key=lambda e: e[0])
 
         print(f"\n{artist} has {len(entries)} tracks (cap: {cap}). Keep which?")
-        for idx, (pos, track) in enumerate(entries):
+        for idx, (_pos, track) in enumerate(entries):
             print(f"  {idx + 1}. {track.title}")
 
         choices_raw = input(
@@ -1313,7 +1313,7 @@ def handle_merge(args, db: Database) -> int:
         print("Plan saved. Apply with: tuneshift batch --apply")
         return 0
 
-    removed, added = apply_plan(db, plan)
+    _removed, added = apply_plan(db, plan)
     print(f'\nMerged: {added} tracks added to "{into_name}"')
 
     if getattr(args, "delete_sources", False):

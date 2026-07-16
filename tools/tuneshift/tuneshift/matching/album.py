@@ -53,7 +53,7 @@ ALBUM_THRESHOLDS = RecommendationThresholds(
 
 def _signed_points(penalty: float, weight: int) -> int:
     """A readable signed contribution for explainability/breakdown."""
-    return -int(round(penalty * weight))
+    return -round(penalty * weight)
 
 
 def _title_signal(source_album: str, candidate_album: str) -> SignalPenalty:

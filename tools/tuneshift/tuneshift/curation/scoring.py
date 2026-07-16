@@ -92,7 +92,7 @@ def score_mood_contribution(
         return 0.5
     # Simple: check if track vibes overlap with mood_profile keywords
     mood_words = set()
-    for key, val in ctx.mood_profile.items():
+    for _key, val in ctx.mood_profile.items():
         if isinstance(val, str):
             mood_words.add(val.lower())
     track_vibes = set(v.lower() for v in (track.vibes or []))

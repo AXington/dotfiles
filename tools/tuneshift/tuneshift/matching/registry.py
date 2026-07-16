@@ -181,7 +181,7 @@ def resolve_scoped_specs(
     # giving most-specific-wins collapse while preserving distinct targets.
     collapsed: dict[tuple[str, str], PreferenceSpec] = {}
     for scope, layer in zip(
-        _SCOPE_NAMES, (global_prefs, playlist_prefs, playlist_track_prefs)
+        _SCOPE_NAMES, (global_prefs, playlist_prefs, playlist_track_prefs), strict=True
     ):
         for row in layer or ():
             axis = row.get("criterion")

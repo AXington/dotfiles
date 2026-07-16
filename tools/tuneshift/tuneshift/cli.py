@@ -1000,7 +1000,7 @@ def _handle_config(args) -> int:
     )
 
     if getattr(args, "show", False) or not args.key:
-        name, backend = detect_backend()
+        name, _backend = detect_backend()
         print("LLM Configuration:")
         if name:
             from tuneshift.sequencer.classifier import TrackClassifier
@@ -1043,7 +1043,7 @@ def _handle_config(args) -> int:
     print(f"Stored {backend_name} API key in {_TOKEN_DIR / f'{backend_name}_key'}")
 
     # Verify it works
-    name, backend = detect_backend()
+    name, _backend = detect_backend()
     if name:
         print(f"Backend now active: {name}")
     return 0

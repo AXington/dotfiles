@@ -247,7 +247,7 @@ class SpotifyClient:
         offset = 0
         while True:
             page = self._call_api(
-                lambda: spotify.playlist_tracks(
+                lambda offset=offset: spotify.playlist_tracks(
                     playlist_id,
                     offset=offset,
                     limit=100,
@@ -332,7 +332,9 @@ class SpotifyClient:
         offset = 0
         while True:
             page = self._call_api(
-                lambda: spotify.current_user_playlists(limit=50, offset=offset)
+                lambda offset=offset: spotify.current_user_playlists(
+                    limit=50, offset=offset
+                )
             )
             items = page.get("items", [])
             for playlist in items:

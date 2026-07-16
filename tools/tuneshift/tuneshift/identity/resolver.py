@@ -137,13 +137,13 @@ class TrackResolver:
 
         # Final evaluation with all collected evidence
         if all_evidence and best_candidates:
-            score, tier = compute_confidence(all_evidence)
+            score, _tier = compute_confidence(all_evidence)
             top = sorted(best_candidates, key=lambda c: c.score, reverse=True)[0]
             return self._finalize(track_id, top, all_evidence)
 
         # Failed to find a confident match this attempt.
         # Check if there's an existing resolution we should preserve.
-        existing_tier, existing_score, _ = self._store.get_resolution_state(track_id)
+        existing_tier, _existing_score, _ = self._store.get_resolution_state(track_id)
 
         if all_evidence:
             self._store.store_failed_evidence(
@@ -214,7 +214,7 @@ class TrackResolver:
         """Store resolution and return result."""
         score, tier = compute_confidence(evidence)
 
-        old_tier, old_score, _ = self._store.get_resolution_state(track_id)
+        old_tier, _old_score, _ = self._store.get_resolution_state(track_id)
         if old_tier is not None:
             old_order = _TIER_ORDER.get(old_tier, 0)
             new_order = _TIER_ORDER.get(tier.value, 0)
