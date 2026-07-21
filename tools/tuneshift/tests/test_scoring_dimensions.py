@@ -1,12 +1,9 @@
-import pytest
 from tuneshift.sequencer.metadata import TrackMetadata
 from tuneshift.sequencer.scoring import (
+    DIMENSION_SCORERS,
+    score_lyrical_thread,
     score_mood_continuity,
     score_sonic_texture,
-    score_lyrical_thread,
-    score_groove_coherence,
-    score_variety,
-    DIMENSION_SCORERS,
 )
 
 
@@ -69,7 +66,7 @@ class TestDimensionRegistry:
         expected = {
             "narrative_arc", "energy_flow", "mood_continuity", "sonic_texture",
             "lyrical_thread", "emotional_arc", "groove_coherence", "era_mood",
-            "variety", "artist_separation",
+            "variety", "artist_separation", "harmonic_key", "harmonic_mode",
         }
         assert set(DIMENSION_SCORERS.keys()) == expected
 

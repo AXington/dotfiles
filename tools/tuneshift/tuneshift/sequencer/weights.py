@@ -12,6 +12,8 @@ PRESETS: dict[str, dict[str, float]] = {
         "artist_separation": 0.6,
         "groove_coherence": 0.4,
         "era_mood": 0.3,
+        "harmonic_key": 0.2,
+        "harmonic_mode": 0.3,
     },
     "energy-wave": {
         "energy_flow": 0.9,
@@ -24,6 +26,8 @@ PRESETS: dict[str, dict[str, float]] = {
         "lyrical_thread": 0.1,
         "emotional_arc": 0.3,
         "era_mood": 0.2,
+        "harmonic_key": 0.5,
+        "harmonic_mode": 0.4,
     },
     "mood-bath": {
         "mood_continuity": 0.9,
@@ -36,6 +40,8 @@ PRESETS: dict[str, dict[str, float]] = {
         "lyrical_thread": 0.2,
         "artist_separation": 0.4,
         "era_mood": 0.6,
+        "harmonic_key": 0.5,
+        "harmonic_mode": 0.5,
     },
     "discovery": {
         "variety": 0.9,
@@ -48,6 +54,8 @@ PRESETS: dict[str, dict[str, float]] = {
         "lyrical_thread": 0.1,
         "emotional_arc": 0.2,
         "era_mood": 0.3,
+        "harmonic_key": 0.3,
+        "harmonic_mode": 0.2,
     },
     "workout": {
         "energy_flow": 0.9,
@@ -60,6 +68,8 @@ PRESETS: dict[str, dict[str, float]] = {
         "lyrical_thread": 0.0,
         "emotional_arc": 0.2,
         "era_mood": 0.1,
+        "harmonic_key": 0.4,
+        "harmonic_mode": 0.3,
     },
 }
 
@@ -74,6 +84,8 @@ ALL_DIMENSIONS = [
     "era_mood",
     "variety",
     "artist_separation",
+    "harmonic_key",
+    "harmonic_mode",
 ]
 
 DEFAULT_WEIGHTS: dict[str, float] = PRESETS["energy-wave"]

@@ -247,6 +247,61 @@ def score_narrative_arc_transition(a: TrackMetadata, b: TrackMetadata) -> float:
     return 0.5
 
 
+def _parse_camelot(code: str | None) -> tuple[int, str] | None:
+    """Parse a Camelot code like ``8B`` into (hour, letter). None if invalid."""
+    if not code or len(code) < 2:
+        return None
+    letter = code[-1].upper()
+    if letter not in ("A", "B"):
+        return None
+    try:
+        hour = int(code[:-1])
+    except ValueError:
+        return None
+    if not 1 <= hour <= 12:
+        return None
+    return hour, letter
+
+
+def camelot_score(a: TrackMetadata, b: TrackMetadata) -> float:
+    """Harmonic compatibility on the Camelot wheel (SEQ-S1).
+
+    Standard harmonic-mixing adjacency: an identical key is perfect; the
+    relative major/minor (same hour, opposite letter) and +/-1 hour on the same
+    letter are highly compatible; compatibility then decays with circular
+    distance around the 12-hour wheel. Returns a neutral 0.5 when either code is
+    missing (callers gate on ``camelot_code`` presence, so this is a safety net).
+    """
+    pa = _parse_camelot(a.camelot_code)
+    pb = _parse_camelot(b.camelot_code)
+    if pa is None or pb is None:
+        return 0.5
+    ha, la = pa
+    hb, lb = pb
+    if ha == hb and la == lb:
+        return 1.0
+    if ha == hb and la != lb:
+        return 0.9  # relative major/minor
+    hour_dist = min((ha - hb) % 12, (hb - ha) % 12)  # 0..6
+    if la == lb and hour_dist == 1:
+        return 0.85  # adjacent hour, same scale
+    if hour_dist == 1:
+        return 0.7  # adjacent hour, opposite scale (energy-shift mix)
+    # Farther apart: decay toward 0 with circular distance.
+    return max(0.0, 1.0 - hour_dist / 6.0) * 0.6
+
+
+def mode_score(a: TrackMetadata, b: TrackMetadata) -> float:
+    """Score major/minor mode continuity (SEQ-S1).
+
+    Staying in the same mode is smoothest; a major<->minor switch is a real but
+    milder transition. Neutral 0.5 when either mode is unknown.
+    """
+    if a.mode is None or b.mode is None:
+        return 0.5
+    return 1.0 if a.mode == b.mode else 0.6
+
+
 DIMENSION_SCORERS: dict[str, Callable[[TrackMetadata, TrackMetadata], float]] = {
     "narrative_arc": score_narrative_arc_transition,
     "energy_flow": energy_score,
@@ -258,6 +313,8 @@ DIMENSION_SCORERS: dict[str, Callable[[TrackMetadata, TrackMetadata], float]] = 
     "era_mood": score_era_mood_transition,
     "variety": score_variety,
     "artist_separation": score_artist_separation_transition,
+    "harmonic_key": camelot_score,
+    "harmonic_mode": mode_score,
 }
 
 # Default equal-weight blend when nothing specified
@@ -298,6 +355,8 @@ _LEGACY_DIMENSION_MAP = {
     "bpm": "groove_coherence",
     "narrative": "narrative_arc",
     "emotional_arc": "emotional_arc",
+    "key": "harmonic_key",
+    "mode": "harmonic_mode",
 }
 
 
@@ -320,6 +379,8 @@ def _has_dimension_data(track: TrackMetadata, dimension: str) -> bool:
         "era_mood": "themes",
         "variety": "instrumentation",
         "artist_separation": "artist_separation",
+        "harmonic_key": "key",
+        "harmonic_mode": "mode",
     }
     check_name = _NEW_TO_CHECK.get(dimension, dimension)
 
