@@ -222,6 +222,48 @@ def _place_moments(
     return result
 
 
+def _validate_pin_conflicts(
+    pins: list | None,
+    track_map: dict[int, TrackMetadata],
+) -> None:
+    """Reject a single track carrying two contradictory placement pins (SEQ-C3).
+
+    A track may have at most one placement pin among opener/closer/position/
+    anchor. Moment pins are soft climax targets resolved by precedence, so they
+    are excluded here. Fails loudly rather than silently emitting a duplicate.
+    """
+    if not pins:
+        return
+
+    placements: dict[int, list[str]] = {}
+    for pin in pins:
+        track_id = pin.track_id
+        if track_id not in track_map or pin.pin_type == "moment":
+            continue
+        if pin.pin_type == "opener":
+            placements.setdefault(track_id, []).append("opener")
+        elif pin.pin_type == "closer":
+            placements.setdefault(track_id, []).append("closer")
+        elif pin.pin_type == "position" and pin.group_order is not None:
+            placements.setdefault(track_id, []).append(
+                f"position (index {pin.group_order})"
+            )
+        elif pin.pin_type == "anchor" and pin.group_id:
+            placements.setdefault(track_id, []).append(
+                f"anchor (group '{pin.group_id}')"
+            )
+
+    for track_id, descriptors in placements.items():
+        if len(descriptors) >= 2:
+            title = track_map[track_id].title
+            raise ValueError(
+                f"Conflicting pins for track {track_id} ('{title}'): "
+                f"{descriptors[0]} and {descriptors[1]}. A track may have only one "
+                "placement pin (opener, closer, position, or anchor). "
+                "Remove one pin and retry."
+            )
+
+
 def _resolve_pins(
     pins: list | None,
     track_map: dict[int, TrackMetadata],
@@ -238,6 +280,8 @@ def _resolve_pins(
 
     if not pins:
         return pinned_opener_id, pinned_closer_id, adjacency_groups, position_pins
+
+    _validate_pin_conflicts(pins, track_map)
 
     for pin in pins:
         if pin.track_id not in track_map:
@@ -582,6 +626,26 @@ def optimize_sequence(
 
         sections = parse_narrative(narrative)
         if sections:
+            has_pins = bool(
+                pinned_opener_id is not None
+                or pinned_closer_id is not None
+                or adjacency_groups
+                or position_pins
+            )
+
+            def _finish_narrative(ordered: list[TrackMetadata]) -> list[TrackMetadata]:
+                # Fold explicit pins into the narrative arc (SEQ-C2) so they are
+                # honored instead of silently dropped.
+                if has_pins:
+                    return _reorder_with_pins(
+                        ordered,
+                        pinned_opener_id,
+                        pinned_closer_id,
+                        adjacency_groups,
+                        position_pins,
+                    )
+                return ordered
+
             total_capacity = sum(s.capacity for s in sections)
             # If sections cover all positions, use positional assignment
             # (the narrative describes the intended order by position)
@@ -600,7 +664,7 @@ def optimize_sequence(
                     idx += section.capacity
                 # Any remaining tracks (if sections didn't cover all)
                 ordered.extend(tracks[idx:])
-                return ordered
+                return _finish_narrative(ordered)
             else:
                 # Partial coverage: use fitness-based assignment
                 assignments = assign_tracks_to_sections(tracks, sections, goal=arc)
@@ -615,7 +679,7 @@ def optimize_sequence(
                     else:
                         ordered.extend(section_tracks)
                 ordered.extend(assignments.get("_flex", []))
-                return ordered
+                return _finish_narrative(ordered)
 
     # Infer intent early for narrative arc
     from tuneshift.sequencer.intent import infer_intent
@@ -628,7 +692,16 @@ def optimize_sequence(
         moment_track_ids = intent.climax_candidates
 
     moment_positions = _place_moments(tracks, moment_track_ids, track_count)
-    position_pins.update(moment_positions)
+    # Explicit position pins win over soft moment targets (SEQ-C6): never let a
+    # moment overwrite an explicit index, and never place a moment for a track
+    # that is already explicitly positioned elsewhere (which would duplicate it).
+    explicitly_pinned_tracks = set(position_pins.values())
+    for moment_idx, moment_tid in moment_positions.items():
+        if moment_idx in position_pins:
+            continue
+        if moment_tid in explicitly_pinned_tracks:
+            continue
+        position_pins[moment_idx] = moment_tid
 
     # Position pins at index 0 override opener; at last index override closer
     if 0 in position_pins:
@@ -636,13 +709,18 @@ def optimize_sequence(
     if (track_count - 1) in position_pins:
         pinned_closer_id = position_pins.pop(track_count - 1)
 
+    # Auto opener/closer must not steal a track that belongs to an anchor group;
+    # picking a group member as an endpoint would break the block's contiguity.
+    anchor_member_ids: set[int] = set()
+    for group_track_ids in adjacency_groups.values():
+        anchor_member_ids.update(group_track_ids)
     opener, closer, remaining = _select_endpoints(
         tracks,
         track_map,
         pinned_opener_id,
         pinned_closer_id,
         arc,
-        exclude_from_auto=set(position_pins.values()),
+        exclude_from_auto=set(position_pins.values()) | anchor_member_ids,
     )
 
     # Remove opener/closer from position_pins to prevent duplication
@@ -680,11 +758,16 @@ def optimize_sequence(
         intent,
     )
 
-    # Insert position-pinned tracks at their target indices
+    # Insert position-pinned tracks at their target indices, keeping anchor
+    # blocks atomic (SEQ-C4): a target index that would land inside a contiguous
+    # anchor block is shifted to the nearest block boundary so the block is not
+    # split. Ranges are recomputed per insertion because each insert shifts them.
+    block_member_sets = [{t.track_id for t in block} for block in anchor_blocks]
     for target_idx in sorted(position_pins.keys()):
         tid = position_pins[target_idx]
         if tid in track_map:
             idx = min(target_idx, len(sequence))
+            idx = _adjust_index_for_blocks(sequence, idx, block_member_sets)
             sequence.insert(idx, track_map[tid])
 
     # Post-optimization: 2-opt and artist distribution, protecting pinned positions
@@ -710,6 +793,139 @@ def optimize_sequence(
         sequence, min_separation=artist_min_separation, protected=pinned_positions
     )
     return sequence
+
+
+def _adjust_index_for_blocks(
+    sequence: list[TrackMetadata],
+    idx: int,
+    block_member_sets: list[set[int]],
+) -> int:
+    """Shift an insertion index so it will not split a contiguous anchor block.
+
+    If inserting at ``idx`` would land strictly between two members of the same
+    anchor block (``sequence[idx-1]`` and ``sequence[idx]`` share a block), move
+    the index to the nearest boundary of that block. Endpoint indices (0 and
+    ``len(sequence)``) can never split a block, so they are returned unchanged.
+    """
+    if idx <= 0 or idx >= len(sequence):
+        return idx
+    prev_id = sequence[idx - 1].track_id
+    cur_id = sequence[idx].track_id
+    for members in block_member_sets:
+        if prev_id in members and cur_id in members:
+            start = idx
+            while start > 0 and sequence[start - 1].track_id in members:
+                start -= 1
+            end = idx
+            while end < len(sequence) and sequence[end].track_id in members:
+                end += 1
+            return start if (idx - start) <= (end - idx) else end
+    return idx
+
+
+def _reorder_with_pins(
+    ordered: list[TrackMetadata],
+    opener_id: int | None,
+    closer_id: int | None,
+    adjacency_groups: dict[str, list[int]],
+    position_pins: dict[int, int],
+) -> list[TrackMetadata]:
+    """Overlay explicit placement pins onto a base (narrative) ordering (SEQ-C2).
+
+    The narrative section sequencer produces ``ordered`` from the description.
+    This folds the user's explicit pins into that arc so they are honored while
+    the un-pinned tracks keep their narrative order as closely as possible:
+
+    * opener/closer pins fix the first/last slot,
+    * position pins fix an absolute index (position beats opener/closer at the
+      same slot, matching the >=3 engine's precedence),
+    * anchor blocks stay contiguous, in ``group_order``, placed at the narrative
+      position of their earliest member.
+
+    Pins are assumed already conflict-free (``_validate_pin_conflicts`` runs in
+    ``_resolve_pins``), so the four pin categories are disjoint per track. If an
+    anchor block cannot be placed contiguously around the fixed pins, a
+    ``ValueError`` is raised rather than silently splitting it.
+    """
+    total = len(ordered)
+    if total == 0:
+        return ordered
+    by_id = {track.track_id: track for track in ordered}
+
+    # Anchor blocks, in group order, members de-duplicated across groups.
+    blocks: list[list[int]] = []
+    anchored: set[int] = set()
+    for group_track_ids in adjacency_groups.values():
+        block = [tid for tid in group_track_ids if tid in by_id and tid not in anchored]
+        if block:
+            blocks.append(block)
+            anchored.update(block)
+
+    # Fixed absolute slots: opener/closer first, then position pins override
+    # (an explicit position pin wins over an opener/closer at the same slot).
+    fixed: dict[int, int] = {}
+    if opener_id is not None and opener_id in by_id:
+        fixed[0] = opener_id
+    if closer_id is not None and closer_id in by_id:
+        fixed[total - 1] = closer_id
+    for idx, tid in position_pins.items():
+        if tid in by_id:
+            fixed[max(0, min(idx, total - 1))] = tid
+    fixed_tracks = set(fixed.values())
+
+    # Floating runs in narrative order: each anchor block is one atomic run
+    # (emitted at its first-appearing member); every other non-fixed track is a
+    # single-element run. Fixed tracks are pulled out for absolute placement.
+    floating: list[list[int]] = []
+    emitted_block: set[int] = set()
+    block_of: dict[int, int] = {
+        tid: b_i for b_i, block in enumerate(blocks) for tid in block
+    }
+    for track in ordered:
+        tid = track.track_id
+        if tid in fixed_tracks:
+            continue
+        if tid in anchored:
+            b_i = block_of[tid]
+            if b_i in emitted_block:
+                continue
+            floating.append(list(blocks[b_i]))
+            emitted_block.add(b_i)
+        else:
+            floating.append([tid])
+
+    result: list[int | None] = [None] * total
+    for idx, tid in fixed.items():
+        result[idx] = tid
+
+    empty = [i for i in range(total) if result[i] is None]
+    empty_set = set(empty)
+    for run in floating:
+        length = len(run)
+        if length == 1:
+            slot = empty.pop(0)
+            empty_set.discard(slot)
+            result[slot] = run[0]
+            continue
+        # Anchor block: find the leftmost window of `length` consecutive empties.
+        start = None
+        for candidate in empty:
+            if all((candidate + offset) in empty_set for offset in range(length)):
+                start = candidate
+                break
+        if start is None:
+            member_titles = ", ".join(by_id[t].title for t in run)
+            raise ValueError(
+                "Cannot honor adjacency pin under the narrative arc: the anchor "
+                f"block ({member_titles}) has no contiguous room around the fixed "
+                "pins. Remove a conflicting position/opener/closer pin and retry."
+            )
+        for offset, tid in enumerate(run):
+            result[start + offset] = tid
+            empty_set.discard(start + offset)
+        empty = [i for i in empty if i in empty_set]
+
+    return [by_id[tid] for tid in result]  # type: ignore[index]
 
 
 def _get_pinned_positions(
