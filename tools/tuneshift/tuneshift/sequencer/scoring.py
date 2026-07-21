@@ -242,11 +242,6 @@ def score_artist_separation_transition(a: TrackMetadata, b: TrackMetadata) -> fl
     return 1.0
 
 
-def score_narrative_arc_transition(a: TrackMetadata, b: TrackMetadata) -> float:  # noqa: ARG001 - uniform pairwise-scorer signature (dispatch table)
-    """Narrative arc is enforced by chapter hard-breaks, not pairwise scoring."""
-    return 0.5
-
-
 def _parse_camelot(code: str | None) -> tuple[int, str] | None:
     """Parse a Camelot code like ``8B`` into (hour, letter). None if invalid."""
     if not code or len(code) < 2:
@@ -303,7 +298,7 @@ def mode_score(a: TrackMetadata, b: TrackMetadata) -> float:
 
 
 DIMENSION_SCORERS: dict[str, Callable[[TrackMetadata, TrackMetadata], float]] = {
-    "narrative_arc": score_narrative_arc_transition,
+    "narrative_arc": narrative_connection_score,
     "energy_flow": energy_score,
     "mood_continuity": score_mood_continuity,
     "sonic_texture": score_sonic_texture,
@@ -321,6 +316,22 @@ DIMENSION_SCORERS: dict[str, Callable[[TrackMetadata, TrackMetadata], float]] = 
 DEFAULT_WEIGHTS: dict[str, float] = {dim: 0.5 for dim in DIMENSION_SCORERS}
 
 
+def _canonicalize_weight_keys(weights: dict[str, float]) -> dict[str, float]:
+    """Fold legacy dimension names onto their new-style twins (SEQ-S2).
+
+    ``resolve_weights`` starts from a new-style base (``energy_flow`` ...) and
+    merges caller-supplied weights that may use legacy names (``energy`` ...).
+    Without canonicalization the merged vector keeps *both* keys and
+    ``score_pair`` counts the same scorer twice, corrupting the intended ratio.
+    Mapping legacy -> new before merging makes the caller's value overwrite the
+    base entry for that single canonical dimension.
+    """
+    canonical: dict[str, float] = {}
+    for key, value in weights.items():
+        canonical[_LEGACY_DIMENSION_MAP.get(key, key)] = value
+    return canonical
+
+
 def resolve_weights(
     cli_weights: dict[str, float] | None,
     db_weights: dict[str, float] | None,
@@ -329,7 +340,9 @@ def resolve_weights(
     """Resolve weight vector from cascade: CLI > DB > preset > default.
 
     Priority: CLI-provided values override DB, which overrides preset.
-    Unspecified dimensions fall through to the next level.
+    Unspecified dimensions fall through to the next level. Legacy dimension
+    names in the CLI/DB layers are canonicalized to their new-style twins so a
+    dimension is never double-counted (SEQ-S2).
     """
     # Start with base
     if preset_name and preset_name in PRESETS:
@@ -339,11 +352,11 @@ def resolve_weights(
 
     # DB overrides base
     if db_weights:
-        base.update(db_weights)
+        base.update(_canonicalize_weight_keys(db_weights))
 
     # CLI overrides everything
     if cli_weights:
-        base.update(cli_weights)
+        base.update(_canonicalize_weight_keys(cli_weights))
 
     return base
 

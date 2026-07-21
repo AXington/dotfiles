@@ -59,16 +59,21 @@ def select_opener(tracks: list[TrackMetadata], arc: str) -> TrackMetadata:
     if target is None:
         target = 0.5
 
-    scored: list[tuple[float, TrackMetadata]] = []
+    scored: list[tuple[bool, float, int, TrackMetadata]] = []
     for track in tracks:
+        has_energy = track.energy is not None
         energy = track.energy if track.energy is not None else 0.5
         energy_fit = 1.0 - abs(energy - target)
         valence = track.valence if track.valence is not None else 0.5
         valence_fit = 1.0 - abs(valence - 0.5) * 0.5
-        scored.append((energy_fit * 0.7 + valence_fit * 0.3, track))
+        fit = energy_fit * 0.7 + valence_fit * 0.3
+        scored.append((has_energy, fit, -track.track_id, track))
 
-    scored.sort(key=lambda item: item[0], reverse=True)
-    return scored[0][1]
+    # Rank metadata-complete tracks first (SEQ-S3): a missing-energy track
+    # defaulting to 0.5 must not out-fit a real endpoint. Ties break on fit,
+    # then deterministically on the lowest track_id.
+    scored.sort(key=lambda item: (item[0], item[1], item[2]), reverse=True)
+    return scored[0][3]
 
 
 def select_closer(tracks: list[TrackMetadata], arc: str) -> TrackMetadata:
@@ -77,15 +82,18 @@ def select_closer(tracks: list[TrackMetadata], arc: str) -> TrackMetadata:
     if target is None:
         target = 0.3
 
-    scored: list[tuple[float, TrackMetadata]] = []
+    scored: list[tuple[bool, float, int, TrackMetadata]] = []
     for track in tracks:
+        has_energy = track.energy is not None
         energy = track.energy if track.energy is not None else 0.5
         energy_fit = 1.0 - abs(energy - target)
         mode_bonus = 0.2 if track.mode == 1 else 0.0
-        scored.append((energy_fit + mode_bonus, track))
+        fit = energy_fit + mode_bonus
+        scored.append((has_energy, fit, -track.track_id, track))
 
-    scored.sort(key=lambda item: item[0], reverse=True)
-    return scored[0][1]
+    # Rank metadata-complete tracks first (SEQ-S3).
+    scored.sort(key=lambda item: (item[0], item[1], item[2]), reverse=True)
+    return scored[0][3]
 
 
 def distribute_artists(
@@ -481,7 +489,7 @@ def _greedy_build(
         current = sequence[-1]
         candidates: list[tuple[float, TrackMetadata]] = []
 
-        for track_id in available:
+        for track_id in sorted(available):
             candidate = free_map[track_id]
             base = score_pair(current, candidate, weights)
             arc_mult = _arc_fit_multiplier(candidate, position, track_count, arc)
@@ -495,7 +503,9 @@ def _greedy_build(
             )
             candidates.append((adjusted, candidate))
 
-        candidates.sort(key=lambda item: item[0], reverse=True)
+        # Sort by score desc; break ties deterministically on the lowest
+        # track_id so ordering never depends on set-iteration order (SEQ-D2).
+        candidates.sort(key=lambda item: (item[0], -item[1].track_id), reverse=True)
 
         bold_jump_cooldown = max(0, bold_jump_cooldown - 1)
         protect_region = position <= 2 or position >= track_count - 3
@@ -544,7 +554,7 @@ def sequence_score(
 
     Sums, over every adjacent transition, the same arc-fit x context-modified
     pairwise score that ``_greedy_build`` optimizes position-by-position. The
-    greedy builder and the local search (``_two_opt``) both optimize this one
+    greedy builder and the local search (``_swap_search``) both optimize this one
     function, so local search can no longer improve raw pairwise continuity at
     the expense of arc fit or context (artist spacing, variety, monotony, ...).
 
@@ -779,7 +789,7 @@ def optimize_sequence(
     for target_idx in position_pins:
         if target_idx < len(sequence):
             pinned_positions.add(target_idx)
-    sequence = _two_opt(
+    sequence = _swap_search(
         sequence,
         weights,
         arc,
@@ -1048,7 +1058,7 @@ def sequence_playlist(
     return result
 
 
-def _two_opt(
+def _swap_search(
     sequence: list[TrackMetadata],
     weights: dict[str, float],
     arc: str = "free",
@@ -1120,6 +1130,13 @@ def _two_opt(
                 break
 
     return result
+
+
+# Back-compat alias: the local search was historically named ``_two_opt`` even
+# though its neighborhood is adjacent swaps, not 2-opt segment reversals
+# (SEQ-A2). ``_swap_search`` is the accurate name; the alias keeps older
+# imports working.
+_two_opt = _swap_search
 
 
 def _optimize_within_section(

@@ -8,7 +8,7 @@ the objective the builder actually targeted.
 """
 
 from tuneshift.sequencer.metadata import TrackMetadata
-from tuneshift.sequencer.optimizer import _two_opt, sequence_score
+from tuneshift.sequencer.optimizer import _swap_search, sequence_score
 
 WEIGHTS = {"energy": 1.0}
 
@@ -78,13 +78,13 @@ class TestTwoOptRespectsObjective:
         """
         seq = _arc_conflict_input()
         before = sequence_score(seq, WEIGHTS, arc="descending")
-        result = _two_opt(list(seq), WEIGHTS, arc="descending")
+        result = _swap_search(list(seq), WEIGHTS, arc="descending")
         after = sequence_score(result, WEIGHTS, arc="descending")
         assert after >= before - 1e-9
 
     def test_two_opt_preserves_endpoints_and_membership(self):
         seq = _arc_conflict_input()
-        result = _two_opt(list(seq), WEIGHTS, arc="descending")
+        result = _swap_search(list(seq), WEIGHTS, arc="descending")
         assert result[0].track_id == seq[0].track_id
         assert result[-1].track_id == seq[-1].track_id
         assert sorted(t.track_id for t in result) == [1, 2, 3, 4, 5, 6]
