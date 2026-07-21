@@ -15,16 +15,69 @@ Configuration via environment variables:
   OLLAMA_HOST               - Ollama host (default: http://localhost:11434)
 """
 
+import ipaddress
 import json
 import logging
 import os
 import time
 from pathlib import Path
 from typing import Any, Protocol
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
 _TOKEN_DIR = Path.home() / ".local" / "share" / "tuneshift"
+
+_LOOPBACK_HOSTNAMES = {"localhost"}
+
+
+def _validate_ollama_host(host: str) -> str:
+    """Validate an Ollama host URL against SSRF (SEC-M1).
+
+    Only loopback destinations (``localhost``, ``127.0.0.0/8``, ``::1``) or hosts
+    explicitly listed in the ``TUNESHIFT_OLLAMA_ALLOWLIST`` environment variable
+    (comma-separated ``host`` or ``host:port`` entries) are permitted. Everything
+    else -- notably cloud metadata endpoints such as ``169.254.169.254`` and
+    other internal services -- is refused before any network call is made.
+
+    Returns ``host`` unchanged when valid so callers can validate inline.
+
+    Raises:
+        ValueError: if the scheme is not http(s), the hostname is missing, or the
+            destination is neither loopback nor allowlisted.
+    """
+    parsed = urlparse(host)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(
+            f"Invalid Ollama host {host!r}: only http/https schemes are supported."
+        )
+    hostname = parsed.hostname
+    if not hostname:
+        raise ValueError(f"Invalid Ollama host {host!r}: no hostname could be parsed.")
+
+    allowlist = {
+        entry.strip().lower()
+        for entry in os.environ.get("TUNESHIFT_OLLAMA_ALLOWLIST", "").split(",")
+        if entry.strip()
+    }
+    if allowlist and (
+        hostname.lower() in allowlist or (parsed.netloc or "").lower() in allowlist
+    ):
+        return host
+
+    if hostname.lower() in _LOOPBACK_HOSTNAMES:
+        return host
+    try:
+        if ipaddress.ip_address(hostname).is_loopback:
+            return host
+    except ValueError:
+        pass
+
+    raise ValueError(
+        f"Refusing to connect to Ollama host {hostname!r}: only loopback "
+        "addresses or hosts in TUNESHIFT_OLLAMA_ALLOWLIST are permitted (SSRF "
+        "protection). Set TUNESHIFT_OLLAMA_ALLOWLIST to authorize a remote host."
+    )
 
 
 def _load_stored_key(backend: str) -> str | None:
@@ -178,6 +231,7 @@ class OllamaBackend:
 
     def __init__(self, host: str | None = None, model: str | None = None) -> None:
         self._host = host or os.environ.get("OLLAMA_HOST", "http://localhost:11434")
+        _validate_ollama_host(self._host)
         self._validated_models: set[str] = set()
         self.selected_model: str | None = model
         # Validate the target model exists if specified
@@ -301,6 +355,7 @@ def detect_backend() -> tuple[str, LLMBackend] | tuple[None, None]:
     try:
         import urllib.request
 
+        _validate_ollama_host(ollama_host)
         with urllib.request.urlopen(f"{ollama_host}/api/tags", timeout=2) as resp:
             data = json.loads(resp.read())
             available_models = [m["name"] for m in data.get("models", [])]
