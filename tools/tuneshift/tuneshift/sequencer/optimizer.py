@@ -615,6 +615,91 @@ def sequence_score(
     return total
 
 
+def _sequence_narrative_sections(
+    tracks: list[TrackMetadata],
+    sections: list[NarrativeSection],
+    weights: dict[str, float],
+    arc: str,
+    pinned_opener_id: int | None,
+    pinned_closer_id: int | None,
+    adjacency_groups: dict[str, list[int]],
+    position_pins: dict[int, int],
+) -> list[TrackMetadata]:
+    """Order tracks by declared narrative sections, then fold in explicit pins.
+
+    Full-coverage narratives (section capacity >= track count) place tracks
+    positionally; partial coverage uses fitness-based assignment. Either way the
+    per-section order is refined by ``_optimize_within_section`` and any explicit
+    pins are overlaid via ``_reorder_with_pins`` (SEQ-C2).
+    """
+    has_pins = bool(
+        pinned_opener_id is not None
+        or pinned_closer_id is not None
+        or adjacency_groups
+        or position_pins
+    )
+
+    def _finish(ordered: list[TrackMetadata]) -> list[TrackMetadata]:
+        if has_pins:
+            return _reorder_with_pins(
+                ordered,
+                pinned_opener_id,
+                pinned_closer_id,
+                adjacency_groups,
+                position_pins,
+            )
+        return ordered
+
+    if sum(section.capacity for section in sections) >= len(tracks):
+        ordered = _fill_sections_positionally(tracks, sections, weights, arc)
+    else:
+        ordered = _fill_sections_by_fitness(tracks, sections, weights, arc)
+    return _finish(ordered)
+
+
+def _fill_sections_positionally(
+    tracks: list[TrackMetadata],
+    sections: list[NarrativeSection],
+    weights: dict[str, float],
+    arc: str,
+) -> list[TrackMetadata]:
+    """Slice tracks into sections by position (narrative order == input order)."""
+    ordered: list[TrackMetadata] = []
+    idx = 0
+    for section in sections:
+        section_tracks = tracks[idx : idx + section.capacity]
+        ordered.extend(_order_section(section_tracks, weights, arc))
+        idx += section.capacity
+    ordered.extend(tracks[idx:])
+    return ordered
+
+
+def _fill_sections_by_fitness(
+    tracks: list[TrackMetadata],
+    sections: list[NarrativeSection],
+    weights: dict[str, float],
+    arc: str,
+) -> list[TrackMetadata]:
+    """Assign tracks to sections by fitness when sections do not cover all slots."""
+    assignments = assign_tracks_to_sections(tracks, sections, goal=arc)
+    ordered: list[TrackMetadata] = []
+    for section in sections:
+        ordered.extend(_order_section(assignments.get(section.name, []), weights, arc))
+    ordered.extend(assignments.get("_flex", []))
+    return ordered
+
+
+def _order_section(
+    section_tracks: list[TrackMetadata],
+    weights: dict[str, float],
+    arc: str,
+) -> list[TrackMetadata]:
+    """Refine a single section's order (no-op for 0/1-track sections)."""
+    if len(section_tracks) > 1:
+        return _optimize_within_section(section_tracks, weights, arc)
+    return list(section_tracks)
+
+
 def optimize_sequence(
     tracks: list[TrackMetadata],
     weights: dict[str, float],
@@ -661,60 +746,16 @@ def optimize_sequence(
 
         sections = parse_narrative(narrative)
         if sections:
-            has_pins = bool(
-                pinned_opener_id is not None
-                or pinned_closer_id is not None
-                or adjacency_groups
-                or position_pins
+            return _sequence_narrative_sections(
+                tracks,
+                sections,
+                weights,
+                arc,
+                pinned_opener_id,
+                pinned_closer_id,
+                adjacency_groups,
+                position_pins,
             )
-
-            def _finish_narrative(ordered: list[TrackMetadata]) -> list[TrackMetadata]:
-                # Fold explicit pins into the narrative arc (SEQ-C2) so they are
-                # honored instead of silently dropped.
-                if has_pins:
-                    return _reorder_with_pins(
-                        ordered,
-                        pinned_opener_id,
-                        pinned_closer_id,
-                        adjacency_groups,
-                        position_pins,
-                    )
-                return ordered
-
-            total_capacity = sum(s.capacity for s in sections)
-            # If sections cover all positions, use positional assignment
-            # (the narrative describes the intended order by position)
-            if total_capacity >= len(tracks):
-                ordered: list[TrackMetadata] = []
-                idx = 0
-                for section in sections:
-                    section_tracks = tracks[idx : idx + section.capacity]
-                    if len(section_tracks) > 1:
-                        section_ordered = _optimize_within_section(
-                            section_tracks, weights, arc
-                        )
-                        ordered.extend(section_ordered)
-                    else:
-                        ordered.extend(section_tracks)
-                    idx += section.capacity
-                # Any remaining tracks (if sections didn't cover all)
-                ordered.extend(tracks[idx:])
-                return _finish_narrative(ordered)
-            else:
-                # Partial coverage: use fitness-based assignment
-                assignments = assign_tracks_to_sections(tracks, sections, goal=arc)
-                ordered = []
-                for section in sections:
-                    section_tracks = assignments.get(section.name, [])
-                    if len(section_tracks) > 1:
-                        section_ordered = _optimize_within_section(
-                            section_tracks, weights, arc
-                        )
-                        ordered.extend(section_ordered)
-                    else:
-                        ordered.extend(section_tracks)
-                ordered.extend(assignments.get("_flex", []))
-                return _finish_narrative(ordered)
 
     # Infer intent early for narrative arc
     from tuneshift.sequencer.intent import infer_intent
@@ -858,6 +899,114 @@ def _adjust_index_for_blocks(
     return idx
 
 
+def _collect_anchor_blocks(
+    adjacency_groups: dict[str, list[int]],
+    by_id: dict[int, TrackMetadata],
+) -> tuple[list[list[int]], set[int]]:
+    """Materialize anchor blocks in group order, de-duplicating members."""
+    blocks: list[list[int]] = []
+    anchored: set[int] = set()
+    for group_track_ids in adjacency_groups.values():
+        block = [tid for tid in group_track_ids if tid in by_id and tid not in anchored]
+        if block:
+            blocks.append(block)
+            anchored.update(block)
+    return blocks, anchored
+
+
+def _compute_fixed_slots(
+    opener_id: int | None,
+    closer_id: int | None,
+    position_pins: dict[int, int],
+    by_id: dict[int, TrackMetadata],
+    total: int,
+) -> dict[int, int]:
+    """Resolve absolute slots; position pins override opener/closer collisions."""
+    fixed: dict[int, int] = {}
+    if opener_id is not None and opener_id in by_id:
+        fixed[0] = opener_id
+    if closer_id is not None and closer_id in by_id:
+        fixed[total - 1] = closer_id
+    for idx, tid in position_pins.items():
+        if tid in by_id:
+            fixed[max(0, min(idx, total - 1))] = tid
+    return fixed
+
+
+def _collect_floating_runs(
+    ordered: list[TrackMetadata],
+    fixed_tracks: set[int],
+    anchored: set[int],
+    blocks: list[list[int]],
+) -> list[list[int]]:
+    """Build narrative-order runs: each anchor block is one atomic run."""
+    block_of = {tid: b_i for b_i, block in enumerate(blocks) for tid in block}
+    floating: list[list[int]] = []
+    emitted_block: set[int] = set()
+    for track in ordered:
+        tid = track.track_id
+        if tid in fixed_tracks:
+            continue
+        if tid in anchored:
+            b_i = block_of[tid]
+            if b_i in emitted_block:
+                continue
+            floating.append(list(blocks[b_i]))
+            emitted_block.add(b_i)
+        else:
+            floating.append([tid])
+    return floating
+
+
+def _place_pinned_runs(
+    floating: list[list[int]],
+    fixed: dict[int, int],
+    total: int,
+    by_id: dict[int, TrackMetadata],
+) -> list[int]:
+    """Place fixed slots, then fill floating runs into the leftmost empty gaps.
+
+    Anchor blocks (multi-track runs) require a contiguous window of empty slots;
+    if none exists around the fixed pins, raise rather than split the block.
+    """
+    result: list[int | None] = [None] * total
+    for idx, tid in fixed.items():
+        result[idx] = tid
+
+    empty = [i for i in range(total) if result[i] is None]
+    empty_set = set(empty)
+    for run in floating:
+        if len(run) == 1:
+            slot = empty.pop(0)
+            empty_set.discard(slot)
+            result[slot] = run[0]
+            continue
+        start = _find_contiguous_start(empty, empty_set, len(run))
+        if start is None:
+            member_titles = ", ".join(by_id[tid].title for tid in run)
+            raise ValueError(
+                "Cannot honor adjacency pin under the narrative arc: the anchor "
+                f"block ({member_titles}) has no contiguous room around the fixed "
+                "pins. Remove a conflicting position/opener/closer pin and retry."
+            )
+        for offset, tid in enumerate(run):
+            result[start + offset] = tid
+            empty_set.discard(start + offset)
+        empty = [i for i in empty if i in empty_set]
+
+    return result  # type: ignore[return-value]
+
+
+def _find_contiguous_start(
+    empty: list[int], empty_set: set[int], length: int
+) -> int | None:
+    """Leftmost empty index with ``length`` consecutive empty slots after it."""
+    for candidate in empty:
+        if all((candidate + offset) in empty_set for offset in range(length)):
+            return candidate
+    return None
+
+
 def _reorder_with_pins(
     ordered: list[TrackMetadata],
     opener_id: int | None,
@@ -887,80 +1036,11 @@ def _reorder_with_pins(
         return ordered
     by_id = {track.track_id: track for track in ordered}
 
-    # Anchor blocks, in group order, members de-duplicated across groups.
-    blocks: list[list[int]] = []
-    anchored: set[int] = set()
-    for group_track_ids in adjacency_groups.values():
-        block = [tid for tid in group_track_ids if tid in by_id and tid not in anchored]
-        if block:
-            blocks.append(block)
-            anchored.update(block)
-
-    # Fixed absolute slots: opener/closer first, then position pins override
-    # (an explicit position pin wins over an opener/closer at the same slot).
-    fixed: dict[int, int] = {}
-    if opener_id is not None and opener_id in by_id:
-        fixed[0] = opener_id
-    if closer_id is not None and closer_id in by_id:
-        fixed[total - 1] = closer_id
-    for idx, tid in position_pins.items():
-        if tid in by_id:
-            fixed[max(0, min(idx, total - 1))] = tid
-    fixed_tracks = set(fixed.values())
-
-    # Floating runs in narrative order: each anchor block is one atomic run
-    # (emitted at its first-appearing member); every other non-fixed track is a
-    # single-element run. Fixed tracks are pulled out for absolute placement.
-    floating: list[list[int]] = []
-    emitted_block: set[int] = set()
-    block_of: dict[int, int] = {
-        tid: b_i for b_i, block in enumerate(blocks) for tid in block
-    }
-    for track in ordered:
-        tid = track.track_id
-        if tid in fixed_tracks:
-            continue
-        if tid in anchored:
-            b_i = block_of[tid]
-            if b_i in emitted_block:
-                continue
-            floating.append(list(blocks[b_i]))
-            emitted_block.add(b_i)
-        else:
-            floating.append([tid])
-
-    result: list[int | None] = [None] * total
-    for idx, tid in fixed.items():
-        result[idx] = tid
-
-    empty = [i for i in range(total) if result[i] is None]
-    empty_set = set(empty)
-    for run in floating:
-        length = len(run)
-        if length == 1:
-            slot = empty.pop(0)
-            empty_set.discard(slot)
-            result[slot] = run[0]
-            continue
-        # Anchor block: find the leftmost window of `length` consecutive empties.
-        start = None
-        for candidate in empty:
-            if all((candidate + offset) in empty_set for offset in range(length)):
-                start = candidate
-                break
-        if start is None:
-            member_titles = ", ".join(by_id[t].title for t in run)
-            raise ValueError(
-                "Cannot honor adjacency pin under the narrative arc: the anchor "
-                f"block ({member_titles}) has no contiguous room around the fixed "
-                "pins. Remove a conflicting position/opener/closer pin and retry."
-            )
-        for offset, tid in enumerate(run):
-            result[start + offset] = tid
-            empty_set.discard(start + offset)
-        empty = [i for i in empty if i in empty_set]
-
-    return [by_id[tid] for tid in result]  # type: ignore[index]
+    blocks, anchored = _collect_anchor_blocks(adjacency_groups, by_id)
+    fixed = _compute_fixed_slots(opener_id, closer_id, position_pins, by_id, total)
+    floating = _collect_floating_runs(ordered, set(fixed.values()), anchored, blocks)
+    result = _place_pinned_runs(floating, fixed, total, by_id)
+    return [by_id[tid] for tid in result]
 
 
 def _get_pinned_positions(
@@ -1115,9 +1195,7 @@ def _swap_search(
     # hit the cache instead of re-running the dimension loop in score_pair.
     _pair_cache: dict[tuple[int, int], float] = {}
 
-    def _cached_pair(
-        a: TrackMetadata, b: TrackMetadata, w: dict[str, float]
-    ) -> float:
+    def _cached_pair(a: TrackMetadata, b: TrackMetadata, w: dict[str, float]) -> float:
         key = (id(a), id(b))
         cached = _pair_cache.get(key)
         if cached is None:
