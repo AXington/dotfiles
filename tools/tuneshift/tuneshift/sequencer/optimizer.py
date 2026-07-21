@@ -2,6 +2,7 @@
 
 import math
 import random
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from tuneshift.db import Database
@@ -13,6 +14,22 @@ from tuneshift.sequencer.scoring import score_pair
 
 if TYPE_CHECKING:
     from tuneshift.sequencer.intent import PlaylistIntent
+
+
+# Swap-neighborhood windowing (SEQ-A4). At or below the threshold the local
+# search scans the exact full neighborhood so small/medium playlists (including
+# every gold/acceptance fixture) are byte-for-byte unchanged. Above it, the
+# inner look-distance is bounded so cost grows ~O(n * window) per pass instead
+# of O(n^2), keeping large playlists responsive.
+_SWAP_WINDOW_THRESHOLD = 500
+_SWAP_WINDOW = 8
+# Lookback used to warm the context for a bounded region rescore. >= the
+# context window (5) and the artist-recency decay cap (9), so windowed modifiers
+# and recency are reproduced exactly.
+_LOCAL_LOOKBACK = 12
+# Large playlists converge in a few passes; cap them so the windowed heuristic
+# stays well under its wall-clock budget.
+_WINDOWED_MAX_PASSES = 3
 
 
 def _target_energy(position_frac: float, arc: str) -> float | None:
@@ -549,6 +566,8 @@ def sequence_score(
     intent: "PlaylistIntent | None" = None,
     narrative_mode: str = "river",
     context_window: int = 5,
+    score_fn: Callable[[TrackMetadata, TrackMetadata, dict[str, float]], float]
+    | None = None,
 ) -> float:
     """Single global objective for a full sequence (SEQ-A1).
 
@@ -558,8 +577,13 @@ def sequence_score(
     function, so local search can no longer improve raw pairwise continuity at
     the expense of arc fit or context (artist spacing, variety, monotony, ...).
 
+    ``score_fn`` overrides the pairwise scorer; local search injects a memoized
+    variant so repeated adjacent pairs across candidate swaps are not rescored
+    from scratch (SEQ-A4). Defaults to :func:`score_pair`.
+
     Higher is better. Returns 0.0 for sequences shorter than two tracks.
     """
+    pair_score = score_fn if score_fn is not None else score_pair
     total_tracks = len(sequence)
     if total_tracks < 2:
         return 0.0
@@ -576,7 +600,7 @@ def sequence_score(
     for position in range(1, total_tracks):
         current = sequence[position - 1]
         candidate = sequence[position]
-        base = score_pair(current, candidate, weights)
+        base = pair_score(current, candidate, weights)
         arc_mult = _arc_fit_multiplier(candidate, position, total_tracks, arc)
         total += score_candidate(
             candidate,
@@ -1083,7 +1107,23 @@ def _swap_search(
     protected = protected or set()
 
     result = list(sequence)
-    no_improvement_count = 0
+
+    # Memoize the pairwise scorer for the duration of this search (SEQ-A4).
+    # Within one search the track objects are fixed and weights are constant, so
+    # keying on ``(id(a), id(b))`` is safe and unique; each candidate swap only
+    # changes two positions, so the vast majority of adjacent pairs recur and
+    # hit the cache instead of re-running the dimension loop in score_pair.
+    _pair_cache: dict[tuple[int, int], float] = {}
+
+    def _cached_pair(
+        a: TrackMetadata, b: TrackMetadata, w: dict[str, float]
+    ) -> float:
+        key = (id(a), id(b))
+        cached = _pair_cache.get(key)
+        if cached is None:
+            cached = score_pair(a, b, w)
+            _pair_cache[key] = cached
+        return cached
 
     def _objective(seq: list[TrackMetadata]) -> float:
         return sequence_score(
@@ -1094,9 +1134,68 @@ def _swap_search(
             intent=intent,
             narrative_mode=narrative_mode,
             context_window=context_window,
+            score_fn=_cached_pair,
         )
 
-    current_objective = _objective(result)
+    def _region_score(seq: list[TrackMetadata], lo: int, hi: int) -> float:
+        """Sum objective contributions for positions ``[max(1, lo), hi]``.
+
+        The context is warmed by replaying the preceding ``_LOCAL_LOOKBACK``
+        tracks, which is enough to reproduce every windowed modifier (recent
+        tracks, energies, themes) and the artist-recency decay (capped at 9
+        positions) exactly. Only the global "artist ever seen" variety bonus is
+        approximated against the warm window; because the same warm-up is used
+        before and after a swap, that term is consistent across the comparison,
+        so the local delta faithfully ranks the swap. Used only on the large-n
+        windowed path, whose output is heuristic by design.
+        """
+        first = max(1, lo)
+        start = max(0, first - _LOCAL_LOOKBACK)
+        ctx = SequenceContext(
+            position=start,
+            total=len(seq),
+            narrative_mode=narrative_mode,
+            context_window=context_window,
+        )
+        for warm in range(start, first):
+            ctx.advance(seq[warm])
+
+        total = 0.0
+        for position in range(first, hi + 1):
+            current = seq[position - 1]
+            candidate = seq[position]
+            base = _cached_pair(current, candidate, weights)
+            arc_mult = _arc_fit_multiplier(candidate, position, len(seq), arc)
+            total += score_candidate(
+                candidate,
+                current,
+                ctx,
+                base * arc_mult,
+                penalty_overrides,
+                intent,
+            )
+            ctx.advance(candidate)
+        return total
+
+    if track_count <= _SWAP_WINDOW_THRESHOLD:
+        return _exact_swap_search(
+            result, track_count, protected, max_iterations, _objective
+        )
+    return _windowed_swap_search(
+        result, track_count, protected, max_iterations, _region_score
+    )
+
+
+def _exact_swap_search(
+    result: list[TrackMetadata],
+    track_count: int,
+    protected: set[int],
+    max_iterations: int,
+    objective: Callable[[list[TrackMetadata]], float],
+) -> list[TrackMetadata]:
+    """Exact full-objective swap search (unchanged behavior for small inputs)."""
+    current_objective = objective(result)
+    no_improvement_count = 0
 
     for _ in range(max_iterations):
         improved = False
@@ -1111,7 +1210,7 @@ def _swap_search(
                     result[right_index],
                     result[left_index],
                 )
-                new_objective = _objective(result)
+                new_objective = objective(result)
 
                 if new_objective > current_objective + 1e-6:
                     current_objective = new_objective
@@ -1128,6 +1227,56 @@ def _swap_search(
             no_improvement_count += 1
             if no_improvement_count >= 10:
                 break
+
+    return result
+
+
+def _windowed_swap_search(
+    result: list[TrackMetadata],
+    track_count: int,
+    protected: set[int],
+    max_iterations: int,
+    region_score: Callable[[list[TrackMetadata], int, int], float],
+) -> list[TrackMetadata]:
+    """Windowed local-delta swap search for large playlists (SEQ-A4).
+
+    Each swap is bounded to a look-distance of ``_SWAP_WINDOW`` and evaluated by
+    an exact bounded region rescore instead of the full O(n) objective, so cost
+    is ~O(n * window) per pass. Swaps are accepted only when the local objective
+    strictly improves, so the result is never worse than the greedy build.
+    """
+    passes = min(max_iterations, _WINDOWED_MAX_PASSES)
+
+    for _ in range(passes):
+        improved = False
+        for left_index in range(1, track_count - 2):
+            if left_index in protected:
+                continue
+            right_limit = min(left_index + 2 + _SWAP_WINDOW, track_count - 1)
+            for right_index in range(left_index + 2, right_limit):
+                if right_index in protected:
+                    continue
+
+                lo = left_index
+                hi = min(right_index + _LOCAL_LOOKBACK, track_count - 1)
+                before = region_score(result, lo, hi)
+
+                result[left_index], result[right_index] = (
+                    result[right_index],
+                    result[left_index],
+                )
+                after = region_score(result, lo, hi)
+
+                if after > before + 1e-6:
+                    improved = True
+                else:
+                    result[left_index], result[right_index] = (
+                        result[right_index],
+                        result[left_index],
+                    )
+
+        if not improved:
+            break
 
     return result
 
