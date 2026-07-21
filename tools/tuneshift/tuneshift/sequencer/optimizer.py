@@ -112,14 +112,15 @@ def distribute_artists(
         violation_idx = None
         for index in range(track_count - 1):
             if result[index].artist == result[index + 1].artist:
-                violation_idx = index + 1
+                candidate = index + 1
+                # A pinned violator cannot be moved; skip it and keep scanning
+                # so later, movable clumps are still redistributed (SEQ-C5).
+                if candidate in protected:
+                    continue
+                violation_idx = candidate
                 break
 
         if violation_idx is None:
-            break
-
-        # Skip if the violator is pinned
-        if violation_idx in protected:
             break
 
         violator = result[violation_idx]
