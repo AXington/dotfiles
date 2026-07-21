@@ -58,3 +58,13 @@ def test_no_s310_unguarded_urlopen() -> None:
     """Every urlopen/Request site is scheme-guarded or justified (guards S310)."""
     result = _ruff_select("S310")
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_no_ble001_blind_except() -> None:
+    """No un-justified blind ``except Exception`` (guards ERR-M1).
+
+    Every remaining broad catch is a genuine boundary handler carrying a
+    justified ``# noqa: BLE001``; all others were narrowed to specific types.
+    """
+    result = _ruff_select("BLE001")
+    assert result.returncode == 0, result.stdout + result.stderr

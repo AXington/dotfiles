@@ -12,6 +12,7 @@ roll back a committed remap. Sync failures downgrade an item's status to
 
 from __future__ import annotations
 
+import logging
 import sys
 from dataclasses import dataclass, field
 from types import SimpleNamespace
@@ -22,6 +23,8 @@ from tuneshift.enrichment import platform_metadata
 from tuneshift.enrichment.retry import RetryConfig, RetryStats
 from tuneshift.enrichment.retry import retry_api_call as _retry_api_call
 from tuneshift.models import PlatformMapping
+
+logger = logging.getLogger(__name__)
 
 PLATFORM = "tidal"
 
@@ -199,8 +202,14 @@ def _reenrich_track(db: Database, client, item: PlanItem, stats: RetryStats) -> 
             # metadata (the upsert alone never wrote tags -- that gap is why an
             # Atmos-mapped track stayed untagged after doctor --apply).
             platform_metadata.derive_tags(db, item.track_id)
-    except Exception:
-        pass
+    except Exception:  # noqa: BLE001
+        # Best-effort re-enrichment: a failure here must never roll back the
+        # committed remap. Log with context instead of swallowing silently.
+        logger.warning(
+            "re-enrichment after remap failed for track=%s",
+            item.track_id,
+            exc_info=True,
+        )
 
 
 def _sync_playlist(db: Database, name: str) -> bool:
@@ -216,7 +225,7 @@ def _sync_playlist(db: Database, name: str) -> bool:
     )
     try:
         return handle_sync(args, db) == 0
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         print(f'  ! Sync of "{name}" failed: {exc}', file=sys.stderr)
         return False
 
@@ -278,7 +287,7 @@ def apply_plan(
             item.status = "applied"
             result.applied += 1
             result.affected_playlists.add(item.playlist)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             item.status = "failed"
             item.note = str(exc)
             result.failed += 1

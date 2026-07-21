@@ -237,7 +237,7 @@ class TidalClient:
             assert self._session is not None
             try:
                 track = self._session.track(int(track_id))
-            except Exception:
+            except Exception:  # noqa: BLE001
                 return None
             return self._track_to_result(track)
 
@@ -285,7 +285,7 @@ class TidalClient:
                         skipped += 1
                         continue
                     results.append(self._track_to_result(track))
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001
                     track_id = getattr(track, "id", "unknown")
                     print(
                         f"  Skipping unavailable track {track_id}: {exc}",

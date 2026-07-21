@@ -267,7 +267,7 @@ class YTMusicClient:
         ytmusic = self._ensure_session()
         try:
             song = self._call_api(lambda: ytmusic.get_song(track_id))
-        except Exception:
+        except Exception:  # noqa: BLE001
             return None
         details = song.get("videoDetails", {})
         if not details:

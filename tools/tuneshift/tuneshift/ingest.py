@@ -80,7 +80,7 @@ def ingest_from_platform(
                     user_approved=True,
                 )
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             import sys
 
             print(f"  Skipping track at position {position}: {exc}", file=sys.stderr)

@@ -181,7 +181,7 @@ class ResolutionWorker:
             )
             logger.info("resolution rate-limited, backing off: track=%s", track_id)
             return False
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             return self._handle_failure(track_id, exc)
 
         if not candidates:
@@ -250,7 +250,7 @@ class ResolutionWorker:
         if self._enricher is not None:
             try:
                 self._enricher(self._db, track)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 logger.warning(
                     "enrichment failed after resolve: track=%s",
                     track_id,

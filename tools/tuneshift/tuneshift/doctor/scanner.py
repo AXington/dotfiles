@@ -153,7 +153,7 @@ def _scan_one_track(
         report = _retry_api_call(_fetch, config=config, stats=stats)
     except PermanentAPIError:
         return _unavailable_item(next_id, track, playlist_name, mapping)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         if is_permanent(exc):
             return _unavailable_item(next_id, track, playlist_name, mapping)
         # Transient error survived all retries: report as unavailable-unknown so

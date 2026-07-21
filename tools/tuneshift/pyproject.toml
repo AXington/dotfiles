@@ -41,13 +41,16 @@ line-length = 88
 target-version = "py310"
 
 [tool.ruff.lint]
-# Permanent select set. S113 (request timeout) and S310 (urlopen scheme) are now
+# Permanent select set. S113 (request timeout) and S310 (urlopen scheme) are
 # enforced: every raw HTTP/urlopen site sets an explicit timeout and is guarded by
 # a validator (OLLAMA_HOST SSRF check / _ensure_https_url) or carries a justified
-# noqa. BLE is enabled in the next remediation phase once its sites are justified.
+# noqa. BLE001 (blind-except) is enforced: every remaining broad `except Exception`
+# is a genuine boundary handler (per-platform/per-item degrade loop, best-effort
+# probe, or thread-marshal) that logs+surfaces or returns an explicit sentinel and
+# carries a justified noqa; all others were narrowed to specific types.
 # S608 stays on: every hardcoded-SQL site is allowlist-guarded and carries a
 # justified noqa.
-select = ["E", "F", "I", "B", "ARG", "RUF", "UP", "S113", "S310", "S608"]
+select = ["E", "F", "I", "B", "ARG", "RUF", "UP", "BLE", "S113", "S310", "S608"]
 
 [tool.ruff.lint.per-file-ignores]
 # Tests may use unused fixtures/args and long descriptive assertions.

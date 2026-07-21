@@ -351,7 +351,7 @@ def apply_plan(
                 _apply_one(db, plan.plan_id, change, remote_executor)
             change.status = "applied"
             report.applied += 1
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             change.status = "failed"
             report.failed += 1
             report.errors.append(f"change {change.change_id}: {exc}")

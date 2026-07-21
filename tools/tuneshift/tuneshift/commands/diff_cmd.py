@@ -54,7 +54,7 @@ def handle_diff(args, db: Database) -> int:
                     pt.platform_id
                     for pt in client.get_playlist_tracks(platform_playlist_id)
                 }
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 print(f"  (could not fetch live {platform_name} state: {exc})")
 
         to_add: list[str] = []

@@ -122,7 +122,7 @@ def _remove_and_sync(db: Database, playlist, track, position: int) -> bool:
                 print(f"  {platform_name}: removed")
             else:
                 print(f"  {platform_name}: track not found on platform")
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             print(f"  {platform_name}: sync failed ({exc})", file=sys.stderr)
             failures = True
 

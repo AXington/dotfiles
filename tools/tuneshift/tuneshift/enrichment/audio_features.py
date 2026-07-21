@@ -47,7 +47,7 @@ def spotify_audio_features_via_isrc(
         return None
     try:
         features = getter(isrc)
-    except Exception:
+    except Exception:  # noqa: BLE001
         logger.warning(
             "spotify audio-features lookup failed for isrc=%s", isrc, exc_info=True
         )
@@ -98,7 +98,7 @@ def estimate_energy_valence(
         response = classifier._backend.complete(
             prompt, classifier._model, max_tokens=60
         )
-    except Exception:
+    except Exception:  # noqa: BLE001
         logger.warning(
             "energy/valence estimate failed for %s - %s", title, artist, exc_info=True
         )

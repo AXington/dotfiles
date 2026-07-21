@@ -54,7 +54,7 @@ def _remote_ids(
 ) -> list[str] | None:
     try:
         return [t.platform_id for t in client.get_playlist_tracks(platform_playlist_id)]
-    except Exception:
+    except Exception:  # noqa: BLE001
         return None
 
 

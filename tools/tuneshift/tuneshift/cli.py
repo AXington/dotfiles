@@ -1428,7 +1428,7 @@ def main(argv: list[str] | None = None) -> int:
     except TuneShiftError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         print(f"Unexpected error: {type(exc).__name__}: {exc}", file=sys.stderr)
         print("Run with TUNESHIFT_DEBUG=1 for full traceback.", file=sys.stderr)
         if os.environ.get("TUNESHIFT_DEBUG"):

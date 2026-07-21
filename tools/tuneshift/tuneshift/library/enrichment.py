@@ -230,7 +230,7 @@ def capture_tidal_catalog(
                 "derived tidal tags for track=%s: %s", track_id, ", ".join(tags)
             )
         return tags
-    except Exception:
+    except Exception:  # noqa: BLE001
         logger.warning(
             "tidal catalog capture failed: track=%s", track_id, exc_info=True
         )

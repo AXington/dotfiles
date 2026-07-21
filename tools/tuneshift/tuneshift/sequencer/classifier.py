@@ -317,7 +317,7 @@ def detect_backend() -> tuple[str, LLMBackend] | tuple[None, None]:
     elif explicit in ("openai", "openai-compatible"):
         try:
             return explicit, OpenAICompatibleBackend()
-        except (ImportError, ValueError, Exception):
+        except Exception:  # noqa: BLE001
             return None, None
     elif explicit == "ollama":
         try:
@@ -327,7 +327,7 @@ def detect_backend() -> tuple[str, LLMBackend] | tuple[None, None]:
     elif explicit:
         try:
             return "openai-compatible", OpenAICompatibleBackend()
-        except (ImportError, ValueError, Exception):
+        except Exception:  # noqa: BLE001
             return None, None
 
     # Auto-detect
@@ -346,7 +346,7 @@ def detect_backend() -> tuple[str, LLMBackend] | tuple[None, None]:
     if os.environ.get("TUNESHIFT_LLM_BASE_URL"):
         try:
             return "openai-compatible", OpenAICompatibleBackend()
-        except (ImportError, ValueError, Exception):
+        except Exception:  # noqa: BLE001
             pass
 
     # Check if Ollama is reachable AND has a usable model
@@ -444,7 +444,7 @@ class _TimeoutBackend:
         def _target() -> None:
             try:
                 box["value"] = self._inner.complete(prompt, model, max_tokens)
-            except BaseException as exc:
+            except BaseException as exc:  # noqa: BLE001
                 box["error"] = exc
 
         worker = threading.Thread(target=_target, daemon=True)
@@ -534,7 +534,7 @@ class TrackClassifier:
             return True
         try:
             return bool(ping())
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.warning("Backend reachability probe failed", exc_info=True)
             return False
 
@@ -566,7 +566,7 @@ class TrackClassifier:
                 results = parse_classification_response(text)
                 if results:
                     return results
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 logger.warning(
                     "Classification attempt %s/%s failed (%s): %s",
                     attempt + 1,

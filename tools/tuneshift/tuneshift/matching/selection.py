@@ -149,7 +149,7 @@ class SelectionResult:
 def _extract(criterion: Criterion, meta: object) -> CriterionValue | None:
     try:
         return criterion.extract(meta)
-    except Exception:
+    except Exception:  # noqa: BLE001
         # A criterion that cannot read a field yields no verdict, never a crash
         # that would abort selection for the whole playlist.
         return None

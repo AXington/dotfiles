@@ -128,7 +128,7 @@ def handle_map(args, db: Database) -> int:
                 )
                 if "atmos-available" in tags:
                     print("  Captured catalog metadata (Atmos available)")
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.warning("catalog capture after mapping failed", exc_info=True)
     return 0
 

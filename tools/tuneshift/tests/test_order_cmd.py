@@ -83,19 +83,29 @@ def test_push_order_platform_error_is_logged_and_surfaced(
     assert "sync failed" in capsys.readouterr().err
 
 
-def test_push_order_unexpected_error_propagates(
-    monkeypatch: pytest.MonkeyPatch,
+def test_push_order_heterogeneous_platform_error_is_surfaced(
+    monkeypatch: pytest.MonkeyPatch, caplog, capsys
 ) -> None:
-    """An unexpected exception type is a real bug and must not be swallowed."""
+    """Platform SDKs raise heterogeneous exception types (e.g. tidalapi's
+    TidalAPIError subclasses Exception, not OSError; a malformed response can
+    KeyError). All must degrade this one platform and surface, never crash the
+    whole order push."""
+
+    class _PlatformApiError(Exception):
+        """Stand-in for a platform SDK error that is not an OSError subclass."""
 
     class _BuggyClient(_FailingClient):
         def replace_playlist_tracks(self, playlist_id, track_ids):
-            raise KeyError("unexpected internal key")
+            raise _PlatformApiError("upstream 500 from platform API")
 
     monkeypatch.setattr(
         "tuneshift.commands.ingest_cmd._load_client", lambda name: _BuggyClient()
     )
     playlist = SimpleNamespace(id=42)
 
-    with pytest.raises(KeyError):
-        order_cmd._push_order_to_platforms(_FakeDB(), playlist)
+    with caplog.at_level(logging.WARNING, logger="tuneshift.commands.order_cmd"):
+        failures = order_cmd._push_order_to_platforms(_FakeDB(), playlist)
+
+    assert failures is True
+    assert any("failed" in record.message.lower() for record in caplog.records)
+    assert "sync failed" in capsys.readouterr().err

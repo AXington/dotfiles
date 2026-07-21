@@ -26,9 +26,9 @@ try:
 
     try:
         from tidalapi.exceptions import AssetNotAvailable as _TidalAssetNotAvailable
-    except Exception:  # pragma: no cover - older tidalapi lacks this class
+    except ImportError:  # pragma: no cover - older tidalapi lacks this class
         _TidalAssetNotAvailable = _TidalObjectNotFound
-except Exception:  # pragma: no cover - tidalapi is always present in prod
+except ImportError:  # pragma: no cover - tidalapi is always present in prod
 
     class _TidalAPIError(Exception):
         pass
@@ -142,7 +142,7 @@ def enrich_playlist_from_tidal(
             if not quiet:
                 print(f" skip (not found: {exc})")
             skipped += 1
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             if is_permanent(exc):
                 if not quiet:
                     print(" skip (not found)")

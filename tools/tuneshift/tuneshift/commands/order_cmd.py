@@ -152,11 +152,13 @@ def _push_order_to_platforms(db: Database, playlist) -> bool:
             try:
                 client.replace_playlist_tracks(platform_playlist_id, platform_ids)
                 print(f"  {platform_name}: synced ({len(platform_ids)} tracks)")
-            except (OSError, RuntimeError, ValueError) as exc:
-                # Per-platform boundary: a network/auth/data failure on one
-                # platform must not abort syncing the others. Log with context
-                # and surface to the user + caller (never swallow silently).
-                # Unexpected exception types propagate as real bugs.
+            except Exception as exc:  # noqa: BLE001
+                # Per-platform boundary: platform SDKs raise heterogeneous
+                # exception types (tidalapi TidalAPIError, requests/urllib
+                # OSError, auth RuntimeError, malformed-response KeyError). One
+                # platform's failure must not abort syncing the others, so
+                # degrade here -- but log with context and surface to the user
+                # and caller (failures=True); never swallow silently.
                 logger.warning(
                     "Order push to %s failed for playlist %s: %s",
                     platform_name,

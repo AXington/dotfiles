@@ -176,7 +176,7 @@ def build_concept_judge(
         try:
             raw = backend.complete(_build_prompt(rule, tracks), model)
             parsed = _extract_json_object(raw)
-        except Exception:
+        except Exception:  # noqa: BLE001
             return verdicts
         for track in tracks:
             value = parsed.get(str(track.track_id))
