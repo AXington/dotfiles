@@ -6,6 +6,10 @@ import sys
 
 from tuneshift.db import Database
 
+# Bound every Tidal folder API call so a hung connection cannot stall the CLI
+# indefinitely (B113/S113). Matches the timeout used by other platform clients.
+_REQUEST_TIMEOUT = 30
+
 
 def handle_tag(args, db: Database) -> int:
     """Tag a playlist with a collection."""
@@ -137,6 +141,7 @@ def _folders_list(db: Database) -> int:
         "https://api.tidal.com/v2/my-collection/playlists/folders",
         headers=headers,
         params=params,
+        timeout=_REQUEST_TIMEOUT,
     )
     if resp.status_code != 200:
         print(f"Tidal API error: {resp.status_code}", file=sys.stderr)
@@ -157,6 +162,7 @@ def _folders_list(db: Database) -> int:
                 "https://api.tidal.com/v2/my-collection/playlists/folders",
                 headers=headers,
                 params={**params, "folderId": trn.replace("trn:folder:", "")},
+                timeout=_REQUEST_TIMEOUT,
             )
             sub_items = (
                 sub_resp.json().get("items", []) if sub_resp.status_code == 200 else []
@@ -200,6 +206,7 @@ def _folders_import(db: Database) -> int:
         "https://api.tidal.com/v2/my-collection/playlists/folders",
         headers=headers,
         params=params,
+        timeout=_REQUEST_TIMEOUT,
     )
     if resp.status_code != 200:
         print(f"Tidal API error: {resp.status_code}", file=sys.stderr)
@@ -226,6 +233,7 @@ def _folders_import(db: Database) -> int:
             "https://api.tidal.com/v2/my-collection/playlists/folders",
             headers=headers,
             params={**params, "folderId": trn.replace("trn:folder:", "")},
+            timeout=_REQUEST_TIMEOUT,
         )
         if sub_resp.status_code != 200:
             continue
@@ -280,6 +288,7 @@ def _folders_create(db: Database, name: str) -> int:
                 "name": name,
                 "countryCode": session.country_code,
             },
+            timeout=_REQUEST_TIMEOUT,
         )
         if resp.status_code in (200, 201):
             data = resp.json()
@@ -420,6 +429,7 @@ def _folders_sync(db: Database) -> int:
             "order": "NAME",
             "includeOnly": "",
         },
+        timeout=_REQUEST_TIMEOUT,
     )
     if resp.status_code == 200:
         for item in resp.json().get("items", []):
@@ -488,6 +498,7 @@ def _folders_pull(db: Database) -> int:
         "https://api.tidal.com/v2/my-collection/playlists/folders",
         headers=headers,
         params=params,
+        timeout=_REQUEST_TIMEOUT,
     )
     if resp.status_code != 200:
         print(f"Tidal API error: {resp.status_code}", file=sys.stderr)
@@ -510,6 +521,7 @@ def _folders_pull(db: Database) -> int:
             "https://api.tidal.com/v2/my-collection/playlists/folders",
             headers=headers,
             params={**params, "folderId": trn.replace("trn:folder:", "")},
+            timeout=_REQUEST_TIMEOUT,
         )
         if sub_resp.status_code != 200:
             continue

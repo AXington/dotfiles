@@ -14,6 +14,18 @@ from tuneshift.platforms.rate_limiter import RateLimiter
 _TOKEN_DIR = Path.home() / ".local" / "share" / "tuneshift"
 _BASE_URL = "https://api.genius.com"
 
+
+def _ensure_https_url(url: str) -> str:
+    """Reject any non-https URL before it reaches urlopen (S310 defense).
+
+    Genius API and lyric-page URLs are always https; a search result that came
+    back with any other scheme is treated as hostile and refused.
+    """
+    if urllib.parse.urlparse(url).scheme != "https":
+        raise ValueError(f"Refusing to open non-https Genius URL: {url!r}")
+    return url
+
+
 # Genius provides X-RateLimit-* headers. Adaptive mode reads them and paces
 # accordingly. Baseline 1 req/s (community best practice: 0.5-2s between calls).
 _genius_limiter = RateLimiter(max_per_second=1.0, adaptive=True)
@@ -35,7 +47,8 @@ def _load_access_token() -> str | None:
 
 def _raw_get(req: urllib.request.Request, *, decode_json: bool = True):
     """Perform a single HTTP GET, feeding rate limit headers to the limiter."""
-    with urllib.request.urlopen(req, timeout=10) as resp:
+    # req is always built from an _ensure_https_url-validated URL below.
+    with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310
         headers = dict(resp.headers)
         _genius_limiter.update_from_headers(headers)
         body = resp.read()
@@ -60,8 +73,8 @@ def _request(
     if params:
         url += "?" + urllib.parse.urlencode(params)
 
-    req = urllib.request.Request(
-        url,
+    req = urllib.request.Request(  # noqa: S310
+        _ensure_https_url(url),
         headers={
             "Authorization": f"Bearer {token}",
             "User-Agent": "tuneshift/1.0",
@@ -104,7 +117,9 @@ def get_lyrics(
         return None
 
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "tuneshift/1.0"})
+        req = urllib.request.Request(  # noqa: S310
+            _ensure_https_url(url), headers={"User-Agent": "tuneshift/1.0"}
+        )
         # Page scraping is heavier than API calls: pace it too.
         _genius_limiter.wait()
         html = retry_api_call(_raw_get, req, decode_json=False, stats=stats)

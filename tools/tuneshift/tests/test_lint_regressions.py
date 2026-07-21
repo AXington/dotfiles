@@ -46,3 +46,15 @@ def test_no_e501() -> None:
     """No lines exceed the configured length limit (guards the E501 cleanup)."""
     result = _ruff_select("E501")
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_no_s113_request_without_timeout() -> None:
+    """Every requests/urllib call sets an explicit timeout (guards B113/S113)."""
+    result = _ruff_select("S113")
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_no_s310_unguarded_urlopen() -> None:
+    """Every urlopen/Request site is scheme-guarded or justified (guards S310)."""
+    result = _ruff_select("S310")
+    assert result.returncode == 0, result.stdout + result.stderr

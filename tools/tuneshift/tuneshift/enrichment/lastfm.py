@@ -19,6 +19,14 @@ from tuneshift.platforms.rate_limiter import RateLimiter
 _TOKEN_DIR = Path.home() / ".local" / "share" / "tuneshift"
 _BASE_URL = "https://ws.audioscrobbler.com/2.0/"
 
+
+def _ensure_https_url(url: str) -> str:
+    """Reject any non-https URL before it reaches urlopen (S310 defense)."""
+    if urllib.parse.urlparse(url).scheme != "https":
+        raise ValueError(f"Refusing to open non-https Last.fm URL: {url!r}")
+    return url
+
+
 # Last.fm has no rate limit headers. Soft limit ~5 req/s triggers throttling.
 # Conservative fixed rate of 1.5 req/s keeps us safely under the radar.
 _lastfm_limiter = RateLimiter(max_per_second=1.5, adaptive=False)
@@ -52,8 +60,10 @@ def _raw_request(url: str) -> dict:
     failures, including rate limiting (error 29). We must inspect the body
     and raise the appropriate exception so retry logic can react.
     """
-    req = urllib.request.Request(url, headers={"User-Agent": "tuneshift/1.0"})
-    with urllib.request.urlopen(req, timeout=10) as resp:
+    req = urllib.request.Request(  # noqa: S310
+        _ensure_https_url(url), headers={"User-Agent": "tuneshift/1.0"}
+    )
+    with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310
         data = json.loads(resp.read())
 
     # Last.fm signals errors in the body even with HTTP 200

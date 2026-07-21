@@ -32,7 +32,7 @@ def test_lastfm_error_29_raises_transient(monkeypatch):
                         lambda *a, **k: _FakeResponse(body))
 
     with pytest.raises(TransientAPIError):
-        lastfm._raw_request("http://x")
+        lastfm._raw_request("https://x")
 
 
 def test_lastfm_error_6_raises_permanent(monkeypatch):
@@ -42,7 +42,7 @@ def test_lastfm_error_6_raises_permanent(monkeypatch):
                         lambda *a, **k: _FakeResponse(body))
 
     with pytest.raises(PermanentAPIError):
-        lastfm._raw_request("http://x")
+        lastfm._raw_request("https://x")
 
 
 def test_lastfm_success_returns_data(monkeypatch):
@@ -50,7 +50,7 @@ def test_lastfm_success_returns_data(monkeypatch):
     monkeypatch.setattr(lastfm.urllib.request, "urlopen",
                         lambda *a, **k: _FakeResponse(body))
 
-    data = lastfm._raw_request("http://x")
+    data = lastfm._raw_request("https://x")
     assert "toptags" in data
 
 

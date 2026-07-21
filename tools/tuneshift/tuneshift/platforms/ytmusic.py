@@ -145,6 +145,7 @@ class YTMusicClient:
                 "refresh_token": self._refresh_token,
                 "grant_type": "refresh_token",
             },
+            timeout=10,
         )
         if resp.status_code == 200:
             new_data = resp.json()
