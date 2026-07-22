@@ -55,16 +55,19 @@ select = ["E", "F", "I", "B", "ARG", "RUF", "UP", "BLE", "S113", "S310", "S608"]
 [tool.ruff.lint.per-file-ignores]
 # Tests may use unused fixtures/args and long descriptive assertions.
 "tests/**" = ["ARG", "E501", "B", "RUF"]
-# E501 waived file-wide on these four modules. Each embeds long string literals
+# E501 waived file-wide on these modules. Each embeds long string literals
 # that cannot be reflowed and cannot carry an inline noqa (the over-length text is
-# inside the string): db.py holds CREATE TABLE / index DDL whose text SQLite stores
-# verbatim in sqlite_master and which are immutable migration history; the other
-# three hold LLM prompt bodies whose line structure is semantically significant.
-# These files also contain some over-length single-line SQL literals; a file-scoped
-# waiver is unavoidable because an inline noqa on those would be flagged RUF100 once
-# the string-interior lines force the file-scoped ignore. Every OTHER module remains
-# E501-gated (enforced by tests/test_lint_regressions.py::test_no_e501).
+# inside the string): db.py holds the head CREATE TABLE / index DDL and
+# persistence/migrations/* hold the versioned migration DDL, whose text SQLite
+# stores verbatim in sqlite_master and which are immutable migration history; the
+# other three hold LLM prompt bodies whose line structure is semantically
+# significant. These files also contain some over-length single-line SQL literals;
+# a file-scoped waiver is unavoidable because an inline noqa on those would be
+# flagged RUF100 once the string-interior lines force the file-scoped ignore. Every
+# OTHER module remains E501-gated (enforced by
+# tests/test_lint_regressions.py::test_no_e501).
 "tuneshift/db.py" = ["E501"]
+"tuneshift/persistence/migrations/*.py" = ["E501"]
 "tuneshift/sequencer/classifier.py" = ["E501"]
 "tuneshift/enrichment/pipeline.py" = ["E501"]
 "tuneshift/commands/batch_cmd.py" = ["E501"]
