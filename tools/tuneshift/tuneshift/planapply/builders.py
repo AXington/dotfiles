@@ -193,11 +193,8 @@ def build_enrich_plan(db: Database, track_id: int, fields: dict[str, object]) ->
             f"Enrichment may only overwrite matcher-read fields; got {sorted(unknown)}"
         )
 
-    cols = ", ".join(spec.columns)
-    row = db.conn.execute(
-        f"SELECT {cols} FROM tracks WHERE id = ?",  # noqa: S608 - identifiers from allowlist
-        (track_id,),
-    ).fetchone()
+    cols = list(spec.columns)
+    row = db.read_spec_columns(spec, cols, {"id": track_id})
     if row is None:
         raise ValueError(f"No track with id {track_id}")
 

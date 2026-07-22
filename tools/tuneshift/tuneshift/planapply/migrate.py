@@ -44,11 +44,7 @@ def _mapping_row(
 
 
 def _candidate_track_ids(db: Database, platform: str) -> list[int]:
-    rows = db.conn.execute(
-        "SELECT track_id FROM platform_tracks WHERE platform = ? ORDER BY track_id",
-        (platform,),
-    ).fetchall()
-    return [row["track_id"] for row in rows]
+    return db.get_platform_track_ids(platform)
 
 
 def build_migration_plan(

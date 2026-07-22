@@ -31,12 +31,11 @@ from tuneshift.reconcile import reconcile_track
 
 
 def _playlist_meta(db: Database, playlist_id: int) -> tuple[str, str]:
-    row = db.conn.execute(
-        "SELECT name, description FROM playlists WHERE id = ?", (playlist_id,)
-    ).fetchone()
-    if row is None:
+    meta = db.get_playlist_name_description(playlist_id)
+    if meta is None:
         raise ValueError(f"No playlist with id {playlist_id}")
-    return row["name"], (row["description"] or "")
+    name, description = meta
+    return name, (description or "")
 
 
 def _reorder_tracks(tracks: list, ordered_track_ids: list[int]) -> list:
@@ -175,13 +174,13 @@ def make_sync_executor(
                 # already-synced playlist preserves last_synced_at instead of
                 # deleting the row and resetting it to NULL (BUG-6b: a re-link
                 # made status report "never synced" for a genuinely-synced
-                # playlist).
-                db.conn.execute(
-                    "INSERT INTO platform_playlists "
-                    "(playlist_id, platform, platform_playlist_id) VALUES (?, ?, ?) "
-                    "ON CONFLICT(playlist_id, platform) DO UPDATE SET "
-                    "platform_playlist_id = excluded.platform_playlist_id",
-                    (local_playlist_id, platform, platform_playlist_id),
+                # playlist). commit=False keeps the link inside the caller's
+                # journaled apply transaction.
+                db.link_platform_playlist(
+                    local_playlist_id,
+                    platform,
+                    platform_playlist_id,
+                    commit=False,
                 )
                 link_journal = {
                     "table": "platform_playlists",

@@ -55,10 +55,8 @@ def build_rematch_plan(
 
 
 def _playlist_scope(db: Database, playlist_id: int) -> str:
-    row = db.conn.execute(
-        "SELECT name FROM playlists WHERE id = ?", (playlist_id,)
-    ).fetchone()
-    return row["name"] if row is not None else str(playlist_id)
+    name = db.get_playlist_name(playlist_id)
+    return name if name is not None else str(playlist_id)
 
 
 def _change_for_track(

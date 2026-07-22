@@ -67,10 +67,8 @@ def build_heal_plan(
 def _scope(db: Database, playlist_id: int | None) -> str:
     if playlist_id is None:
         return "global"
-    row = db.conn.execute(
-        "SELECT name FROM playlists WHERE id = ?", (playlist_id,)
-    ).fetchone()
-    return row["name"] if row is not None else str(playlist_id)
+    name = db.get_playlist_name(playlist_id)
+    return name if name is not None else str(playlist_id)
 
 
 def _target_track_ids(
@@ -83,11 +81,7 @@ def _target_track_ids(
         return track_ids
     if playlist_id is not None:
         return [t.id for t in db.get_playlist_tracks(playlist_id)]
-    rows = db.conn.execute(
-        "SELECT track_id FROM platform_tracks WHERE platform = ? AND user_approved = 1",
-        (platform,),
-    ).fetchall()
-    return [row["track_id"] for row in rows]
+    return db.get_platform_track_ids(platform, approved_only=True)
 
 
 def _heal_change(

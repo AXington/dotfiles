@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from tuneshift.db import Database
+from tuneshift.persistence.specs import TABLE_SPECS, TableSpec
 from tuneshift.planapply.models import Plan, PlanChange
 
 # Journal entries for remote pushes are tagged with this table-name prefix so
@@ -45,67 +46,12 @@ class ApplyError(Exception):
     """Raised when a plan change cannot be applied safely."""
 
 
-@dataclass(frozen=True)
-class _TableSpec:
-    """Allowlist describing a table apply may write."""
-
-    name: str
-    pk: tuple[str, ...]
-    columns: tuple[str, ...]
-
-    @property
-    def all_columns(self) -> tuple[str, ...]:
-        return (*self.pk, *self.columns)
-
-
-# Tables the plan/apply engine is permitted to mutate. Extend deliberately as
-# new routed mutations are added (Tasks 4.4-4.7).
-_TABLE_SPECS: dict[str, _TableSpec] = {
-    "playlist_track_mappings": _TableSpec(
-        name="playlist_track_mappings",
-        pk=("playlist_id", "track_id", "platform"),
-        columns=("platform_track_id", "source", "user_approved"),
-    ),
-    # NOTE: playlist_track_prefs is intentionally NOT routed through plan/apply.
-    # Preferences are configuration set directly via the `prefs` CLI, not a
-    # playlist mutation. Its storage now uses a surrogate id PK with a nullable
-    # (playlist_id, target) logical key enforced by a COALESCE unique index -
-    # shapes the generic engine's NULL-unsafe `col = ?` WHERE and
-    # `ON CONFLICT(raw-columns)` arbiter cannot address. A future task that wants
-    # planned pref changes must add NULL-safe key handling before re-listing it.
-    # Global default lock lives on platform_tracks (spec section 8, AC-L1). A routed
-    # self-heal (planapply/heal.py, AC-L3) re-binds the locked id and refreshes
-    # the same-recording fingerprint, so both are writable through plan/apply.
-    "platform_tracks": _TableSpec(
-        name="platform_tracks",
-        pk=("track_id", "platform"),
-        columns=("platform_track_id", "status", "user_approved", "fingerprint"),
-    ),
-    # A sync push may find-or-create + link the remote playlist at apply time.
-    # That link is a LOCAL write, so it is journaled (see ``_apply_remote``) and
-    # therefore must be a known table so rollback can reverse it.
-    "platform_playlists": _TableSpec(
-        name="platform_playlists",
-        pk=("playlist_id", "platform"),
-        columns=("platform_playlist_id",),
-    ),
-    # Enrichment overwrites of matcher-read fields are routed + journaled
-    # (routing table row "Enrichment metadata overwrite"). Only the fields the
-    # matcher actually reads are writable through plan/apply.
-    "tracks": _TableSpec(
-        name="tracks",
-        pk=("id",),
-        columns=(
-            "isrc",
-            "duration_seconds",
-            "album_artist",
-            "album_type",
-            "label",
-            "release_date",
-            "audio_modes",
-        ),
-    ),
-}
+# The table allowlist now lives in tuneshift.persistence.specs so db.Database can
+# own the spec-driven CRUD without importing planapply. These module-level
+# aliases preserve the historical private names used throughout this module and
+# by planapply.builders.
+_TableSpec = TableSpec
+_TABLE_SPECS = TABLE_SPECS
 
 
 @dataclass
@@ -136,12 +82,7 @@ def _validate_columns(spec: _TableSpec, row: dict[str, Any]) -> None:
 
 
 def _read_row(db: Database, spec: _TableSpec, pk_values: dict[str, Any]) -> dict | None:
-    where = " AND ".join(f"{col} = ?" for col in spec.pk)
-    cols = ", ".join(spec.all_columns)
-    row = db.conn.execute(
-        f"SELECT {cols} FROM {spec.name} WHERE {where}",  # noqa: S608 - identifiers from allowlist
-        tuple(pk_values[col] for col in spec.pk),
-    ).fetchone()
+    row = db.read_spec_columns(spec, spec.all_columns, pk_values)
     if row is None:
         return None
     return {col: row[col] for col in spec.all_columns}
@@ -155,18 +96,7 @@ def _insert_row(db: Database, spec: _TableSpec, proposed: dict[str, Any]) -> Non
     with NOT NULL columns outside the spec (e.g. ``tracks``), use ``_update_row``.
     """
     _validate_columns(spec, proposed)
-    cols = [c for c in spec.all_columns if c in proposed]
-    placeholders = ", ".join("?" for _ in cols)
-    col_list = ", ".join(cols)
-    updates = ", ".join(f"{c} = excluded.{c}" for c in cols if c not in spec.pk)
-    pk_list = ", ".join(spec.pk)
-    conflict = (
-        f" ON CONFLICT({pk_list}) DO UPDATE SET {updates}"
-        if updates
-        else f" ON CONFLICT({pk_list}) DO NOTHING"
-    )
-    sql = f"INSERT INTO {spec.name} ({col_list}) VALUES ({placeholders}){conflict}"  # noqa: S608
-    db.conn.execute(sql, tuple(proposed[c] for c in cols))
+    db.insert_spec_row(spec, proposed)
 
 
 def _update_row(db: Database, spec: _TableSpec, proposed: dict[str, Any]) -> None:
@@ -176,16 +106,7 @@ def _update_row(db: Database, spec: _TableSpec, proposed: dict[str, Any]) -> Non
     spec, so an enrichment overwrite must not go through an INSERT.
     """
     _validate_columns(spec, proposed)
-    set_cols = [c for c in spec.columns if c in proposed]
-    if not set_cols:
-        return
-    assignments = ", ".join(f"{c} = ?" for c in set_cols)
-    where = " AND ".join(f"{col} = ?" for col in spec.pk)
-    params = [proposed[c] for c in set_cols] + [proposed[col] for col in spec.pk]
-    db.conn.execute(
-        f"UPDATE {spec.name} SET {assignments} WHERE {where}",  # noqa: S608 - identifiers from allowlist
-        tuple(params),
-    )
+    db.update_spec_row(spec, proposed)
 
 
 def _restore_row(db: Database, spec: _TableSpec, prior: dict[str, Any]) -> None:
@@ -198,11 +119,7 @@ def _restore_row(db: Database, spec: _TableSpec, prior: dict[str, Any]) -> None:
 
 
 def _delete_row(db: Database, spec: _TableSpec, pk_values: dict[str, Any]) -> None:
-    where = " AND ".join(f"{col} = ?" for col in spec.pk)
-    db.conn.execute(
-        f"DELETE FROM {spec.name} WHERE {where}",  # noqa: S608 - identifiers from allowlist
-        tuple(pk_values[col] for col in spec.pk),
-    )
+    db.delete_spec_row(spec, pk_values)
 
 
 def _live_locked(db: Database, change: PlanChange) -> bool:
