@@ -21,6 +21,7 @@ from tuneshift.models import (
     Track,
 )
 from tuneshift.persistence.migrations import run_migrations
+from tuneshift.persistence.specs import TableSpec
 from tuneshift.types import JournalEntry, ReviewItem
 
 _SCHEMA_VERSION = 22
@@ -2604,7 +2605,12 @@ class Database:
         self.conn.commit()
 
     def link_platform_playlist(
-        self, playlist_id: int, platform: str, platform_playlist_id: str
+        self,
+        playlist_id: int,
+        platform: str,
+        platform_playlist_id: str,
+        *,
+        commit: bool = True,
     ) -> None:
         """Link a canonical playlist to a platform playlist.
 
@@ -2612,6 +2618,9 @@ class Database:
         already-synced playlist preserves ``last_synced_at`` (INSERT OR REPLACE
         deletes the row and resets the timestamp to NULL, making status report
         "never synced" for a genuinely-synced playlist -- BUG-6b).
+
+        ``commit=False`` links within a caller-managed transaction (e.g. the
+        plan/apply push) so the link is journaled and reversible with the push.
         """
         self.conn.execute(
             """INSERT INTO platform_playlists (playlist_id, platform, platform_playlist_id)
@@ -2620,7 +2629,8 @@ class Database:
                platform_playlist_id = excluded.platform_playlist_id""",
             (playlist_id, platform, platform_playlist_id),
         )
-        self.conn.commit()
+        if commit:
+            self.conn.commit()
 
     def get_linked_platforms(self, playlist_id: int) -> list[str]:
         """Return platform names linked to this playlist."""
@@ -2637,6 +2647,346 @@ class Database:
             (playlist_id, platform),
         ).fetchone()
         return row["platform_playlist_id"] if row else None
+
+    # --- ARCH-M3: named query methods -------------------------------------
+    # These route raw SQL out of the command/planapply/library layers so the
+    # SQL surface stays inside the persistence boundary (enforced by
+    # tests/test_lint_regressions.py::test_no_conn_execute_leak). Write methods
+    # here DO NOT commit: every current caller composes them inside a
+    # caller-managed transaction and commits explicitly, so an internal commit
+    # would change transaction granularity. Callers that want autocommit pass
+    # ``commit=True``.
+
+    def all_track_ids(self) -> list[int]:
+        """Return every track id in the library."""
+        return [row[0] for row in self.conn.execute("SELECT id FROM tracks")]
+
+    def get_resolution_attempts(
+        self, track_id: int, *, transient: bool = False
+    ) -> int:
+        """Return the stored (hard or transient) attempt count for a queued track.
+
+        Returns 0 when the track has no resolution_queue row. ``transient`` reads
+        the rate-limit backoff counter instead of the hard-failure counter.
+        """
+        counter = "transient_attempts" if transient else "attempts"
+        row = self.conn.execute(
+            f"SELECT {counter} AS n FROM resolution_queue WHERE track_id = ?",  # noqa: S608 - counter is a code-controlled literal; value parameterized
+            (track_id,),
+        ).fetchone()
+        return int(row["n"]) if row else 0
+
+    def get_track_position(self, playlist_id: int, track_id: int) -> int | None:
+        """Return a track's position in a playlist, or None if it is not present."""
+        row = self.conn.execute(
+            "SELECT position FROM playlist_tracks WHERE playlist_id = ? AND track_id = ?",
+            (playlist_id, track_id),
+        ).fetchone()
+        return int(row["position"]) if row else None
+
+    def get_playlist_track_positions(self, playlist_id: int) -> list[int]:
+        """Return the ordered positions of every row in a playlist."""
+        return [
+            row["position"]
+            for row in self.conn.execute(
+                "SELECT position FROM playlist_tracks WHERE playlist_id = ? "
+                "ORDER BY position",
+                (playlist_id,),
+            )
+        ]
+
+    def get_max_playlist_position(self, playlist_id: int) -> int:
+        """Return the highest position in a playlist, or 0 if the playlist is empty."""
+        row = self.conn.execute(
+            "SELECT MAX(position) FROM playlist_tracks WHERE playlist_id = ?",
+            (playlist_id,),
+        ).fetchone()
+        return (row[0] if row else 0) or 0
+
+    def get_playlist_reorder_config(
+        self, playlist_id: int
+    ) -> tuple[int, str | None] | None:
+        """Return ``(auto_reorder, reorder_arc)`` for a playlist, or None if absent."""
+        row = self.conn.execute(
+            "SELECT auto_reorder, reorder_arc FROM playlists WHERE id = ?",
+            (playlist_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        return row["auto_reorder"], row["reorder_arc"]
+
+    def get_playlist_name(self, playlist_id: int) -> str | None:
+        """Return a playlist's name, or None if no such playlist exists."""
+        row = self.conn.execute(
+            "SELECT name FROM playlists WHERE id = ?", (playlist_id,)
+        ).fetchone()
+        return row["name"] if row else None
+
+    def get_playlist_name_description(
+        self, playlist_id: int
+    ) -> tuple[str, str | None] | None:
+        """Return ``(name, description)`` for a playlist, or None if absent."""
+        row = self.conn.execute(
+            "SELECT name, description FROM playlists WHERE id = ?", (playlist_id,)
+        ).fetchone()
+        if row is None:
+            return None
+        return row["name"], row["description"]
+
+    def get_track_title(self, track_id: int) -> str | None:
+        """Return a track's title, or None if no such track exists."""
+        row = self.conn.execute(
+            "SELECT title FROM tracks WHERE id = ?", (track_id,)
+        ).fetchone()
+        return row["title"] if row else None
+
+    def get_platform_track_ids(
+        self, platform: str, *, approved_only: bool = False
+    ) -> list[int]:
+        """Return track ids mapped on a platform, ordered by track_id.
+
+        ``approved_only`` restricts to rows with ``user_approved = 1``.
+        """
+        if approved_only:
+            rows = self.conn.execute(
+                "SELECT track_id FROM platform_tracks "
+                "WHERE platform = ? AND user_approved = 1 ORDER BY track_id",
+                (platform,),
+            )
+        else:
+            rows = self.conn.execute(
+                "SELECT track_id FROM platform_tracks WHERE platform = ? "
+                "ORDER BY track_id",
+                (platform,),
+            )
+        return [row["track_id"] for row in rows]
+
+    def get_platform_tracks_columns(self) -> list[str]:
+        """Return the platform_tracks column names in schema order."""
+        return [
+            row[1]
+            for row in self.conn.execute("PRAGMA table_info(platform_tracks)")
+        ]
+
+    def get_platform_tracks_for_track(self, track_id: int) -> list[sqlite3.Row]:
+        """Return every platform_tracks row for a track (all columns)."""
+        return self.conn.execute(
+            "SELECT * FROM platform_tracks WHERE track_id = ?", (track_id,)
+        ).fetchall()
+
+    def get_latest_batch_history(self) -> sqlite3.Row | None:
+        """Return the most recent un-reverted batch_history row, or None."""
+        return self.conn.execute(
+            "SELECT id, playlist_id, plan_json FROM batch_history "
+            "WHERE reverted_at IS NULL ORDER BY applied_at DESC LIMIT 1"
+        ).fetchone()
+
+    def get_batch_history_entry(self, history_id: int) -> sqlite3.Row | None:
+        """Return a batch_history row by id, or None if it does not exist."""
+        return self.conn.execute(
+            "SELECT id, playlist_id, plan_json FROM batch_history WHERE id = ?",
+            (history_id,),
+        ).fetchone()
+
+    def list_batch_history_entries(
+        self, *, playlist_id: int | None = None, limit: int = 20
+    ) -> list[sqlite3.Row]:
+        """Return recent batch_history rows, newest first.
+
+        Scoped to ``playlist_id`` when given (returning all of that playlist's
+        history); otherwise the ``limit`` most recent rows across all playlists.
+        """
+        if playlist_id is not None:
+            return self.conn.execute(
+                "SELECT id, playlist_id, applied_at, reverted_at, plan_json "
+                "FROM batch_history WHERE playlist_id = ? ORDER BY applied_at DESC",
+                (playlist_id,),
+            ).fetchall()
+        return self.conn.execute(
+            "SELECT id, playlist_id, applied_at, reverted_at, plan_json "
+            "FROM batch_history ORDER BY applied_at DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+
+    def set_track_metadata(
+        self, track_id: int, metadata: dict, *, commit: bool = False
+    ) -> None:
+        """Overwrite a track's full metadata JSON blob.
+
+        Distinct from :meth:`update_track_metadata`, which remaps individual
+        audio fields; this writes the entire ``metadata`` column verbatim.
+        """
+        self.conn.execute(
+            "UPDATE tracks SET metadata = ? WHERE id = ?",
+            (json.dumps(metadata), track_id),
+        )
+        if commit:
+            self.conn.commit()
+
+    def append_playlist_track(
+        self, playlist_id: int, track_id: int, position: int, *, commit: bool = False
+    ) -> None:
+        """Insert a playlist row at ``position`` (plain INSERT, errors on conflict).
+
+        Unlike :meth:`add_track_to_playlist` (INSERT OR REPLACE), this refuses to
+        silently overwrite an occupied position, so callers that pre-check for a
+        free slot surface a genuine conflict instead of clobbering a row.
+        """
+        self.conn.execute(
+            "INSERT INTO playlist_tracks (playlist_id, track_id, position) "
+            "VALUES (?, ?, ?)",
+            (playlist_id, track_id, position),
+        )
+        if commit:
+            self.conn.commit()
+
+    def insert_playlist_track_if_absent(
+        self, playlist_id: int, track_id: int, position: int, *, commit: bool = False
+    ) -> None:
+        """INSERT OR IGNORE a playlist row (no-op if the position is taken)."""
+        self.conn.execute(
+            "INSERT OR IGNORE INTO playlist_tracks (playlist_id, track_id, position) "
+            "VALUES (?, ?, ?)",
+            (playlist_id, track_id, position),
+        )
+        if commit:
+            self.conn.commit()
+
+    def shift_playlist_position(
+        self,
+        playlist_id: int,
+        from_position: int,
+        to_position: int,
+        *,
+        commit: bool = False,
+    ) -> None:
+        """Move the row currently at ``from_position`` to ``to_position``."""
+        self.conn.execute(
+            "UPDATE playlist_tracks SET position = ? "
+            "WHERE playlist_id = ? AND position = ?",
+            (to_position, playlist_id, from_position),
+        )
+        if commit:
+            self.conn.commit()
+
+    def set_playlist_track_position(
+        self, playlist_id: int, track_id: int, position: int, *, commit: bool = False
+    ) -> None:
+        """Set a specific track's position within a playlist."""
+        self.conn.execute(
+            "UPDATE playlist_tracks SET position = ? "
+            "WHERE playlist_id = ? AND track_id = ?",
+            (position, playlist_id, track_id),
+        )
+        if commit:
+            self.conn.commit()
+
+    def remove_playlist_track(
+        self, playlist_id: int, track_id: int, *, commit: bool = False
+    ) -> None:
+        """Delete every row for a track_id within a playlist."""
+        self.conn.execute(
+            "DELETE FROM playlist_tracks WHERE playlist_id = ? AND track_id = ?",
+            (playlist_id, track_id),
+        )
+        if commit:
+            self.conn.commit()
+
+    def delete_playlist(self, playlist_id: int, *, commit: bool = False) -> None:
+        """Delete a playlist row by id."""
+        self.conn.execute(
+            "DELETE FROM playlists WHERE id = ?", (playlist_id,)
+        )
+        if commit:
+            self.conn.commit()
+
+    def clear_all_tidal_folder_assignments(self, *, commit: bool = False) -> None:
+        """Clear every playlist's cached Tidal folder id (full re-sync prelude)."""
+        self.conn.execute("UPDATE playlists SET tidal_folder_id = NULL")
+        if commit:
+            self.conn.commit()
+
+    # --- ARCH-M3: spec-driven generic CRUD (plan/apply journal engine) -----
+    # The plan/apply engine mutates arbitrary allowlisted tables; these methods
+    # own the SQL construction so planapply/apply.py holds no raw SQL. Table and
+    # column identifiers come only from a TableSpec allowlist; every value is
+    # parameterized. Callers validate the payload columns before calling and
+    # manage the surrounding transaction (no internal commit).
+
+    def read_spec_columns(
+        self,
+        spec: TableSpec,
+        columns: Sequence[str],
+        pk_values: dict[str, Any],
+    ) -> sqlite3.Row | None:
+        """SELECT ``columns`` from a spec table for one primary-key tuple.
+
+        ``columns`` must be a subset of ``spec.all_columns`` (guarded here as
+        defense in depth; callers already derive them from the spec).
+        """
+        unknown = set(columns) - set(spec.all_columns)
+        if unknown:
+            raise ValueError(
+                f"Columns {sorted(unknown)} not in spec for {spec.name!r}"
+            )
+        where = " AND ".join(f"{col} = ?" for col in spec.pk)
+        col_list = ", ".join(columns)
+        return self.conn.execute(
+            f"SELECT {col_list} FROM {spec.name} WHERE {where}",  # noqa: S608 - identifiers from spec allowlist; values parameterized
+            tuple(pk_values[col] for col in spec.pk),
+        ).fetchone()
+
+    def insert_spec_row(
+        self, spec: TableSpec, proposed: dict[str, Any], *, commit: bool = False
+    ) -> None:
+        """Insert a spec row, upserting on the primary key.
+
+        Only columns present in ``proposed`` are written; on PK conflict the
+        non-PK supplied columns are updated (or DO NOTHING when none remain).
+        """
+        cols = [c for c in spec.all_columns if c in proposed]
+        placeholders = ", ".join("?" for _ in cols)
+        col_list = ", ".join(cols)
+        updates = ", ".join(f"{c} = excluded.{c}" for c in cols if c not in spec.pk)
+        pk_list = ", ".join(spec.pk)
+        conflict = (
+            f" ON CONFLICT({pk_list}) DO UPDATE SET {updates}"
+            if updates
+            else f" ON CONFLICT({pk_list}) DO NOTHING"
+        )
+        sql = f"INSERT INTO {spec.name} ({col_list}) VALUES ({placeholders}){conflict}"  # noqa: S608 - identifiers from spec allowlist; values parameterized
+        self.conn.execute(sql, tuple(proposed[c] for c in cols))
+        if commit:
+            self.conn.commit()
+
+    def update_spec_row(
+        self, spec: TableSpec, proposed: dict[str, Any], *, commit: bool = False
+    ) -> None:
+        """Update only the supplied non-PK columns of an existing spec row."""
+        set_cols = [c for c in spec.columns if c in proposed]
+        if not set_cols:
+            return
+        assignments = ", ".join(f"{c} = ?" for c in set_cols)
+        where = " AND ".join(f"{col} = ?" for col in spec.pk)
+        params = [proposed[c] for c in set_cols] + [proposed[col] for col in spec.pk]
+        self.conn.execute(
+            f"UPDATE {spec.name} SET {assignments} WHERE {where}",  # noqa: S608 - identifiers from spec allowlist; values parameterized
+            tuple(params),
+        )
+        if commit:
+            self.conn.commit()
+
+    def delete_spec_row(
+        self, spec: TableSpec, pk_values: dict[str, Any], *, commit: bool = False
+    ) -> None:
+        """Delete a spec row identified by its primary-key tuple."""
+        where = " AND ".join(f"{col} = ?" for col in spec.pk)
+        self.conn.execute(
+            f"DELETE FROM {spec.name} WHERE {where}",  # noqa: S608 - identifiers from spec allowlist; values parameterized
+            tuple(pk_values[col] for col in spec.pk),
+        )
+        if commit:
+            self.conn.commit()
 
     def mark_playlist_synced(self, playlist_id: int, platform: str) -> None:
         """Record that a playlist was successfully pushed to a platform.
