@@ -4,6 +4,7 @@ These run ruff for a specific rule across the package so a regression fails the
 suite even before CI. Kept narrow (single rules) so they are fast and stable.
 """
 
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -68,3 +69,42 @@ def test_no_ble001_blind_except() -> None:
     """
     result = _ruff_select("BLE001")
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+# Raw-SQL access is confined to the persistence layer. Every other module must
+# route through named Database methods so the SQL surface stays auditable and
+# swappable (guards ARCH-M3). ``.conn.commit()`` stays allowed everywhere: it is
+# a legitimate caller-managed transaction boundary, not a query.
+_CONN_LEAK_RE = re.compile(r"\.conn\.(execute|executescript|executemany|cursor)\b")
+_PERSISTENCE_ALLOWLIST = (
+    Path("tuneshift") / "db.py",
+    Path("tuneshift") / "persistence",
+)
+
+
+def _is_persistence_path(rel: Path) -> bool:
+    return any(
+        rel == allowed or allowed in rel.parents for allowed in _PERSISTENCE_ALLOWLIST
+    )
+
+
+def test_no_conn_execute_leak() -> None:
+    """No raw ``.conn.execute*/cursor`` outside the persistence layer (ARCH-M3).
+
+    Walks ``tuneshift/**/*.py`` and fails if any module other than ``db.py`` or
+    ``persistence/`` touches the sqlite connection's query API directly. This is
+    a structural leak-gate: new command/library code must call a named Database
+    method instead of embedding SQL.
+    """
+    offenders: list[str] = []
+    for path in sorted((_PKG_ROOT / "tuneshift").rglob("*.py")):
+        rel = path.relative_to(_PKG_ROOT)
+        if _is_persistence_path(rel):
+            continue
+        for lineno, line in enumerate(path.read_text().splitlines(), 1):
+            if _CONN_LEAK_RE.search(line):
+                offenders.append(f"{rel}:{lineno}: {line.strip()}")
+    assert not offenders, (
+        "Raw .conn query access outside the persistence layer "
+        "(route through a named Database method instead):\n" + "\n".join(offenders)
+    )
