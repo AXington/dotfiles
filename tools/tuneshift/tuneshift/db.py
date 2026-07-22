@@ -7,7 +7,7 @@ import sqlite3
 from collections.abc import Sequence
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from tuneshift.matching.normalize import _WHITESPACE_RE
 from tuneshift.matching.normalize import normalize_artist as _alias_normalize
@@ -20,10 +20,7 @@ from tuneshift.models import (
     PlaylistPin,
     Track,
 )
-
-if TYPE_CHECKING:
-    from tuneshift.matching import ReviewItem
-    from tuneshift.planapply.models import JournalEntry
+from tuneshift.types import JournalEntry, ReviewItem
 
 _SCHEMA_VERSION = 22
 
@@ -2146,8 +2143,6 @@ class Database:
         :func:`tuneshift.matching.cluster_reviews` and
         :func:`tuneshift.matching.compute_burden`.
         """
-        from tuneshift.matching import ReviewItem
-
         sql = """
             SELECT DISTINCT p.id AS playlist_id, p.name AS playlist_name,
                    t.id AS track_id, t.title, t.artist, t.album,
@@ -2741,8 +2736,6 @@ class Database:
 
     def get_journal_entries(self, plan_id: str) -> list["JournalEntry"]:
         """Return a plan's journal entries newest-first (reverse-replay order)."""
-        from tuneshift.planapply.models import JournalEntry
-
         rows = self.conn.execute(
             """SELECT id, plan_id, table_name, row_key, op,
                       prior_value, new_value, applied_at

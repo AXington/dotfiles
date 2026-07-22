@@ -26,6 +26,8 @@ import json
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 
+from tuneshift.types import JournalEntry as JournalEntry
+
 PLAN_VERSION = 1
 
 OP_VALUES = ("insert", "update", "delete", "remote_push")
@@ -139,17 +141,3 @@ class Plan:
     def is_empty(self) -> bool:
         """A plan with no actionable changes is a no-op (AC-P4 idempotency)."""
         return not any(c.is_actionable for c in self.changes)
-
-
-@dataclass
-class JournalEntry:
-    """One recorded write, used to reverse an applied plan (AC-P4)."""
-
-    id: int
-    plan_id: str
-    table_name: str
-    row_key: str
-    op: str
-    prior_value: dict | None
-    new_value: dict | None
-    applied_at: str

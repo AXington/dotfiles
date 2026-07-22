@@ -25,6 +25,7 @@ from dataclasses import dataclass, field
 
 from tuneshift.matching.audit import Availability, ReasonCode, describe_reason
 from tuneshift.matching.normalize import normalize_artist
+from tuneshift.types import ReviewItem
 
 #: Result states that require a human decision.
 AMBIGUOUS_STATES = frozenset({Availability.AMBIGUOUS})
@@ -37,21 +38,6 @@ HARD_FAIL_REASONS = frozenset({ReasonCode.LOCK_HELD})
 # Review-kind labels.
 AMBIGUOUS = "ambiguous"
 HARD_FAIL = "hard_fail"
-
-
-@dataclass(frozen=True)
-class ReviewItem:
-    """One track outcome that may require human review."""
-
-    track_id: int
-    title: str
-    artist: str
-    album: str | None
-    platform: str
-    availability: str
-    reason_code: str
-    playlist_id: int | None = None
-    playlist_name: str | None = None
 
 
 @dataclass
