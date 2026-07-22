@@ -1092,8 +1092,7 @@ def _handle_tag_dispatch(args, db) -> int:
         from tuneshift.enrichment.platform_metadata import derive_tags
 
         if getattr(args, "all", False):
-            all_tracks = db.conn.execute("SELECT id FROM tracks").fetchall()
-            track_ids = [r[0] for r in all_tracks]
+            track_ids = db.all_track_ids()
         elif getattr(args, "playlist", None):
             playlist = db.find_playlist_by_name(args.playlist)
             if not playlist:

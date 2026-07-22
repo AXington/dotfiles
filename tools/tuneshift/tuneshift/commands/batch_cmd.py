@@ -622,11 +622,7 @@ def apply_plan(db: Database, plan: BatchPlan) -> tuple[int, int]:
                 )
                 continue
             next_pos = len(existing)
-            db.conn.execute(
-                "INSERT INTO playlist_tracks (playlist_id, track_id, position) VALUES (?, ?, ?)",
-                (plan.playlist_id, track.id, next_pos),
-            )
-            db.conn.commit()
+            db.append_playlist_track(plan.playlist_id, track.id, next_pos, commit=True)
             added += 1
             executed_ops.append(
                 {
@@ -727,14 +723,11 @@ def apply_plan(db: Database, plan: BatchPlan) -> tuple[int, int]:
         )
 
     # Phase 3: Auto-reorder if enabled
-    playlist_row = db.conn.execute(
-        "SELECT auto_reorder, reorder_arc FROM playlists WHERE id = ?",
-        (plan.playlist_id,),
-    ).fetchone()
-    if playlist_row and playlist_row[0]:
+    cfg = db.get_playlist_reorder_config(plan.playlist_id)
+    if cfg and cfg[0]:
         from tuneshift.sequencer.optimizer import sequence_playlist
 
-        arc = playlist_row[1] or "wave"
+        arc = cfg[1] or "wave"
         sequence_playlist(db, plan.playlist_id, arc=arc)
 
     # Phase 4: Report sync instructions
@@ -877,15 +870,9 @@ def undo_batch(db: Database, history_id: int | None = None) -> bool:
     Returns True if successful.
     """
     if history_id is None:
-        row = db.conn.execute(
-            "SELECT id, playlist_id, plan_json FROM batch_history "
-            "WHERE reverted_at IS NULL ORDER BY applied_at DESC LIMIT 1"
-        ).fetchone()
+        row = db.get_latest_batch_history()
     else:
-        row = db.conn.execute(
-            "SELECT id, playlist_id, plan_json FROM batch_history WHERE id = ?",
-            (history_id,),
-        ).fetchone()
+        row = db.get_batch_history_entry(history_id)
 
     if row is None:
         return False
@@ -901,38 +888,19 @@ def undo_batch(db: Database, history_id: int | None = None) -> bool:
             existing = db.get_playlist_tracks(playlist_id)
             insert_pos = min(pos, len(existing)) if pos is not None else len(existing)
             # Shift positions down to make room (from end to avoid PK conflicts)
-            max_pos = (
-                db.conn.execute(
-                    "SELECT MAX(position) FROM playlist_tracks WHERE playlist_id = ?",
-                    (playlist_id,),
-                ).fetchone()[0]
-                or 0
-            )
+            max_pos = db.get_max_playlist_position(playlist_id)
             for shift_pos in range(max_pos, insert_pos - 1, -1):
-                db.conn.execute(
-                    "UPDATE playlist_tracks SET position = ? "
-                    "WHERE playlist_id = ? AND position = ?",
-                    (shift_pos + 1, playlist_id, shift_pos),
-                )
-            db.conn.execute(
-                "INSERT OR IGNORE INTO playlist_tracks (playlist_id, track_id, position) "
-                "VALUES (?, ?, ?)",
-                (playlist_id, op["track_id"], insert_pos),
+                db.shift_playlist_position(playlist_id, shift_pos, shift_pos + 1)
+            db.insert_playlist_track_if_absent(
+                playlist_id, op["track_id"], insert_pos
             )
         elif op["action"] == "add" and op.get("track_id"):
             # Remove the track that was added
-            db.conn.execute(
-                "DELETE FROM playlist_tracks WHERE playlist_id = ? AND track_id = ?",
-                (playlist_id, op["track_id"]),
-            )
+            db.remove_playlist_track(playlist_id, op["track_id"])
             # Re-compact positions
             tracks = db.get_playlist_tracks(playlist_id)
             for i, t in enumerate(tracks):
-                db.conn.execute(
-                    "UPDATE playlist_tracks SET position = ? "
-                    "WHERE playlist_id = ? AND track_id = ?",
-                    (i, playlist_id, t.id),
-                )
+                db.set_playlist_track_position(playlist_id, t.id, i)
 
     db.conn.commit()
     db.mark_batch_reverted(hid)
@@ -972,16 +940,9 @@ def handle_batch(args, db: Database) -> int:
         )
         if playlist is None:
             # Show all history
-            rows = db.conn.execute(
-                "SELECT id, playlist_id, applied_at, reverted_at, plan_json "
-                "FROM batch_history ORDER BY applied_at DESC LIMIT 20"
-            ).fetchall()
+            rows = db.list_batch_history_entries(limit=20)
         else:
-            rows = db.conn.execute(
-                "SELECT id, playlist_id, applied_at, reverted_at, plan_json "
-                "FROM batch_history WHERE playlist_id = ? ORDER BY applied_at DESC",
-                (playlist.id,),
-            ).fetchall()
+            rows = db.list_batch_history_entries(playlist_id=playlist.id)
 
         if not rows:
             print("No batch history found.")
@@ -1053,18 +1014,14 @@ def handle_batch(args, db: Database) -> int:
             f"Banned artist sweep: {total_ops} tracks across {len(results)} playlists"
         )
         for pid, ops in results.items():
-            pl_name = db.conn.execute(
-                "SELECT name FROM playlists WHERE id = ?", (pid,)
-            ).fetchone()[0]
+            pl_name = db.get_playlist_name(pid)
             print(f"  {pl_name}: {len(ops)} tracks")
             for op in ops:
                 print(f'    - "{op.track_title}" by {op.track_artist} ({op.reason})')
         if getattr(args, "plan", False):
             # Save the first playlist's plan (multi-playlist sweep applies sequentially)
             first_pid = next(iter(results))
-            first_name = db.conn.execute(
-                "SELECT name FROM playlists WHERE id = ?", (first_pid,)
-            ).fetchone()[0]
+            first_name = db.get_playlist_name(first_pid)
             plan = BatchPlan(
                 playlist_name=first_name,
                 playlist_id=first_pid,
@@ -1319,7 +1276,7 @@ def handle_merge(args, db: Database) -> int:
     if getattr(args, "delete_sources", False):
         for p in source_playlists:
             if p.id != into_id:
-                db.conn.execute("DELETE FROM playlists WHERE id = ?", (p.id,))
+                db.delete_playlist(p.id)
                 print(f"  Deleted source playlist: {p.name}")
         db.conn.commit()
 

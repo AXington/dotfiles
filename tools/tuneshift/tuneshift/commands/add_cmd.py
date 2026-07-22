@@ -54,11 +54,7 @@ def handle_add(args, db: Database) -> int:
             print(f"Replace target not found: {replace_target}", file=sys.stderr)
             return 1
         old_track = old_matches[0]
-        row = db.conn.execute(
-            "SELECT position FROM playlist_tracks WHERE playlist_id = ? AND track_id = ?",  # noqa: E501
-            (playlist_id, old_track.id),
-        ).fetchone()
-        position = row[0] if row else None
+        position = db.get_track_position(playlist_id, old_track.id)
         db.transfer_pins(playlist_id, old_track.id, track_id)
         db.remove_track_from_playlist(playlist_id, old_track.id)
 
@@ -144,12 +140,9 @@ def _sync_add_to_platforms(
 
 def _auto_reorder(db: Database, playlist_id: int) -> None:
     """Trigger auto-reorder if the playlist has it enabled."""
-    row = db.conn.execute(
-        "SELECT auto_reorder, reorder_arc FROM playlists WHERE id = ?",
-        (playlist_id,),
-    ).fetchone()
-    if row and row[0]:
+    cfg = db.get_playlist_reorder_config(playlist_id)
+    if cfg and cfg[0]:
         from tuneshift.sequencer.optimizer import sequence_playlist
 
-        arc = row[1] or "wave"
+        arc = cfg[1] or "wave"
         sequence_playlist(db, playlist_id, arc=arc)

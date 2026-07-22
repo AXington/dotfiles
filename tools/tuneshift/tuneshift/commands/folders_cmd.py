@@ -505,7 +505,7 @@ def _folders_pull(db: Database) -> int:
         return 1
 
     # Clear all local assignments
-    db.conn.execute("UPDATE playlists SET tidal_folder_id = NULL")
+    db.clear_all_tidal_folder_assignments(commit=False)
     updated = 0
 
     for item in resp.json().get("items", []):

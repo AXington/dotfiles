@@ -98,13 +98,8 @@ def _audit_mappings(db: Database, playlist) -> list[str]:
 
     for track in tracks:
         # Check each platform mapping
-        cols = [
-            r[1]
-            for r in db.conn.execute("PRAGMA table_info(platform_tracks)").fetchall()
-        ]
-        rows = db.conn.execute(
-            "SELECT * FROM platform_tracks WHERE track_id = ?", (track.id,)
-        ).fetchall()
+        cols = db.get_platform_tracks_columns()
+        rows = db.get_platform_tracks_for_track(track.id)
 
         for row in rows:
             mapping = dict(zip(cols, row, strict=True))

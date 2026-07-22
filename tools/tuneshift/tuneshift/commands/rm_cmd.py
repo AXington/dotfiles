@@ -69,25 +69,19 @@ def _remove_and_sync(db: Database, playlist, track, position: int) -> bool:
     # stored playlist_tracks.position value. Map it to the real stored position so
     # we delete ONLY the chosen row: the same track_id may appear at several
     # positions, and a track_id-wide delete would silently wipe every copy.
-    ordered = db.conn.execute(
-        "SELECT position FROM playlist_tracks WHERE playlist_id = ? ORDER BY position",
-        (playlist.id,),
-    ).fetchall()
-    stored_position = ordered[position - 1]["position"]
+    ordered = db.get_playlist_track_positions(playlist.id)
+    stored_position = ordered[position - 1]
     db.remove_playlist_track_by_position(playlist.id, stored_position)
     print(
         f'Removed "{track.title} - {track.artist}" (position {position}) from "{playlist.name}"'  # noqa: E501
     )
 
     # Auto-reorder if enabled
-    row = db.conn.execute(
-        "SELECT auto_reorder, reorder_arc FROM playlists WHERE id = ?",
-        (playlist.id,),
-    ).fetchone()
-    if row and row[0]:
+    cfg = db.get_playlist_reorder_config(playlist.id)
+    if cfg and cfg[0]:
         from tuneshift.sequencer.optimizer import sequence_playlist
 
-        arc = row[1] or "wave"
+        arc = cfg[1] or "wave"
         sequence_playlist(db, playlist.id, arc=arc)
 
     # Sync removal to linked platforms
