@@ -573,20 +573,11 @@ def parse_plan_file(content: str) -> list[PlanOperation]:
     return ops
 
 
-def apply_plan(db: Database, plan: BatchPlan) -> tuple[int, int]:
-    """Apply a plan: execute ALL local DB changes first, then sync.
-
-    DB changes are atomic (all happen or none). Platform sync happens after
-    and failures don't affect local state. History records only what actually
-    executed.
-
-    Returns (removals_applied, additions_applied).
-    """
+def _apply_batch_removals(
+    db: Database, plan: BatchPlan, executed_ops: list[dict]
+) -> int:
+    """Execute removal ops locally, recording each into executed_ops."""
     removed = 0
-    added = 0
-    executed_ops: list[dict] = []
-
-    # Phase 1: Execute ALL local DB changes (no platform sync yet)
     for op in plan.removals:
         if op.track_id is None:
             continue
@@ -609,48 +600,59 @@ def apply_plan(db: Database, plan: BatchPlan) -> tuple[int, int]:
                 "previous_section": op.previous_section,
             }
         )
+    return removed
 
+
+def _apply_batch_additions(
+    db: Database, plan: BatchPlan, executed_ops: list[dict]
+) -> int:
+    """Execute addition ops locally, recording each into executed_ops."""
+    added = 0
     failed_additions: list[str] = []
     for op in plan.additions:
         if not op.track_title:
             continue
         tracks_found = db.find_tracks_by_title_artist(op.track_title, op.track_artist)
-        if tracks_found:
-            track = tracks_found[0]
-            existing = db.get_playlist_tracks(plan.playlist_id)
-            if any(t.id == track.id for t in existing):
-                failed_additions.append(
-                    f'"{op.track_title}" by {op.track_artist} (already in playlist)'
-                )
-                continue
-            next_pos = len(existing)
-            db.append_playlist_track(plan.playlist_id, track.id, next_pos, commit=True)
-            added += 1
-            executed_ops.append(
-                {
-                    "action": "add",
-                    "track": op.track_title,
-                    "artist": op.track_artist,
-                    "track_id": track.id,
-                    "reason": op.reason,
-                    "position": next_pos,
-                    "previous_position": None,
-                    "previous_section": None,
-                }
-            )
-        else:
+        if not tracks_found:
             failed_additions.append(
                 f'"{op.track_title}" by {op.track_artist} (not found in library)'
             )
+            continue
+        track = tracks_found[0]
+        existing = db.get_playlist_tracks(plan.playlist_id)
+        if any(t.id == track.id for t in existing):
+            failed_additions.append(
+                f'"{op.track_title}" by {op.track_artist} (already in playlist)'
+            )
+            continue
+        next_pos = len(existing)
+        db.append_playlist_track(plan.playlist_id, track.id, next_pos, commit=True)
+        added += 1
+        executed_ops.append(
+            {
+                "action": "add",
+                "track": op.track_title,
+                "artist": op.track_artist,
+                "track_id": track.id,
+                "reason": op.reason,
+                "position": next_pos,
+                "previous_position": None,
+                "previous_section": None,
+            }
+        )
 
     if failed_additions:
         print(f"  Failed additions ({len(failed_additions)}):")
         for f in failed_additions:
             print(f"    - {f}")
+    return added
 
-    # Handle split operations (create_playlist + move_to_playlist)
+
+def _apply_batch_splits(
+    db: Database, plan: BatchPlan, executed_ops: list[dict]
+) -> None:
+    """Execute create_playlist / move_to_playlist ops for --split."""
     new_playlist_id = None
-    moved = 0
     for op in plan.operations:
         if op.action == "create_playlist" and op.target_name:
             existing = db.find_playlist_by_name(op.target_name)
@@ -676,7 +678,6 @@ def apply_plan(db: Database, plan: BatchPlan) -> tuple[int, int]:
             next_pos = len(new_tracks)
             db.add_track_to_playlist(new_playlist_id, op.track_id, next_pos)
             db.remove_track_from_playlist(plan.playlist_id, op.track_id)
-            moved += 1
             executed_ops.append(
                 {
                     "action": "move_to_playlist",
@@ -691,7 +692,11 @@ def apply_plan(db: Database, plan: BatchPlan) -> tuple[int, int]:
                 }
             )
 
-    # Handle set_narrative (for --structure)
+
+def _apply_batch_narratives(
+    db: Database, plan: BatchPlan, executed_ops: list[dict]
+) -> None:
+    """Execute set_narrative ops (from --structure)."""
     for op in plan.operations:
         if op.action == "set_narrative" and op.target_name:
             # target_name holds the narrative text for set_narrative ops
@@ -710,6 +715,24 @@ def apply_plan(db: Database, plan: BatchPlan) -> tuple[int, int]:
                     "target_name": op.target_name,
                 }
             )
+
+
+def apply_plan(db: Database, plan: BatchPlan) -> tuple[int, int]:
+    """Apply a plan: execute ALL local DB changes first, then sync.
+
+    DB changes are atomic (all happen or none). Platform sync happens after
+    and failures don't affect local state. History records only what actually
+    executed.
+
+    Returns (removals_applied, additions_applied).
+    """
+    executed_ops: list[dict] = []
+
+    # Phase 1: Execute ALL local DB changes (no platform sync yet)
+    removed = _apply_batch_removals(db, plan, executed_ops)
+    added = _apply_batch_additions(db, plan, executed_ops)
+    _apply_batch_splits(db, plan, executed_ops)
+    _apply_batch_narratives(db, plan, executed_ops)
 
     # Phase 2: Record ONLY what actually executed in history
     if executed_ops:
