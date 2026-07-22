@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import sys
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from tuneshift.composer import compose_playlist
 from tuneshift.composer.candidate_finder import find_candidates
@@ -317,6 +317,79 @@ def _accept_concept_findings(
     return 0
 
 
+def _review_list_accepted(db: Database, playlist: Any) -> int:
+    accepted_rows = db.list_concept_acceptances(playlist.id)
+    if not accepted_rows:
+        print(f'No accepted concept findings for "{playlist.name}".')
+        return 0
+    print(f'Accepted concept findings for "{playlist.name}":')
+    for track_id, rule_text in accepted_rows:
+        print(f'  - track {track_id}: "{rule_text}"')
+    return 0
+
+
+def _print_review_header(
+    playlist: Any, concept: Any, tracks: list, llm_judge: Any
+) -> None:
+    from tuneshift.composer.rules import RuleKind, classify_rule
+
+    print(f'Review: "{playlist.name}" ({len(tracks)} tracks)')
+    print(f"Concept: {concept.theme}")
+    print(f"Hard rules: {concept.hard_rules}")
+    print(f"Soft rules: {concept.soft_rules}")
+
+    has_thematic = any(
+        classify_rule(rule) is RuleKind.THEMATIC for rule in concept.hard_rules
+    )
+    if has_thematic:
+        label = getattr(llm_judge, "model_label", None)
+        if label:
+            print(
+                f"Thematic rules judged by: {label} "
+                f"(verdict quality is model-dependent)"
+            )
+        else:
+            print("Thematic rules: no LLM backend reachable (reported as unverified)")
+    print()
+
+
+def _print_findings_section(title: str, items: list) -> None:
+    if not items:
+        return
+    print(f"{title} ({len(items)}):")
+    for finding in items:
+        print(f"  - {finding.description}")
+    print()
+
+
+def _apply_review_fixes(
+    db: Database, playlist: Any, tracks: list, hard: list
+) -> None:
+    """Remove tracks that violate hard concept rules."""
+    import re as _re
+
+    removed: list[str] = []
+    for finding in hard:
+        # Format: 'HARD: "Title" by Artist - Rule: ...'
+        title_match = _re.search(r'"([^"]+)" by (.+?) - Rule:', finding.description)
+        if not title_match:
+            continue
+        title = title_match.group(1)
+        artist_name = title_match.group(2)
+        for track in tracks:
+            if track.title == title and track.artist == artist_name:
+                db.remove_track_from_playlist(playlist.id, track.track_id)
+                removed.append(f"{title} by {artist_name}")
+                break
+
+    if removed:
+        print(f"REMOVED ({len(removed)} tracks):")
+        for entry in removed:
+            print(f"  - {entry}")
+    else:
+        print("No tracks could be matched for removal.")
+
+
 def handle_review(args, db: Database) -> int:
     """Review a playlist for concept compliance (works with or without narrative)."""
     from tuneshift.composer.concept_llm import make_concept_judge
@@ -335,14 +408,7 @@ def handle_review(args, db: Database) -> int:
         return 1
 
     if getattr(args, "list_accepted", False):
-        accepted_rows = db.list_concept_acceptances(playlist.id)
-        if not accepted_rows:
-            print(f'No accepted concept findings for "{playlist.name}".')
-            return 0
-        print(f'Accepted concept findings for "{playlist.name}":')
-        for track_id, rule_text in accepted_rows:
-            print(f'  - track {track_id}: "{rule_text}"')
-        return 0
+        return _review_list_accepted(db, playlist)
 
     accept_track = getattr(args, "accept_track", None)
     if accept_track is not None:
@@ -365,26 +431,7 @@ def handle_review(args, db: Database) -> int:
         accepted=accepted,
     )
 
-    print(f'Review: "{playlist.name}" ({len(tracks)} tracks)')
-    print(f"Concept: {concept.theme}")
-    print(f"Hard rules: {concept.hard_rules}")
-    print(f"Soft rules: {concept.soft_rules}")
-
-    from tuneshift.composer.rules import RuleKind, classify_rule
-
-    has_thematic = any(
-        classify_rule(rule) is RuleKind.THEMATIC for rule in concept.hard_rules
-    )
-    if has_thematic:
-        label = getattr(llm_judge, "model_label", None)
-        if label:
-            print(
-                f"Thematic rules judged by: {label} "
-                f"(verdict quality is model-dependent)"
-            )
-        else:
-            print("Thematic rules: no LLM backend reachable (reported as unverified)")
-    print()
+    _print_review_header(playlist, concept, tracks, llm_judge)
 
     if not findings:
         print("No issues found.")
@@ -394,49 +441,11 @@ def handle_review(args, db: Database) -> int:
     soft = [f for f in findings if 0.3 < f.severity < 0.8]
     unknown = [f for f in findings if f.severity <= 0.3]
 
-    if hard:
-        print(f"VIOLATIONS ({len(hard)}):")
-        for f in hard:
-            print(f"  - {f.description}")
-        print()
-
-    if soft:
-        print(f"WARNINGS ({len(soft)}):")
-        for f in soft:
-            print(f"  - {f.description}")
-        print()
-
-    if unknown:
-        print(f"UNVERIFIED ({len(unknown)}):")
-        for f in unknown:
-            print(f"  - {f.description}")
-        print()
+    _print_findings_section("VIOLATIONS", hard)
+    _print_findings_section("WARNINGS", soft)
+    _print_findings_section("UNVERIFIED", unknown)
 
     if getattr(args, "fix", False) and hard:
-        # Remove tracks that violate hard rules
-        removed: list[str] = []
-        for finding in hard:
-            # Extract track title from finding description
-            # Format: 'HARD: "Title" by Artist - Rule: ...'
-            import re as _re
-
-            title_match = _re.search(r'"([^"]+)" by (.+?) - Rule:', finding.description)
-            if not title_match:
-                continue
-            title = title_match.group(1)
-            artist_name = title_match.group(2)
-            # Find the track in the playlist
-            for track in tracks:
-                if track.title == title and track.artist == artist_name:
-                    db.remove_track_from_playlist(playlist.id, track.track_id)
-                    removed.append(f"{title} by {artist_name}")
-                    break
-
-        if removed:
-            print(f"REMOVED ({len(removed)} tracks):")
-            for r in removed:
-                print(f"  - {r}")
-        else:
-            print("No tracks could be matched for removal.")
+        _apply_review_fixes(db, playlist, tracks, hard)
 
     return 0
