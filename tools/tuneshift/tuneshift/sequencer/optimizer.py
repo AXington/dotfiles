@@ -113,6 +113,107 @@ def select_closer(tracks: list[TrackMetadata], arc: str) -> TrackMetadata:
     return scored[0][3]
 
 
+def _has_adjacency_violation(seq: list[TrackMetadata], idx: int) -> bool:
+    """True when the track at ``idx`` shares an artist with a neighbor."""
+    if idx > 0 and seq[idx].artist == seq[idx - 1].artist:
+        return True
+    if idx < len(seq) - 1 and seq[idx].artist == seq[idx + 1].artist:
+        return True
+    return False
+
+
+def _first_swap_violation(
+    result: list[TrackMetadata], protected: set[int]
+) -> int | None:
+    """Index of the first movable track that clumps with its predecessor."""
+    for index in range(len(result) - 1):
+        if result[index].artist == result[index + 1].artist:
+            candidate = index + 1
+            # A pinned violator cannot be moved; skip it and keep scanning so
+            # later, movable clumps are still redistributed (SEQ-C5).
+            if candidate in protected:
+                continue
+            return candidate
+    return None
+
+
+def _best_redistribution_target(
+    result: list[TrackMetadata],
+    violation_idx: int,
+    violator: TrackMetadata,
+    protected: set[int],
+) -> int | None:
+    """Best non-violating swap partner that maximizes same-artist spacing."""
+    track_count = len(result)
+    best_target = None
+    best_distance = -1
+    artist_positions = [
+        index for index in range(track_count) if result[index].artist == violator.artist
+    ]
+
+    for target_idx in range(track_count):
+        if target_idx == violation_idx:
+            continue
+        if target_idx in protected:
+            continue
+        target_track = result[target_idx]
+        if target_track.artist == violator.artist:
+            continue
+
+        result[violation_idx], result[target_idx] = (
+            result[target_idx],
+            result[violation_idx],
+        )
+        creates_violation = _has_adjacency_violation(
+            result,
+            violation_idx,
+        ) or _has_adjacency_violation(result, target_idx)
+        result[violation_idx], result[target_idx] = (
+            result[target_idx],
+            result[violation_idx],
+        )
+
+        if creates_violation:
+            continue
+
+        if len(artist_positions) > 1:
+            min_dist = min(
+                abs(target_idx - position)
+                for position in artist_positions
+                if position != violation_idx
+            )
+        else:
+            min_dist = track_count
+
+        if min_dist > best_distance:
+            best_distance = min_dist
+            best_target = target_idx
+    return best_target
+
+
+def _fallback_swap(
+    result: list[TrackMetadata],
+    violation_idx: int,
+    violator: TrackMetadata,
+    protected: set[int],
+) -> bool:
+    """Last resort: swap the violator with any movable different-artist track,
+    scanning from the end. Returns False when none is available."""
+    for target_idx in range(len(result) - 1, -1, -1):
+        if target_idx == violation_idx:
+            continue
+        if target_idx in protected:
+            continue
+        if result[target_idx].artist == violator.artist:
+            continue
+        result[violation_idx], result[target_idx] = (
+            result[target_idx],
+            result[violation_idx],
+        )
+        return True
+    return False
+
+
 def distribute_artists(
     sequence: list[TrackMetadata],
     min_separation: int = 4,
@@ -125,76 +226,16 @@ def distribute_artists(
         return result
     protected = protected or set()
 
-    def _has_adjacency_violation(seq: list[TrackMetadata], idx: int) -> bool:
-        if idx > 0 and seq[idx].artist == seq[idx - 1].artist:
-            return True
-        if idx < len(seq) - 1 and seq[idx].artist == seq[idx + 1].artist:
-            return True
-        return False
-
     max_passes = max(50, min_separation * 10)
     for _ in range(max_passes):
-        violation_idx = None
-        for index in range(track_count - 1):
-            if result[index].artist == result[index + 1].artist:
-                candidate = index + 1
-                # A pinned violator cannot be moved; skip it and keep scanning
-                # so later, movable clumps are still redistributed (SEQ-C5).
-                if candidate in protected:
-                    continue
-                violation_idx = candidate
-                break
-
+        violation_idx = _first_swap_violation(result, protected)
         if violation_idx is None:
             break
 
         violator = result[violation_idx]
-        best_target = None
-        best_distance = -1
-        artist_positions = [
-            index
-            for index in range(track_count)
-            if result[index].artist == violator.artist
-        ]
-
-        for target_idx in range(track_count):
-            if target_idx == violation_idx:
-                continue
-            if target_idx in protected:
-                continue
-            target_track = result[target_idx]
-            if target_track.artist == violator.artist:
-                continue
-
-            result[violation_idx], result[target_idx] = (
-                result[target_idx],
-                result[violation_idx],
-            )
-            creates_violation = _has_adjacency_violation(
-                result,
-                violation_idx,
-            ) or _has_adjacency_violation(result, target_idx)
-            result[violation_idx], result[target_idx] = (
-                result[target_idx],
-                result[violation_idx],
-            )
-
-            if creates_violation:
-                continue
-
-            if len(artist_positions) > 1:
-                min_dist = min(
-                    abs(target_idx - position)
-                    for position in artist_positions
-                    if position != violation_idx
-                )
-            else:
-                min_dist = track_count
-
-            if min_dist > best_distance:
-                best_distance = min_dist
-                best_target = target_idx
-
+        best_target = _best_redistribution_target(
+            result, violation_idx, violator, protected
+        )
         if best_target is not None:
             result[violation_idx], result[best_target] = (
                 result[best_target],
@@ -202,19 +243,7 @@ def distribute_artists(
             )
             continue
 
-        for target_idx in range(track_count - 1, -1, -1):
-            if target_idx == violation_idx:
-                continue
-            if target_idx in protected:
-                continue
-            if result[target_idx].artist == violator.artist:
-                continue
-            result[violation_idx], result[target_idx] = (
-                result[target_idx],
-                result[violation_idx],
-            )
-            break
-        else:
+        if not _fallback_swap(result, violation_idx, violator, protected):
             break
 
     return result
@@ -700,6 +729,69 @@ def _order_section(
     return list(section_tracks)
 
 
+def _apply_moment_and_index_pins(
+    tracks,
+    pins,
+    intent,
+    position_pins,
+    track_count,
+    pinned_opener_id,
+    pinned_closer_id,
+):
+    """Merge soft moment targets into position_pins (explicit pins win) and
+    promote index-0 / last-index pins to opener / closer overrides. Mutates
+    position_pins; returns the resolved (opener_id, closer_id)."""
+    moment_track_ids = [p.track_id for p in (pins or []) if p.pin_type == "moment"]
+    if not moment_track_ids and intent:
+        moment_track_ids = intent.climax_candidates
+
+    moment_positions = _place_moments(tracks, moment_track_ids, track_count)
+    # Explicit position pins win over soft moment targets (SEQ-C6): never let a
+    # moment overwrite an explicit index, and never place a moment for a track
+    # that is already explicitly positioned elsewhere (which would duplicate it).
+    explicitly_pinned_tracks = set(position_pins.values())
+    for moment_idx, moment_tid in moment_positions.items():
+        if moment_idx in position_pins:
+            continue
+        if moment_tid in explicitly_pinned_tracks:
+            continue
+        position_pins[moment_idx] = moment_tid
+
+    # Position pins at index 0 override opener; at last index override closer
+    if 0 in position_pins:
+        pinned_opener_id = position_pins.pop(0)
+    if (track_count - 1) in position_pins:
+        pinned_closer_id = position_pins.pop(track_count - 1)
+    return pinned_opener_id, pinned_closer_id
+
+
+def _insert_position_pins(sequence, position_pins, track_map, anchor_blocks):
+    """Insert position-pinned tracks at their target indices, shifting each
+    index off an anchor-block interior so blocks stay contiguous (SEQ-C4)."""
+    block_member_sets = [{t.track_id for t in block} for block in anchor_blocks]
+    for target_idx in sorted(position_pins.keys()):
+        tid = position_pins[target_idx]
+        if tid in track_map:
+            idx = min(target_idx, len(sequence))
+            idx = _adjust_index_for_blocks(sequence, idx, block_member_sets)
+            sequence.insert(idx, track_map[tid])
+
+
+def _protected_positions(
+    sequence, pinned_opener_id, pinned_closer_id, adjacency_groups, position_pins
+):
+    """Indices that 2-opt / distribution must not move: opener, closer, anchor
+    members, and explicit position pins."""
+    pinned_positions = _get_pinned_positions(
+        sequence, pinned_opener_id, pinned_closer_id, adjacency_groups
+    )
+    # Also protect position-pinned indices
+    for target_idx in position_pins:
+        if target_idx < len(sequence):
+            pinned_positions.add(target_idx)
+    return pinned_positions
+
+
 def optimize_sequence(
     tracks: list[TrackMetadata],
     weights: dict[str, float],
@@ -763,27 +855,15 @@ def optimize_sequence(
     intent = infer_intent(tracks, narrative=narrative) if arc == "narrative" else None
 
     # Collect moment track IDs and determine their target positions
-    moment_track_ids = [p.track_id for p in (pins or []) if p.pin_type == "moment"]
-    if not moment_track_ids and intent:
-        moment_track_ids = intent.climax_candidates
-
-    moment_positions = _place_moments(tracks, moment_track_ids, track_count)
-    # Explicit position pins win over soft moment targets (SEQ-C6): never let a
-    # moment overwrite an explicit index, and never place a moment for a track
-    # that is already explicitly positioned elsewhere (which would duplicate it).
-    explicitly_pinned_tracks = set(position_pins.values())
-    for moment_idx, moment_tid in moment_positions.items():
-        if moment_idx in position_pins:
-            continue
-        if moment_tid in explicitly_pinned_tracks:
-            continue
-        position_pins[moment_idx] = moment_tid
-
-    # Position pins at index 0 override opener; at last index override closer
-    if 0 in position_pins:
-        pinned_opener_id = position_pins.pop(0)
-    if (track_count - 1) in position_pins:
-        pinned_closer_id = position_pins.pop(track_count - 1)
+    pinned_opener_id, pinned_closer_id = _apply_moment_and_index_pins(
+        tracks,
+        pins,
+        intent,
+        position_pins,
+        track_count,
+        pinned_opener_id,
+        pinned_closer_id,
+    )
 
     # Auto opener/closer must not steal a track that belongs to an anchor group;
     # picking a group member as an endpoint would break the block's contiguity.
@@ -838,22 +918,12 @@ def optimize_sequence(
     # blocks atomic (SEQ-C4): a target index that would land inside a contiguous
     # anchor block is shifted to the nearest block boundary so the block is not
     # split. Ranges are recomputed per insertion because each insert shifts them.
-    block_member_sets = [{t.track_id for t in block} for block in anchor_blocks]
-    for target_idx in sorted(position_pins.keys()):
-        tid = position_pins[target_idx]
-        if tid in track_map:
-            idx = min(target_idx, len(sequence))
-            idx = _adjust_index_for_blocks(sequence, idx, block_member_sets)
-            sequence.insert(idx, track_map[tid])
+    _insert_position_pins(sequence, position_pins, track_map, anchor_blocks)
 
     # Post-optimization: 2-opt and artist distribution, protecting pinned positions
-    pinned_positions = _get_pinned_positions(
-        sequence, pinned_opener_id, pinned_closer_id, adjacency_groups
+    pinned_positions = _protected_positions(
+        sequence, pinned_opener_id, pinned_closer_id, adjacency_groups, position_pins
     )
-    # Also protect position-pinned indices
-    for target_idx in position_pins:
-        if target_idx < len(sequence):
-            pinned_positions.add(target_idx)
     sequence = _swap_search(
         sequence,
         weights,
