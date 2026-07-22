@@ -1,9 +1,12 @@
 """Command-line entry point for tuneshift."""
 
 import argparse
+import importlib
 import logging
 import os
 import sys
+from collections.abc import Callable
+from typing import Any
 
 from tuneshift import TuneShiftError, __version__
 from tuneshift.db import Database
@@ -1222,6 +1225,96 @@ def _configure_logging(args) -> None:
     logging.basicConfig(level=level, stream=sys.stderr, format=fmt, force=True)
 
 
+_SIMPLE_COMMANDS: dict[str, tuple[str, str]] = {
+    "ingest": ("tuneshift.commands.ingest_cmd", "handle_ingest"),
+    "sync": ("tuneshift.commands.sync_cmd", "handle_sync"),
+    "diff": ("tuneshift.commands.diff_cmd", "handle_diff"),
+    "add": ("tuneshift.commands.add_cmd", "handle_add"),
+    "rm": ("tuneshift.commands.rm_cmd", "handle_rm"),
+    "login": ("tuneshift.commands.login_cmd", "handle_login"),
+    "status": ("tuneshift.commands.status_cmd", "handle_status"),
+    "list": ("tuneshift.commands.status_cmd", "handle_list"),
+    "order": ("tuneshift.commands.order_cmd", "handle_order"),
+    "pin": ("tuneshift.commands.pin_cmd", "handle_pin"),
+    "import-text": ("tuneshift.commands.import_text_cmd", "handle_import_text"),
+    "enrich": ("tuneshift.commands.enrich_cmd", "handle_enrich"),
+    "doctor": ("tuneshift.commands.doctor_cmd", "handle_doctor"),
+    "narrative": ("tuneshift.commands.narrative_cmd", "handle_narrative"),
+    "export": ("tuneshift.commands.export_cmd", "handle_export"),
+    "import-json": ("tuneshift.commands.import_json_cmd", "handle_import_json"),
+    "map": ("tuneshift.commands.map_cmd", "handle_map"),
+    "unmap": ("tuneshift.commands.map_cmd", "handle_unmap"),
+    "unlock": ("tuneshift.commands.lock_cmd", "handle_unlock"),
+    "edit": ("tuneshift.commands.edit_cmd", "handle_edit"),
+    "explain": ("tuneshift.commands.explain_cmd", "handle_explain"),
+    "why": ("tuneshift.commands.explain_cmd", "handle_why"),
+    "triage": ("tuneshift.commands.triage_cmd", "handle_triage"),
+    "goal": ("tuneshift.commands.goal_cmd", "handle_goal"),
+    "weights": ("tuneshift.commands.weights_cmd", "handle_weights"),
+    "curate": ("tuneshift.commands.curate_cmd", "handle_curate"),
+    "prefs": ("tuneshift.commands.prefs_cmd", "handle_prefs"),
+    "alias": ("tuneshift.commands.alias_cmd", "handle_alias"),
+    "share": ("tuneshift.commands.share_cmd", "handle_share"),
+    "link": ("tuneshift.commands.link_cmd", "handle_link"),
+    "compose": ("tuneshift.commands.compose_cmd", "handle_compose"),
+    "concept": ("tuneshift.commands.compose_cmd", "handle_concept"),
+    "review": ("tuneshift.commands.compose_cmd", "handle_review"),
+    "batch": ("tuneshift.commands.batch_cmd", "handle_batch"),
+    "plan": ("tuneshift.commands.plan_cmd", "handle_plan"),
+    "merge": ("tuneshift.commands.batch_cmd", "handle_merge"),
+    "audit": ("tuneshift.commands.audit_cmd", "handle_audit"),
+    "untag": ("tuneshift.commands.folders_cmd", "handle_untag"),
+    "collections": ("tuneshift.commands.folders_cmd", "handle_collections"),
+    "folders": ("tuneshift.commands.folders_cmd", "handle_folders"),
+}
+
+
+def _dispatch_lock(args: Any, db: Database) -> int:
+    from tuneshift.commands.lock_cmd import handle_lock, handle_lock_list
+
+    if getattr(args, "list_locks", False):
+        return handle_lock_list(args, db)
+    return handle_lock(args, db)
+
+
+def _dispatch_resolve(args: Any, db: Database) -> int:
+    from tuneshift.commands.resolve import run_resolve
+
+    run_resolve(args, db)
+    return 0
+
+
+def _dispatch_config(args: Any, _db: Database) -> int:
+    return _handle_config(args)
+
+
+_SPECIAL_COMMANDS: dict[str, Callable[[Any, Database], int]] = {
+    "resolve": _dispatch_resolve,
+    "lock": _dispatch_lock,
+    "config": _dispatch_config,
+    "ban": _handle_ban,
+    "tag": _handle_tag_dispatch,
+    "analyze": _handle_analyze,
+}
+
+
+def _dispatch_command(args: Any, db: Database) -> int | None:
+    """Route a parsed command to its handler.
+
+    Returns the handler's exit code, or None if the command is unknown (the
+    caller then prints help and returns a non-zero status).
+    """
+    special = _SPECIAL_COMMANDS.get(args.command)
+    if special is not None:
+        return special(args, db)
+    entry = _SIMPLE_COMMANDS.get(args.command)
+    if entry is None:
+        return None
+    module_name, attr = entry
+    handler = getattr(importlib.import_module(module_name), attr)
+    return handler(args, db)
+
+
 def main(argv: list[str] | None = None) -> int:
     """Run the tuneshift CLI."""
     parser = build_parser()
@@ -1239,188 +1332,11 @@ def main(argv: list[str] | None = None) -> int:
     db = Database(db_path)
 
     try:
-        if args.command == "ingest":
-            from tuneshift.commands.ingest_cmd import handle_ingest
-
-            return handle_ingest(args, db)
-        elif args.command == "sync":
-            from tuneshift.commands.sync_cmd import handle_sync
-
-            return handle_sync(args, db)
-        elif args.command == "diff":
-            from tuneshift.commands.diff_cmd import handle_diff
-
-            return handle_diff(args, db)
-        elif args.command == "add":
-            from tuneshift.commands.add_cmd import handle_add
-
-            return handle_add(args, db)
-        elif args.command == "rm":
-            from tuneshift.commands.rm_cmd import handle_rm
-
-            return handle_rm(args, db)
-        elif args.command == "login":
-            from tuneshift.commands.login_cmd import handle_login
-
-            return handle_login(args, db)
-        elif args.command == "status":
-            from tuneshift.commands.status_cmd import handle_status
-
-            return handle_status(args, db)
-        elif args.command == "list":
-            from tuneshift.commands.status_cmd import handle_list
-
-            return handle_list(args, db)
-        elif args.command == "order":
-            from tuneshift.commands.order_cmd import handle_order
-
-            return handle_order(args, db)
-        elif args.command == "pin":
-            from tuneshift.commands.pin_cmd import handle_pin
-
-            return handle_pin(args, db)
-        elif args.command == "resolve":
-            from tuneshift.commands.resolve import run_resolve
-
-            run_resolve(args, db)
-            return 0
-        elif args.command == "import-text":
-            from tuneshift.commands.import_text_cmd import handle_import_text
-
-            return handle_import_text(args, db)
-        elif args.command == "enrich":
-            from tuneshift.commands.enrich_cmd import handle_enrich
-
-            return handle_enrich(args, db)
-        elif args.command == "doctor":
-            from tuneshift.commands.doctor_cmd import handle_doctor
-
-            return handle_doctor(args, db)
-        elif args.command == "narrative":
-            from tuneshift.commands.narrative_cmd import handle_narrative
-
-            return handle_narrative(args, db)
-        elif args.command == "export":
-            from tuneshift.commands.export_cmd import handle_export
-
-            return handle_export(args, db)
-        elif args.command == "import-json":
-            from tuneshift.commands.import_json_cmd import handle_import_json
-
-            return handle_import_json(args, db)
-        elif args.command == "map":
-            from tuneshift.commands.map_cmd import handle_map
-
-            return handle_map(args, db)
-        elif args.command == "unmap":
-            from tuneshift.commands.map_cmd import handle_unmap
-
-            return handle_unmap(args, db)
-        elif args.command == "lock":
-            from tuneshift.commands.lock_cmd import handle_lock, handle_lock_list
-
-            if getattr(args, "list_locks", False):
-                return handle_lock_list(args, db)
-            return handle_lock(args, db)
-        elif args.command == "unlock":
-            from tuneshift.commands.lock_cmd import handle_unlock
-
-            return handle_unlock(args, db)
-        elif args.command == "edit":
-            from tuneshift.commands.edit_cmd import handle_edit
-
-            return handle_edit(args, db)
-        elif args.command == "explain":
-            from tuneshift.commands.explain_cmd import handle_explain
-
-            return handle_explain(args, db)
-        elif args.command == "why":
-            from tuneshift.commands.explain_cmd import handle_why
-
-            return handle_why(args, db)
-        elif args.command == "triage":
-            from tuneshift.commands.triage_cmd import handle_triage
-
-            return handle_triage(args, db)
-        elif args.command == "goal":
-            from tuneshift.commands.goal_cmd import handle_goal
-
-            return handle_goal(args, db)
-        elif args.command == "weights":
-            from tuneshift.commands.weights_cmd import handle_weights
-
-            return handle_weights(args, db)
-        elif args.command == "curate":
-            from tuneshift.commands.curate_cmd import handle_curate
-
-            return handle_curate(args, db)
-        elif args.command == "prefs":
-            from tuneshift.commands.prefs_cmd import handle_prefs
-
-            return handle_prefs(args, db)
-        elif args.command == "alias":
-            from tuneshift.commands.alias_cmd import handle_alias
-
-            return handle_alias(args, db)
-        elif args.command == "share":
-            from tuneshift.commands.share_cmd import handle_share
-
-            return handle_share(args, db)
-        elif args.command == "link":
-            from tuneshift.commands.link_cmd import handle_link
-
-            return handle_link(args, db)
-        elif args.command == "compose":
-            from tuneshift.commands.compose_cmd import handle_compose
-
-            return handle_compose(args, db)
-        elif args.command == "concept":
-            from tuneshift.commands.compose_cmd import handle_concept
-
-            return handle_concept(args, db)
-        elif args.command == "review":
-            from tuneshift.commands.compose_cmd import handle_review
-
-            return handle_review(args, db)
-        elif args.command == "config":
-            return _handle_config(args)
-        elif args.command == "batch":
-            from tuneshift.commands.batch_cmd import handle_batch
-
-            return handle_batch(args, db)
-        elif args.command == "plan":
-            from tuneshift.commands.plan_cmd import handle_plan
-
-            return handle_plan(args, db)
-        elif args.command == "ban":
-            return _handle_ban(args, db)
-        elif args.command == "merge":
-            from tuneshift.commands.batch_cmd import handle_merge
-
-            return handle_merge(args, db)
-        elif args.command == "audit":
-            from tuneshift.commands.audit_cmd import handle_audit
-
-            return handle_audit(args, db)
-        elif args.command == "tag":
-            return _handle_tag_dispatch(args, db)
-        elif args.command == "untag":
-            from tuneshift.commands.folders_cmd import handle_untag
-
-            return handle_untag(args, db)
-        elif args.command == "analyze":
-            return _handle_analyze(args, db)
-        elif args.command == "collections":
-            from tuneshift.commands.folders_cmd import handle_collections
-
-            return handle_collections(args, db)
-        elif args.command == "folders":
-            from tuneshift.commands.folders_cmd import handle_folders
-
-            return handle_folders(args, db)
-        else:
+        result = _dispatch_command(args, db)
+        if result is None:
             parser.print_help()
             return 1
+        return result
     except KeyboardInterrupt:
         print("\nInterrupted.", file=sys.stderr)
         return 130
@@ -1437,3 +1353,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     finally:
         db.close()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
