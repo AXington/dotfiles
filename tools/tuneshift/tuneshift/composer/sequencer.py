@@ -11,6 +11,11 @@ from tuneshift.models import PlaylistPin
 from tuneshift.sequencer.metadata import TrackMetadata
 from tuneshift.sequencer.scoring import resolve_weights, score_pair
 
+# (opener_ids, closer_ids, position_pins, adjacent_groups)
+_PinGroups = tuple[
+    list[int], list[int], list[tuple[int, int]], dict[str, list[tuple[int, int]]]
+]
+
 
 def sequence_sections(
     assignments: SectionAssignments,
@@ -220,19 +225,10 @@ def _energy_value(track: TrackMetadata) -> float:
     return 0.5
 
 
-def _apply_pins(
-    ordered: list[TrackMetadata], pins: list[PlaylistPin]
-) -> list[TrackMetadata]:
-    """Apply opener/closer/position/adjacent pins to the final ordered list.
-
-    Pins override the composer's energy-based ordering to enforce user-defined
-    constraints. Processing order: position pins first, then opener, closer,
-    and finally adjacent groups.
-    """
-    track_by_id = {t.track_id: t for t in ordered}
-    result = list(ordered)
-
-    # Resolve pin groups
+def _resolve_pin_groups(
+    pins: list[PlaylistPin], track_by_id: dict[int, TrackMetadata]
+) -> _PinGroups:
+    """Classify pins into opener, closer, position, and adjacent-group buckets."""
     opener_ids: list[int] = []
     closer_ids: list[int] = []
     position_pins: list[tuple[int, int]] = []  # (target_index, track_id)
@@ -253,9 +249,16 @@ def _apply_pins(
             adjacent_groups.setdefault(pin.group_id, []).append(
                 (pin.group_order or 0, pin.track_id)
             )
+    return opener_ids, closer_ids, position_pins, adjacent_groups
 
-    # Apply adjacent groups: keep group members together in their specified order.
-    # Find the earliest current position of any group member and place the group there.
+
+def _apply_adjacent_groups(
+    result: list[TrackMetadata],
+    adjacent_groups: dict[str, list[tuple[int, int]]],
+    track_by_id: dict[int, TrackMetadata],
+) -> list[TrackMetadata]:
+    """Keep each adjacent group's members together, in order, at the group's
+    earliest current position."""
     for _group_id, members in adjacent_groups.items():
         members.sort(key=lambda pair: pair[0])
         member_ids = {tid for _, tid in members}
@@ -274,8 +277,15 @@ def _apply_pins(
         # Insert in group order at the earliest position
         for offset, track in enumerate(member_tracks):
             result.insert(insert_at + offset, track)
+    return result
 
-    # Apply position pins (absolute 0-based index)
+
+def _apply_position_pins(
+    result: list[TrackMetadata],
+    position_pins: list[tuple[int, int]],
+    track_by_id: dict[int, TrackMetadata],
+) -> list[TrackMetadata]:
+    """Move each position-pinned track to its absolute 0-based index."""
     for target_index, track_id in sorted(position_pins):
         track = track_by_id.get(track_id)
         if track is None:
@@ -283,26 +293,37 @@ def _apply_pins(
         result = [t for t in result if t.track_id != track_id]
         clamped = min(target_index, len(result))
         result.insert(clamped, track)
+    return result
 
-    # Apply opener (move to position 0)
-    for track_id in opener_ids:
+
+def _apply_endpoint_pins(
+    result: list[TrackMetadata],
+    track_ids: list[int],
+    track_by_id: dict[int, TrackMetadata],
+    *,
+    at_start: bool,
+) -> list[TrackMetadata]:
+    """Move opener (at_start) or closer tracks to the list's start/end."""
+    for track_id in track_ids:
         track = track_by_id.get(track_id)
         if track is None:
             continue
         result = [t for t in result if t.track_id != track_id]
-        result.insert(0, track)
+        if at_start:
+            result.insert(0, track)
+        else:
+            result.append(track)
+    return result
 
-    # Apply closer (move to last position)
-    for track_id in closer_ids:
-        track = track_by_id.get(track_id)
-        if track is None:
-            continue
-        result = [t for t in result if t.track_id != track_id]
-        result.append(track)
 
-    # Re-apply adjacent groups that include opener/closer to preserve group order
-    # (opener pin may have pulled a group member to position 0 while the group
-    # wants them together)
+def _reapply_opener_groups(
+    result: list[TrackMetadata],
+    adjacent_groups: dict[str, list[tuple[int, int]]],
+    opener_ids: list[int],
+    track_by_id: dict[int, TrackMetadata],
+) -> list[TrackMetadata]:
+    """Re-pull adjacent groups that contain an opener back together at the front
+    (an opener pin may have moved one member to position 0)."""
     for _group_id, members in adjacent_groups.items():
         members.sort(key=lambda pair: pair[0])
         member_ids = [tid for _, tid in members]
@@ -315,5 +336,27 @@ def _apply_pins(
             result = [t for t in result if t.track_id not in set(member_ids)]
             for offset, track in enumerate(member_tracks):
                 result.insert(offset, track)
+    return result
 
+
+def _apply_pins(
+    ordered: list[TrackMetadata], pins: list[PlaylistPin]
+) -> list[TrackMetadata]:
+    """Apply opener/closer/position/adjacent pins to the final ordered list.
+
+    Pins override the composer's energy-based ordering to enforce user-defined
+    constraints. Processing order: position pins first, then opener, closer,
+    and finally adjacent groups.
+    """
+    track_by_id = {t.track_id: t for t in ordered}
+    result = list(ordered)
+
+    opener_ids, closer_ids, position_pins, adjacent_groups = _resolve_pin_groups(
+        pins, track_by_id
+    )
+    result = _apply_adjacent_groups(result, adjacent_groups, track_by_id)
+    result = _apply_position_pins(result, position_pins, track_by_id)
+    result = _apply_endpoint_pins(result, opener_ids, track_by_id, at_start=True)
+    result = _apply_endpoint_pins(result, closer_ids, track_by_id, at_start=False)
+    result = _reapply_opener_groups(result, adjacent_groups, opener_ids, track_by_id)
     return result
