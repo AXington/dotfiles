@@ -1110,6 +1110,246 @@ def _verify_lock(
     return _locked_unavailable_result(ReasonCode.LOCK_HELD)
 
 
+def _reconcile_cached(
+    db,
+    track,
+    track_id,
+    client,
+    platform_name,
+    cached_mapping,
+    effective_lock,
+    verify_locked,
+):
+    mapping = cached_mapping or db.get_platform_mapping(track_id, platform_name)
+    # A lock (either scope) is authoritative on every non-forced run - it must
+    # be consulted BEFORE the auto-match cache, so a per-playlist override is
+    # never shadowed by the global cached mapping.
+    if effective_lock is not None:
+        if verify_locked and effective_lock.scope == "global" and mapping is not None:
+            return _verify_lock(db, track, client, mapping)
+        # Per-playlist self-heal is routed through the plan/apply engine
+        # (Task 5.3); until then a per-playlist lock is trusted without a
+        # liveness probe rather than mutated inline.
+        if effective_lock.status == "unavailable":
+            return _locked_unavailable_result(ReasonCode.LOCKED)
+        return _locked_available_result(
+            _mapping_from_effective(track_id, platform_name, effective_lock),
+            ReasonCode.LOCKED,
+        )
+    tier, _, _ = db.get_resolution_state(track_id)
+    if tier is not None and mapping is not None:
+        if mapping.status == "unavailable":
+            audit = MatchAudit(
+                availability=Availability.EXACT_UNAVAILABLE,
+                reason_code=ReasonCode.BLOCKED_IN_MARKET,
+            )
+            return ReconcileResult(
+                confidence="not_found",
+                from_cache=True,
+                availability=audit.availability,
+                reason_code=audit.reason_code,
+                audit=audit,
+            )
+        audit = MatchAudit(
+            availability=Availability.EXACT_AVAILABLE,
+            reason_code=ReasonCode.MATCHED,
+            chosen_platform_id=mapping.platform_track_id,
+            chosen_score=mapping.match_score or 100,
+        )
+        return ReconcileResult(
+            platform_track_id=mapping.platform_track_id,
+            score=mapping.match_score or 100,
+            confidence="high",
+            is_divergent=mapping.is_divergent,
+            divergence_note=mapping.divergence_note,
+            from_cache=True,
+            availability=audit.availability,
+            reason_code=audit.reason_code,
+            audit=audit,
+        )
+    return None
+
+
+def _ordered_survivors(selection, prefs):
+    survivors = [c for c, _ in selection.ranked] if selection.winner is not None else []
+    if survivors:
+        # The engine ranked available survivors by Distance (and any typed/soft
+        # preference). When it resolved the winner via a preference or precedence
+        # (decided_by set - e.g. a "prefer atmos" spatial criterion), that choice
+        # is authoritative and must not be second-guessed. Only when the weighted
+        # score alone left the top band unresolved (decided_by is None, an
+        # effective tie) do the per-playlist free-text keyword bias + the
+        # standard-edition tiebreak decide the pick - the legacy keyword-
+        # preference behaviour. The sort is stable, so a band with no keyword/
+        # edition signal keeps the engine's order.
+        winner_result = selection.winner
+        if selection.decided_by is None:
+            base_distance = selection.winner_distance.total
+            band = [
+                cand
+                for cand, dist in selection.ranked
+                if dist.total - base_distance <= AMBIGUITY_DELTA
+            ]
+            if len(band) > 1:
+                band.sort(
+                    key=lambda c: (
+                        -preference_sort_bias(c.album or "", prefs),
+                        edition_cost(c.album or ""),
+                    )
+                )
+                winner_result = band[0]
+        ordered = [winner_result, *[c for c in survivors if c is not winner_result]]
+    else:
+        ordered = []
+    return ordered
+
+
+def _reconcile_not_found(
+    track,
+    platform_name,
+    all_candidates,
+    prefs,
+    prefer_classes,
+    avoid_classes,
+    resolver,
+    selection,
+    active_prefs,
+    _int_score,
+):
+    # No confident *available* winner. Rank ALL candidates with the integer
+    # path so an exact-but-unavailable release still surfaces as held
+    # (EXACT_UNAVAILABLE), never a silent miss.
+    scored_all = [
+        (_int_score(r), edition_cost(r.album or ""), r) for r in all_candidates
+    ]
+    scored_all.sort(
+        key=lambda x: (
+            -(x[0] + preference_sort_bias(x[2].album or "", prefs)),
+            x[1],
+        )
+    )
+    fallback_conf = (
+        classify_scores([s for s, _, _ in scored_all], min_lead=prefs.min_lead)
+        if scored_all
+        else "not_found"
+    )
+    audit = _build_audit(
+        track=track,
+        platform_name=platform_name,
+        scored=scored_all,
+        confidence=fallback_conf,
+        prefer=prefer_classes,
+        avoid=avoid_classes,
+        resolver=resolver,
+        selection=selection,
+        active=active_prefs,
+    )
+    if audit.availability == Availability.EXACT_UNAVAILABLE and scored_all:
+        # The exact recording exists but is unplayable here: report it as
+        # held (its id + score), flagged via availability so callers never
+        # treat it as a live, selectable match.
+        held_score, _, held = scored_all[0]
+        return ReconcileResult(
+            platform_track_id=held.platform_id,
+            platform_title=held.title,
+            platform_artist=held.artist,
+            platform_album=held.album,
+            score=held_score,
+            confidence=fallback_conf,
+            alternatives=[r for _, _, r in scored_all[1:4]],
+            availability=audit.availability,
+            reason_code=audit.reason_code,
+            audit=audit,
+        )
+    return ReconcileResult(
+        confidence="not_found",
+        alternatives=[r for _, _, r in scored_all[:3]],
+        availability=audit.availability,
+        reason_code=audit.reason_code,
+        audit=audit,
+    )
+
+
+def _finalize_reconcile_winner(
+    track,
+    platform_name,
+    scored,
+    confidence,
+    prefer_classes,
+    avoid_classes,
+    resolver,
+    selection,
+    active_prefs,
+    candidate_strategies,
+):
+    audit = _build_audit(
+        track=track,
+        platform_name=platform_name,
+        scored=scored,
+        confidence=confidence,
+        prefer=prefer_classes,
+        avoid=avoid_classes,
+        resolver=resolver,
+        selection=selection,
+        active=active_prefs,
+    )
+    best_score, _, best_result = scored[0]
+    is_div = _check_divergence(track.album, best_result.album)
+    div_note = f"Version differs: {best_result.album}" if is_div else None
+
+    # Duration sanity check
+    if (
+        track.duration_seconds
+        and best_result.duration_seconds
+        and best_result.duration_seconds > track.duration_seconds * 1.6
+    ):
+        is_div = True
+        div_note = (
+            f"Duration suspicious: "
+            f"{best_result.duration_seconds}s vs expected ~{track.duration_seconds}s"
+        )
+
+    # Artist mismatch check: if best result has a completely different artist, flag it.
+    # Canonicalize through the alias resolver first so equivalent surface forms
+    # (98\u00ba / 98 Degrees) are not falsely flagged as a mismatch.
+    from difflib import SequenceMatcher as _SM
+
+    from tuneshift.matching import normalize_artist as _norm_artist
+
+    src_artist_norm = resolver.canonical(_norm_artist(track.artist))
+    res_artist_norm = (
+        resolver.canonical(_norm_artist(best_result.artist))
+        if best_result.artist
+        else ""
+    )
+    if src_artist_norm and res_artist_norm:
+        artist_ratio = _SM(None, src_artist_norm, res_artist_norm).ratio()
+        if artist_ratio < 0.4:
+            is_div = True
+            div_note = (
+                f'Artist mismatch: expected "{track.artist}", '
+                f'got "{best_result.artist}"'
+            )
+
+    match_type = candidate_strategies.get(best_result.platform_id, "")
+
+    return ReconcileResult(
+        platform_track_id=best_result.platform_id,
+        platform_title=best_result.title,
+        platform_artist=best_result.artist,
+        platform_album=best_result.album,
+        score=best_score,
+        confidence=confidence,
+        is_divergent=is_div,
+        divergence_note=div_note,
+        alternatives=[r for _, _, r in scored[1:4]],
+        match_type=match_type,
+        availability=audit.availability,
+        reason_code=audit.reason_code,
+        audit=audit,
+    )
+
+
 def reconcile_track(
     db: Database,
     track_id: int,
@@ -1166,57 +1406,18 @@ def reconcile_track(
 
     # Cache/mapping checks
     if not force:
-        mapping = cached_mapping or db.get_platform_mapping(track_id, platform_name)
-        # A lock (either scope) is authoritative on every non-forced run - it must
-        # be consulted BEFORE the auto-match cache, so a per-playlist override is
-        # never shadowed by the global cached mapping.
-        if effective_lock is not None:
-            if (
-                verify_locked
-                and effective_lock.scope == "global"
-                and mapping is not None
-            ):
-                return _verify_lock(db, track, client, mapping)
-            # Per-playlist self-heal is routed through the plan/apply engine
-            # (Task 5.3); until then a per-playlist lock is trusted without a
-            # liveness probe rather than mutated inline.
-            if effective_lock.status == "unavailable":
-                return _locked_unavailable_result(ReasonCode.LOCKED)
-            return _locked_available_result(
-                _mapping_from_effective(track_id, platform_name, effective_lock),
-                ReasonCode.LOCKED,
-            )
-        tier, _, _ = db.get_resolution_state(track_id)
-        if tier is not None and mapping is not None:
-            if mapping.status == "unavailable":
-                audit = MatchAudit(
-                    availability=Availability.EXACT_UNAVAILABLE,
-                    reason_code=ReasonCode.BLOCKED_IN_MARKET,
-                )
-                return ReconcileResult(
-                    confidence="not_found",
-                    from_cache=True,
-                    availability=audit.availability,
-                    reason_code=audit.reason_code,
-                    audit=audit,
-                )
-            audit = MatchAudit(
-                availability=Availability.EXACT_AVAILABLE,
-                reason_code=ReasonCode.MATCHED,
-                chosen_platform_id=mapping.platform_track_id,
-                chosen_score=mapping.match_score or 100,
-            )
-            return ReconcileResult(
-                platform_track_id=mapping.platform_track_id,
-                score=mapping.match_score or 100,
-                confidence="high",
-                is_divergent=mapping.is_divergent,
-                divergence_note=mapping.divergence_note,
-                from_cache=True,
-                availability=audit.availability,
-                reason_code=audit.reason_code,
-                audit=audit,
-            )
+        cached = _reconcile_cached(
+            db,
+            track,
+            track_id,
+            client,
+            platform_name,
+            cached_mapping,
+            effective_lock,
+            verify_locked,
+        )
+        if cached is not None:
+            return cached
 
     # Alias resolver (seed + user-curated DB classes), built once per run so an
     # aliased artist scores and is retrieved under every equivalent surface form.
@@ -1302,36 +1503,7 @@ def reconcile_track(
         alias_resolver=resolver,
     )
 
-    survivors = [c for c, _ in selection.ranked] if selection.winner is not None else []
-    if survivors:
-        # The engine ranked available survivors by Distance (and any typed/soft
-        # preference). When it resolved the winner via a preference or precedence
-        # (decided_by set - e.g. a "prefer atmos" spatial criterion), that choice
-        # is authoritative and must not be second-guessed. Only when the weighted
-        # score alone left the top band unresolved (decided_by is None, an
-        # effective tie) do the per-playlist free-text keyword bias + the
-        # standard-edition tiebreak decide the pick - the legacy keyword-
-        # preference behaviour. The sort is stable, so a band with no keyword/
-        # edition signal keeps the engine's order.
-        winner_result = selection.winner
-        if selection.decided_by is None:
-            base_distance = selection.winner_distance.total
-            band = [
-                cand
-                for cand, dist in selection.ranked
-                if dist.total - base_distance <= AMBIGUITY_DELTA
-            ]
-            if len(band) > 1:
-                band.sort(
-                    key=lambda c: (
-                        -preference_sort_bias(c.album or "", prefs),
-                        edition_cost(c.album or ""),
-                    )
-                )
-                winner_result = band[0]
-        ordered = [winner_result, *[c for c in survivors if c is not winner_result]]
-    else:
-        ordered = []
+    ordered = _ordered_survivors(selection, prefs)
     scored: list[tuple[int, int, TrackResult]] = [  # (score, edition_penalty, result)
         (_int_score(r), edition_cost(r.album or ""), r) for r in ordered
     ]
@@ -1348,124 +1520,30 @@ def reconcile_track(
         confidence = "ambiguous"
 
     if confidence == "not_found":
-        # No confident *available* winner. Rank ALL candidates with the integer
-        # path so an exact-but-unavailable release still surfaces as held
-        # (EXACT_UNAVAILABLE), never a silent miss.
-        scored_all = [
-            (_int_score(r), edition_cost(r.album or ""), r) for r in all_candidates
-        ]
-        scored_all.sort(
-            key=lambda x: (
-                -(x[0] + preference_sort_bias(x[2].album or "", prefs)),
-                x[1],
-            )
-        )
-        fallback_conf = (
-            classify_scores([s for s, _, _ in scored_all], min_lead=prefs.min_lead)
-            if scored_all
-            else "not_found"
-        )
-        audit = _build_audit(
-            track=track,
-            platform_name=platform_name,
-            scored=scored_all,
-            confidence=fallback_conf,
-            prefer=prefer_classes,
-            avoid=avoid_classes,
-            resolver=resolver,
-            selection=selection,
-            active=active_prefs,
-        )
-        if audit.availability == Availability.EXACT_UNAVAILABLE and scored_all:
-            # The exact recording exists but is unplayable here: report it as
-            # held (its id + score), flagged via availability so callers never
-            # treat it as a live, selectable match.
-            held_score, _, held = scored_all[0]
-            return ReconcileResult(
-                platform_track_id=held.platform_id,
-                platform_title=held.title,
-                platform_artist=held.artist,
-                platform_album=held.album,
-                score=held_score,
-                confidence=fallback_conf,
-                alternatives=[r for _, _, r in scored_all[1:4]],
-                availability=audit.availability,
-                reason_code=audit.reason_code,
-                audit=audit,
-            )
-        return ReconcileResult(
-            confidence="not_found",
-            alternatives=[r for _, _, r in scored_all[:3]],
-            availability=audit.availability,
-            reason_code=audit.reason_code,
-            audit=audit,
+        return _reconcile_not_found(
+            track,
+            platform_name,
+            all_candidates,
+            prefs,
+            prefer_classes,
+            avoid_classes,
+            resolver,
+            selection,
+            active_prefs,
+            _int_score,
         )
 
-    audit = _build_audit(
-        track=track,
-        platform_name=platform_name,
-        scored=scored,
-        confidence=confidence,
-        prefer=prefer_classes,
-        avoid=avoid_classes,
-        resolver=resolver,
-        selection=selection,
-        active=active_prefs,
-    )
-    best_score, _, best_result = scored[0]
-    is_div = _check_divergence(track.album, best_result.album)
-    div_note = f"Version differs: {best_result.album}" if is_div else None
-
-    # Duration sanity check
-    if (
-        track.duration_seconds
-        and best_result.duration_seconds
-        and best_result.duration_seconds > track.duration_seconds * 1.6
-    ):
-        is_div = True
-        div_note = (
-            f"Duration suspicious: "
-            f"{best_result.duration_seconds}s vs expected ~{track.duration_seconds}s"
-        )
-
-    # Artist mismatch check: if best result has a completely different artist, flag it.
-    # Canonicalize through the alias resolver first so equivalent surface forms
-    # (98\u00ba / 98 Degrees) are not falsely flagged as a mismatch.
-    from difflib import SequenceMatcher as _SM
-
-    from tuneshift.matching import normalize_artist as _norm_artist
-
-    src_artist_norm = resolver.canonical(_norm_artist(track.artist))
-    res_artist_norm = (
-        resolver.canonical(_norm_artist(best_result.artist))
-        if best_result.artist
-        else ""
-    )
-    if src_artist_norm and res_artist_norm:
-        artist_ratio = _SM(None, src_artist_norm, res_artist_norm).ratio()
-        if artist_ratio < 0.4:
-            is_div = True
-            div_note = (
-                f'Artist mismatch: expected "{track.artist}", '
-                f'got "{best_result.artist}"'
-            )
-
-    match_type = candidate_strategies.get(best_result.platform_id, "")
-
-    return ReconcileResult(
-        platform_track_id=best_result.platform_id,
-        platform_title=best_result.title,
-        platform_artist=best_result.artist,
-        platform_album=best_result.album,
-        score=best_score,
-        confidence=confidence,
-        is_divergent=is_div,
-        divergence_note=div_note,
-        alternatives=[r for _, _, r in scored[1:4]],
-        match_type=match_type,
-        availability=audit.availability,
-        reason_code=audit.reason_code,
-        audit=audit,
+    return _finalize_reconcile_winner(
+        track,
+        platform_name,
+        scored,
+        confidence,
+        prefer_classes,
+        avoid_classes,
+        resolver,
+        selection,
+        active_prefs,
+        candidate_strategies,
     )
 
 
