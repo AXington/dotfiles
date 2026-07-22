@@ -33,8 +33,9 @@ TuneShift is **canonical-first and push-only**:
   self-heal all default to writing a *reviewable plan* that changes nothing until
   applied, and every apply is journaled for one-step rollback.
 - **Schema migrations are automatic.** The schema version is stored in the
-  `schema_meta` table (key `version`) and drives in-DB migrations in
-  `db.py:_migrate_schema()` on open. Check the current version with
+  `schema_meta` table (key `version`) and drives in-DB migrations on open, one
+  versioned module per step under `persistence/migrations/` (`vNNN.py`). Check the
+  current version with
   `sqlite3 tuneshift.db "SELECT value FROM schema_meta WHERE key='version'"`.
 
 ## Quickstart
@@ -122,7 +123,10 @@ The major subsystems each have a dedicated guide under [`docs/`](docs/):
 ```
 tuneshift/
   cli.py              # Argument parsing, command dispatch
-  db.py               # SQLite schema, migrations, all persistence
+  db.py               # Public Database facade over the persistence/ mixins
+  persistence/        # Persistence mixins (base, schema, migrations/, tracks,
+                      #   resolution, playlists, platform, meta, artists,
+                      #   collections); the only place raw SQL lives
   models.py           # Shared dataclasses (Track, Playlist, etc.)
   commands/           # One file per CLI subcommand (~35 modules)
   platforms/          # Platform clients + auth + rate limiting

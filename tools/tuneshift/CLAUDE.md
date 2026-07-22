@@ -40,7 +40,17 @@ load-bearing.
 
 **Schema migrations are in-DB.** The schema version is stored in the `schema_meta`
 table (key `version`), not the `user_version` pragma. Migrations run automatically
-on open; new migrations go in `db.py:_migrate_schema()`.
+on open. Each migration is one versioned module in `persistence/migrations/`
+(`vNNN.py`, each exposing `apply(conn)`); to add one, create the next `vNNN.py`,
+register it in `persistence/migrations/__init__.py`, and bump `_SCHEMA_VERSION` in
+`persistence/base.py`. `SchemaMixin._migrate_schema()` delegates to the ordered
+chain via `run_migrations()`.
+
+**Raw SQL is confined to the persistence layer.** Only `db.py` and modules under
+`persistence/` may call `.conn.execute*` / `.conn.cursor()`. Every other module
+goes through a named `Database` method. This boundary is enforced by the
+`test_no_conn_execute_leak` gate in `tests/test_lint_regressions.py` (a bare
+`.conn.commit()` for caller-managed transactions is the only exception).
 
 ### Module Layout
 
@@ -48,7 +58,8 @@ on open; new migrations go in `db.py:_migrate_schema()`.
 
 | Module | Responsibility |
 |--------|---------------|
-| `db.py` | SQLite schema, migrations, all persistence (schema version stored in `schema_meta`) |
+| `db.py` | Public `Database` facade composing the `persistence/` mixins; re-exports the stable public surface (schema version stored in `schema_meta`) |
+| `persistence/` | Persistence mixins split by area (`base`, `schema`, `migrations/`, `tracks`, `resolution`, `playlists`, `platform`, `meta`, `artists`, `collections`); the only place raw SQL lives |
 | `cli.py` | Argument parsing, command dispatch |
 | `models.py` | Shared dataclasses |
 | `reconcile.py` | Track reconciliation: match canonical tracks to platform IDs (wraps `matching/`) |
