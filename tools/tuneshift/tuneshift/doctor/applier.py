@@ -183,25 +183,27 @@ def _apply_one(db: Database, client, item: PlanItem) -> None:
 
 
 def _reenrich_track(db: Database, client, item: PlanItem, stats: RetryStats) -> None:
-    """Best-effort refresh of cached metadata for a remapped track."""
+    """Best-effort refresh of cached metadata for a remapped track.
+
+    Delegates to the canonical per-track enrichment path
+    (:func:`enrichment.platform_metadata.enrich_track_from_tidal`) so the
+    fetch -> upsert -> derive-tags flow (including AC10 atmos tagging) lives in
+    exactly one place instead of being reimplemented here (DEBT-M2).
+    ``refresh=True`` forces a re-fetch because the remap just changed the mapped
+    platform id. Wrapped in the shared retry policy; any failure is logged and
+    swallowed so it never rolls back the committed remap.
+    """
     pid = item.proposed_platform_id or item.current_platform_id
     if not pid:
         return
 
-    def _fetch():
-        platform_metadata._tidal_limiter.wait()
-        return platform_metadata.fetch_track_report(client, pid)
+    def _enrich():
+        return platform_metadata.enrich_track_from_tidal(
+            db, item.track_id, pid, client=client, refresh=True
+        )
 
     try:
-        report = _retry_api_call(_fetch, config=RetryConfig(max_retries=2), stats=stats)
-        if report.get("metadata"):
-            db.upsert_track_platform_metadata(
-                item.track_id, PLATFORM, pid, **report["metadata"]
-            )
-            # AC10: derive the atmos-available tag from the freshly captured
-            # metadata (the upsert alone never wrote tags -- that gap is why an
-            # Atmos-mapped track stayed untagged after doctor --apply).
-            platform_metadata.derive_tags(db, item.track_id)
+        _retry_api_call(_enrich, config=RetryConfig(max_retries=2), stats=stats)
     except Exception:  # noqa: BLE001
         # Best-effort re-enrichment: a failure here must never roll back the
         # committed remap. Log with context instead of swallowing silently.
