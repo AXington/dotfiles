@@ -70,11 +70,7 @@ def enrich_track(
         )
         if result:
             metadata.update(result)
-            db.conn.execute(
-                "UPDATE tracks SET metadata = ? WHERE id = ?",
-                (json.dumps(metadata), track_id),
-            )
-            db.conn.commit()
+            db.set_track_metadata(track_id, metadata, commit=True)
             logger.info("classified track: %s - %s", track.title, track.artist)
 
     # Atmos / Tidal catalog capture (AC10/AC11): any Tidal-mapped track captures

@@ -143,7 +143,6 @@ def _auto_classify_batch(
 
     Uses the search-grounded pipeline (Last.fm + Genius + LLM synthesis).
     """
-    import json
     import sys
 
     from tuneshift.enrichment.pipeline import classify_track_grounded
@@ -196,10 +195,7 @@ def _auto_classify_batch(
         )
         if result:
             metadata.update(result)
-            db.conn.execute(
-                "UPDATE tracks SET metadata = ? WHERE id = ?",
-                (json.dumps(metadata), track_id),
-            )
+            db.set_track_metadata(track_id, metadata)
             classified += 1
 
         if (i + 1) % 10 == 0:

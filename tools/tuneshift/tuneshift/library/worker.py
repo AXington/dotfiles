@@ -296,10 +296,7 @@ class ResolutionWorker:
 
     def _handle_failure(self, track_id: int, exc: Exception) -> bool:
         """Retry a hard failure with backoff; quarantine once retries exhaust."""
-        row = self._db.conn.execute(
-            "SELECT attempts FROM resolution_queue WHERE track_id = ?", (track_id,)
-        ).fetchone()
-        attempts = (row["attempts"] if row else 0) + 1
+        attempts = self._db.get_resolution_attempts(track_id) + 1
         if attempts >= self._max_attempts:
             self._quarantine(
                 track_id,
@@ -348,13 +345,10 @@ class ResolutionWorker:
         the separate ``transient_attempts`` counter, keeping transient throttling
         independent of the hard-failure quarantine budget.
         """
-        counter = "transient_attempts" if transient else "attempts"
         if attempts is None:
-            row = self._db.conn.execute(
-                f"SELECT {counter} AS n FROM resolution_queue WHERE track_id = ?",  # noqa: S608 - counter is a code-controlled literal; value parameterized
-                (track_id,),
-            ).fetchone()
-            attempts = (row["n"] if row else 0) + 1
+            attempts = (
+                self._db.get_resolution_attempts(track_id, transient=transient) + 1
+            )
         delay = self._base_backoff_seconds * (2 ** max(0, attempts - 1))
         return (datetime.now(timezone.utc) + timedelta(seconds=delay)).strftime(
             _SQLITE_TS_FMT
