@@ -22,6 +22,7 @@ from tuneshift.persistence.collections import CollectionsMixin
 from tuneshift.persistence.meta import MetaMixin
 from tuneshift.persistence.platform import PlatformMixin
 from tuneshift.persistence.playlists import PlaylistsMixin
+from tuneshift.persistence.resolution import ResolutionMixin
 from tuneshift.persistence.schema import SchemaMixin
 from tuneshift.persistence.tracks import TracksMixin
 from tuneshift.types import JournalEntry, ReviewItem
@@ -41,6 +42,7 @@ __all__ = [
 class Database(
     SchemaMixin,
     TracksMixin,
+    ResolutionMixin,
     PlaylistsMixin,
     PlatformMixin,
     MetaMixin,
