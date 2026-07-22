@@ -22,6 +22,66 @@ if TYPE_CHECKING:
     from tuneshift.types import JournalEntry as _JournalEntry  # noqa: F401
 
 
+# Metadata keys whose values contribute to the keyword-search haystack.
+_SEARCH_KEYWORD_KEYS = (
+    "vibes",
+    "era_mood",
+    "lastfm_tags",
+    "lyrical_subject",
+    "narrator_stance",
+    "sonic_texture",
+    "space",
+    "groove_feel",
+    "opens_with",
+    "closes_with",
+    "energy_arc_within",
+)
+
+
+def _search_intensity_ok(
+    metadata: dict, track: Track, intensity_range: tuple[float, float] | None
+) -> bool:
+    """Return True when the track's emotional intensity falls in range.
+
+    Uses ``emotional_intensity`` metadata, falling back to ``track.energy``.
+    A missing or non-numeric value fails a bounded search (returns False).
+    """
+    if intensity_range is None:
+        return True
+    raw = metadata.get("emotional_intensity", track.energy)
+    if raw is None:
+        return False
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return False
+    minimum, maximum = intensity_range
+    return minimum <= value <= maximum
+
+
+def _search_stance_ok(metadata: dict, normalized_stance: str | None) -> bool:
+    """Return True when the track's narrator stance matches (case-insensitive)."""
+    if normalized_stance is None:
+        return True
+    stance = metadata.get("narrator_stance")
+    return isinstance(stance, str) and stance.casefold() == normalized_stance
+
+
+def _search_haystack(metadata: dict, track: Track) -> str:
+    """Build the casefolded text blob a keyword search matches against."""
+    terms: list[str] = [track.title, track.artist]
+    if track.album:
+        terms.append(track.album)
+    terms.extend(track.themes)
+    for key in _SEARCH_KEYWORD_KEYS:
+        value = metadata.get(key)
+        if isinstance(value, list):
+            terms.extend(str(item) for item in value if item)
+        elif value:
+            terms.append(str(value))
+    return " ".join(terms).casefold()
+
+
 class TracksMixin(PersistenceBase):
     """Tracks persistence methods for the Database facade."""
 
@@ -352,51 +412,14 @@ class TracksMixin(PersistenceBase):
             track = self._row_to_track(row)
             metadata = track.metadata or {}
 
-            track_intensity = metadata.get("emotional_intensity", track.energy)
-            if intensity_range is not None:
-                if track_intensity is None:
-                    continue
-                try:
-                    intensity_value = float(track_intensity)
-                except (TypeError, ValueError):
-                    continue
-                minimum, maximum = intensity_range
-                if intensity_value < minimum or intensity_value > maximum:
-                    continue
-
-            track_stance = metadata.get("narrator_stance")
-            if normalized_stance is not None:
-                if not isinstance(track_stance, str):
-                    continue
-                if track_stance.casefold() != normalized_stance:
-                    continue
+            if not _search_intensity_ok(metadata, track, intensity_range):
+                continue
+            if not _search_stance_ok(metadata, normalized_stance):
+                continue
 
             overlap_count = 0
             if normalized_keywords:
-                term_groups: list[str] = [track.title, track.artist]
-                if track.album:
-                    term_groups.append(track.album)
-                term_groups.extend(track.themes)
-                for key in (
-                    "vibes",
-                    "era_mood",
-                    "lastfm_tags",
-                    "lyrical_subject",
-                    "narrator_stance",
-                    "sonic_texture",
-                    "space",
-                    "groove_feel",
-                    "opens_with",
-                    "closes_with",
-                    "energy_arc_within",
-                ):
-                    value = metadata.get(key)
-                    if isinstance(value, list):
-                        term_groups.extend(str(item) for item in value if item)
-                    elif value:
-                        term_groups.append(str(value))
-
-                haystack = " ".join(term_groups).casefold()
+                haystack = _search_haystack(metadata, track)
                 overlap_count = sum(
                     1 for keyword in normalized_keywords if keyword in haystack
                 )
