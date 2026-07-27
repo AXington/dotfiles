@@ -227,8 +227,8 @@ def _sync_playlist(db: Database, name: str) -> bool:
     )
     try:
         return handle_sync(args, db) == 0
-    except Exception as exc:  # noqa: BLE001
-        print(f'  ! Sync of "{name}" failed: {exc}', file=sys.stderr)
+    except Exception:  # noqa: BLE001
+        logger.warning("sync failed playlist=%s", name, exc_info=True)
         return False
 
 

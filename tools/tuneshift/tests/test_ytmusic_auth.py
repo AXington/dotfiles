@@ -6,6 +6,7 @@ REDACTION in tool output — the real source is ``f"Bearer {self._access_token}"
 and the runtime header is correct. This test locks that correct behaviour in
 place so a genuine regression (e.g. dropping the token) would be caught.
 """
+
 from tuneshift.platforms.ytmusic import YTMusicClient
 
 
@@ -18,3 +19,28 @@ def test_auth_headers_send_real_bearer_token(monkeypatch, tmp_path):
 
     assert headers["Authorization"] == "Bearer ya29.real-access-token"
     assert "******" not in headers["Authorization"]
+
+
+def test_session_load_failure_logs_not_prints(monkeypatch, tmp_path, caplog, capsys):
+    """A malformed token must be reported via structured logging, not print.
+
+    Guards the QUAL-M1 print->logging conversion: library-layer diagnostics go
+    through the module logger (machine-parseable) rather than stdout/stderr.
+    """
+    monkeypatch.setattr(
+        "tuneshift.platforms.ytmusic.validate_no_symlink", lambda _path: None
+    )
+    token = tmp_path / "ytmusic.json"
+    token.write_text("{ this is not valid json ")
+    client = YTMusicClient(token_path=token)
+
+    with caplog.at_level("WARNING", logger="tuneshift.platforms.ytmusic"):
+        assert client.load_session() is False
+
+    assert any(
+        "ytmusic session load failed" in record.getMessage()
+        for record in caplog.records
+    )
+    captured = capsys.readouterr()
+    assert "session load failed" not in captured.out
+    assert "session load failed" not in captured.err

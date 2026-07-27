@@ -1,5 +1,6 @@
 """Greedy nearest-neighbor plus 2-opt sequence optimizer."""
 
+import logging
 import math
 import random
 from collections.abc import Callable
@@ -14,6 +15,8 @@ from tuneshift.sequencer.scoring import score_pair
 
 if TYPE_CHECKING:
     from tuneshift.sequencer.intent import PlaylistIntent
+
+logger = logging.getLogger(__name__)
 
 
 # Swap-neighborhood windowing (SEQ-A4). At or below the threshold the local
@@ -1221,12 +1224,11 @@ def sequence_playlist(
 
     deferred = len(tail)
     if deferred:
-        import sys
-
-        print(
-            f"  Note: {deferred} track(s) (no sequencer metadata or unavailable on "
-            f"{availability_platform}) appended at end",
-            file=sys.stderr,
+        logger.info(
+            "deferred tracks appended count=%d reason=no_metadata_or_unavailable "
+            "platform=%s",
+            deferred,
+            availability_platform,
         )
 
     return result

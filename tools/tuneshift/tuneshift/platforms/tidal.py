@@ -1,6 +1,7 @@
 """Tidal platform client."""
 
 import json
+import logging
 import random
 import time
 from collections.abc import Callable
@@ -14,6 +15,8 @@ from tuneshift.models import AlbumResult, ArtistResult, PlaylistInfo, TrackResul
 from tuneshift.platforms.auth import secure_write, validate_no_symlink
 from tuneshift.platforms.rate_limiter import RateLimiter
 from tuneshift.platforms.timeout import PlatformTimeout, call_with_timeout
+
+logger = logging.getLogger(__name__)
 
 _TOKEN_DIR = Path.home() / ".local" / "share" / "tuneshift"
 _TOKEN_FILE = _TOKEN_DIR / "tidal.json"
@@ -268,10 +271,8 @@ class TidalClient:
         """Return all tracks for a playlist in order.
 
         Skips unavailable/removed tracks (ObjectNotFound) and tracks with
-        no usable metadata (None name). Prints warnings to stderr.
+        no usable metadata (None name). Logs skipped tracks as warnings.
         """
-        import sys
-
         self._ensure_session()
 
         def _get_tracks() -> list[TrackResult]:
@@ -287,15 +288,17 @@ class TidalClient:
                     results.append(self._track_to_result(track))
                 except Exception as exc:  # noqa: BLE001
                     track_id = getattr(track, "id", "unknown")
-                    print(
-                        f"  Skipping unavailable track {track_id}: {exc}",
-                        file=sys.stderr,
+                    logger.warning(
+                        "skipping unavailable track track_id=%s error=%s",
+                        track_id,
+                        exc,
                     )
                     skipped += 1
             if skipped:
-                print(
-                    f"  Warning: {skipped} unavailable track(s) skipped",
-                    file=sys.stderr,
+                logger.warning(
+                    "unavailable tracks skipped playlist_id=%s count=%d",
+                    playlist_id,
+                    skipped,
                 )
             return results
 

@@ -1,5 +1,6 @@
 """YouTube Music platform client."""
 
+import logging
 import os
 import stat
 from pathlib import Path
@@ -11,6 +12,8 @@ from ytmusicapi import YTMusic
 from tuneshift.models import AlbumResult, ArtistResult, PlaylistInfo, TrackResult
 from tuneshift.platforms.auth import validate_no_symlink
 from tuneshift.platforms.rate_limiter import RateLimiter
+
+logger = logging.getLogger(__name__)
 
 _TOKEN_DIR = Path.home() / ".local" / "share" / "tuneshift"
 _TOKEN_FILE = _TOKEN_DIR / "ytmusic.json"
@@ -112,9 +115,10 @@ class YTMusicClient:
             # Unauthenticated YTMusic instance for search only
             self._yt = YTMusic()
         except (json.JSONDecodeError, KeyError, OSError) as exc:
-            print(
-                f"  ytmusic: session load failed ({type(exc).__name__}: {exc})",
-                file=__import__("sys").stderr,
+            logger.warning(
+                "ytmusic session load failed error_type=%s error=%s",
+                type(exc).__name__,
+                exc,
             )
             return False
         self._fix_token_perms()
