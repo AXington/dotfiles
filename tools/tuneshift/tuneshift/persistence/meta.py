@@ -121,7 +121,7 @@ class MetaMixin(PersistenceBase):
                 fill[column] = 0.0
                 continue
             filled = self.conn.execute(
-                f"SELECT COUNT(*) AS c FROM tracks "  # noqa: S608 - columns from code-controlled allowlist; values parameterized
+                f"SELECT COUNT(*) AS c FROM tracks "  # noqa: S608 - columns from code-controlled allowlist; values parameterized  # nosec B608
                 f"WHERE {column} IS NOT NULL AND {column} != ''"
             ).fetchone()["c"]
             fill[column] = filled / total

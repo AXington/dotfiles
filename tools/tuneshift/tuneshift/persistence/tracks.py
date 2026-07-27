@@ -173,7 +173,7 @@ class TracksMixin(PersistenceBase):
 
         with self.conn:
             self.conn.execute(
-                f"UPDATE tracks SET {', '.join(set_clauses)} WHERE id = ?",  # noqa: S608 - columns from code-controlled allowlist; values parameterized
+                f"UPDATE tracks SET {', '.join(set_clauses)} WHERE id = ?",  # noqa: S608 - columns from code-controlled allowlist; values parameterized  # nosec B608
                 (*params, track_id),
             )
             for field, value in changes.items():
@@ -253,7 +253,7 @@ class TracksMixin(PersistenceBase):
             else:
                 placeholders = ",".join("?" for _ in tiers_below)
                 rows = self.conn.execute(
-                    f"SELECT * FROM tracks WHERE confidence_tier IS NULL OR confidence_tier IN ({placeholders})",  # noqa: S608 - placeholders are bound '?' params; values parameterized
+                    f"SELECT * FROM tracks WHERE confidence_tier IS NULL OR confidence_tier IN ({placeholders})",  # noqa: S608 - placeholders are bound '?' params; values parameterized  # nosec B608
                     tiers_below,
                 ).fetchall()
 
@@ -466,7 +466,7 @@ class TracksMixin(PersistenceBase):
 
         with self.conn:
             self.conn.execute(
-                f"UPDATE tracks SET {', '.join(set_clauses)} WHERE id = ?",  # noqa: S608 - columns from code-controlled allowlist; values parameterized
+                f"UPDATE tracks SET {', '.join(set_clauses)} WHERE id = ?",  # noqa: S608 - columns from code-controlled allowlist; values parameterized  # nosec B608
                 (*params, track_id),
             )
 
@@ -556,7 +556,7 @@ class TracksMixin(PersistenceBase):
 
         with self.conn:
             self.conn.execute(
-                f"UPDATE tracks SET {', '.join(set_clauses)} WHERE id = ?",  # noqa: S608 - columns from code-controlled allowlist; values parameterized
+                f"UPDATE tracks SET {', '.join(set_clauses)} WHERE id = ?",  # noqa: S608 - columns from code-controlled allowlist; values parameterized  # nosec B608
                 (*params, track_id),
             )
         return written
@@ -655,7 +655,7 @@ class TracksMixin(PersistenceBase):
         if updates:
             params.append(track_id)
             self.conn.execute(
-                f"UPDATE tracks SET {', '.join(updates)} WHERE id = ?",  # noqa: S608 - columns from code-controlled allowlist; values parameterized
+                f"UPDATE tracks SET {', '.join(updates)} WHERE id = ?",  # noqa: S608 - columns from code-controlled allowlist; values parameterized  # nosec B608
                 params,
             )
             self.conn.commit()
@@ -717,7 +717,7 @@ class TracksMixin(PersistenceBase):
             return []
         placeholders = ", ".join("?" * len(tags))
         rows = self.conn.execute(
-            f"SELECT t.* FROM tracks t "  # noqa: S608 - placeholders are bound '?' params; values parameterized
+            f"SELECT t.* FROM tracks t "  # noqa: S608 - placeholders are bound '?' params; values parameterized  # nosec B608
             f"WHERE (SELECT COUNT(*) FROM track_tags tt WHERE tt.track_id = t.id AND tt.tag IN ({placeholders})) = ?",
             [*tags, len(tags)],
         ).fetchall()

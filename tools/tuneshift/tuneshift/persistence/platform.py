@@ -262,7 +262,7 @@ class PlatformMixin(PersistenceBase):
             return {}
         placeholders = ",".join("?" for _ in track_ids)
         rows = self.conn.execute(
-            f"SELECT * FROM platform_tracks WHERE track_id IN ({placeholders}) AND platform = ?",  # noqa: S608 - placeholders are bound '?' params; values parameterized
+            f"SELECT * FROM platform_tracks WHERE track_id IN ({placeholders}) AND platform = ?",  # noqa: S608 - placeholders are bound '?' params; values parameterized  # nosec B608
             (*track_ids, platform),
         ).fetchall()
         result: dict[int, PlatformMapping] = {}
@@ -422,7 +422,7 @@ class PlatformMixin(PersistenceBase):
         where = " AND ".join(f"{col} = ?" for col in spec.pk)
         col_list = ", ".join(columns)
         return self.conn.execute(
-            f"SELECT {col_list} FROM {spec.name} WHERE {where}",  # noqa: S608 - identifiers from spec allowlist; values parameterized
+            f"SELECT {col_list} FROM {spec.name} WHERE {where}",  # noqa: S608 - identifiers from spec allowlist; values parameterized  # nosec B608
             tuple(pk_values[col] for col in spec.pk),
         ).fetchone()
 
@@ -440,11 +440,11 @@ class PlatformMixin(PersistenceBase):
         updates = ", ".join(f"{c} = excluded.{c}" for c in cols if c not in spec.pk)
         pk_list = ", ".join(spec.pk)
         conflict = (
-            f" ON CONFLICT({pk_list}) DO UPDATE SET {updates}"
+            f" ON CONFLICT({pk_list}) DO UPDATE SET {updates}"  # nosec B608
             if updates
             else f" ON CONFLICT({pk_list}) DO NOTHING"
         )
-        sql = f"INSERT INTO {spec.name} ({col_list}) VALUES ({placeholders}){conflict}"  # noqa: S608 - identifiers from spec allowlist; values parameterized
+        sql = f"INSERT INTO {spec.name} ({col_list}) VALUES ({placeholders}){conflict}"  # noqa: S608 - identifiers from spec allowlist; values parameterized  # nosec B608
         self.conn.execute(sql, tuple(proposed[c] for c in cols))
         if commit:
             self.conn.commit()
@@ -460,7 +460,7 @@ class PlatformMixin(PersistenceBase):
         where = " AND ".join(f"{col} = ?" for col in spec.pk)
         params = [proposed[c] for c in set_cols] + [proposed[col] for col in spec.pk]
         self.conn.execute(
-            f"UPDATE {spec.name} SET {assignments} WHERE {where}",  # noqa: S608 - identifiers from spec allowlist; values parameterized
+            f"UPDATE {spec.name} SET {assignments} WHERE {where}",  # noqa: S608 - identifiers from spec allowlist; values parameterized  # nosec B608
             tuple(params),
         )
         if commit:
@@ -472,7 +472,7 @@ class PlatformMixin(PersistenceBase):
         """Delete a spec row identified by its primary-key tuple."""
         where = " AND ".join(f"{col} = ?" for col in spec.pk)
         self.conn.execute(
-            f"DELETE FROM {spec.name} WHERE {where}",  # noqa: S608 - identifiers from spec allowlist; values parameterized
+            f"DELETE FROM {spec.name} WHERE {where}",  # noqa: S608 - identifiers from spec allowlist; values parameterized  # nosec B608
             tuple(pk_values[col] for col in spec.pk),
         )
         if commit:
@@ -519,7 +519,7 @@ class PlatformMixin(PersistenceBase):
             sets = ", ".join(f"{k} = ?" for k in fields)
             vals = [*fields.values(), track_id, platform]
             self.conn.execute(
-                f"UPDATE track_platform_metadata SET {sets}, fetched_at = datetime('now') "  # noqa: S608 - columns from code-controlled allowlist; values parameterized
+                f"UPDATE track_platform_metadata SET {sets}, fetched_at = datetime('now') "  # noqa: S608 - columns from code-controlled allowlist; values parameterized  # nosec B608
                 f"WHERE track_id = ? AND platform = ?",
                 vals,
             )
@@ -528,7 +528,7 @@ class PlatformMixin(PersistenceBase):
             placeholders = ", ".join("?" * len(cols))
             vals = [track_id, platform, platform_track_id, *fields.values()]
             self.conn.execute(
-                f"INSERT INTO track_platform_metadata ({', '.join(cols)}) VALUES ({placeholders})",  # noqa: S608 - columns from code-controlled allowlist; values parameterized
+                f"INSERT INTO track_platform_metadata ({', '.join(cols)}) VALUES ({placeholders})",  # noqa: S608 - columns from code-controlled allowlist; values parameterized  # nosec B608
                 vals,
             )
         self.conn.commit()

@@ -127,9 +127,7 @@ class ResolutionMixin(PersistenceBase):
             if anchor_id is not None:
                 placeholders = ",".join("?" for _ in new_evidence_ids)
                 self.conn.execute(
-                    f"""UPDATE evidence
-                       SET is_current = 0, superseded_by = ?
-                       WHERE track_id = ? AND is_current = 1 AND id NOT IN ({placeholders})""",  # noqa: S608 - placeholders are bound '?' params; values parameterized
+                    f"UPDATE evidence SET is_current = 0, superseded_by = ? WHERE track_id = ? AND is_current = 1 AND id NOT IN ({placeholders})",  # noqa: S608 - placeholders are bound '?' params; values parameterized  # nosec B608
                     (anchor_id, track_id, *new_evidence_ids),
                 )
 
@@ -273,7 +271,7 @@ class ResolutionMixin(PersistenceBase):
             set_clauses.append("transient_attempts = transient_attempts + 1")
         with self.conn:
             self.conn.execute(
-                f"UPDATE resolution_queue SET {', '.join(set_clauses)} WHERE track_id = ?",  # noqa: S608 - columns from code-controlled allowlist; values parameterized
+                f"UPDATE resolution_queue SET {', '.join(set_clauses)} WHERE track_id = ?",  # noqa: S608 - columns from code-controlled allowlist; values parameterized  # nosec B608
                 (*params, track_id),
             )
 
@@ -369,7 +367,7 @@ class ResolutionMixin(PersistenceBase):
         """
         counter = "transient_attempts" if transient else "attempts"
         row = self.conn.execute(
-            f"SELECT {counter} AS n FROM resolution_queue WHERE track_id = ?",  # noqa: S608 - counter is a code-controlled literal; value parameterized
+            f"SELECT {counter} AS n FROM resolution_queue WHERE track_id = ?",  # noqa: S608 - counter is a code-controlled literal; value parameterized  # nosec B608
             (track_id,),
         ).fetchone()
         return int(row["n"]) if row else 0

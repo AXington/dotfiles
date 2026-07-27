@@ -43,7 +43,7 @@ class ArtistsMixin(PersistenceBase):
         placeholders = ",".join("?" * len(norms))
         with self.conn:
             rows = self.conn.execute(
-                f"SELECT DISTINCT class_id FROM artist_aliases "  # noqa: S608 - placeholders are bound '?' params; values parameterized
+                f"SELECT DISTINCT class_id FROM artist_aliases "  # noqa: S608 - placeholders are bound '?' params; values parameterized  # nosec B608
                 f"WHERE norm_member IN ({placeholders})",
                 tuple(norms),
             ).fetchall()
@@ -191,7 +191,7 @@ class ArtistsMixin(PersistenceBase):
             return
         sets.append("updated_at = datetime('now')")
         values.append(artist_id)
-        self.conn.execute(f"UPDATE artists SET {', '.join(sets)} WHERE id = ?", values)  # noqa: S608 - columns from code-controlled allowlist; values parameterized
+        self.conn.execute(f"UPDATE artists SET {', '.join(sets)} WHERE id = ?", values)  # noqa: S608 - columns from code-controlled allowlist; values parameterized  # nosec B608
         self.conn.commit()
 
     def get_album(self, album_id: int) -> Album | None:

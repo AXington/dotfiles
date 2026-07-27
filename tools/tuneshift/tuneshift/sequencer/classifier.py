@@ -245,7 +245,7 @@ class OllamaBackend:
         import urllib.request
 
         try:
-            with urllib.request.urlopen(f"{self._host}/api/tags", timeout=5) as resp:  # noqa: S310  (host validated by _validate_ollama_host, SSRF guard)
+            with urllib.request.urlopen(f"{self._host}/api/tags", timeout=5) as resp:  # noqa: S310  (host validated by _validate_ollama_host, SSRF guard)  # nosec B310
                 data = json.loads(resp.read())
                 available = [m["name"] for m in data.get("models", [])]
                 if model not in available:
@@ -275,7 +275,7 @@ class OllamaBackend:
             data=payload,
             headers={"Content-Type": "application/json"},
         )
-        with urllib.request.urlopen(req, timeout=300) as resp:  # noqa: S310  (host validated by _validate_ollama_host, SSRF guard)
+        with urllib.request.urlopen(req, timeout=300) as resp:  # noqa: S310  (host validated by _validate_ollama_host, SSRF guard)  # nosec B310
             result = json.loads(resp.read())
         return result.get("response", "")
 
@@ -284,7 +284,7 @@ class OllamaBackend:
         import urllib.request
 
         try:
-            with urllib.request.urlopen(f"{self._host}/api/tags", timeout=5) as resp:  # noqa: S310  (host validated by _validate_ollama_host, SSRF guard)
+            with urllib.request.urlopen(f"{self._host}/api/tags", timeout=5) as resp:  # noqa: S310  (host validated by _validate_ollama_host, SSRF guard)  # nosec B310
                 json.loads(resp.read())
             return True
         except (OSError, json.JSONDecodeError):
@@ -356,7 +356,7 @@ def detect_backend() -> tuple[str, LLMBackend] | tuple[None, None]:
         import urllib.request
 
         _validate_ollama_host(ollama_host)
-        with urllib.request.urlopen(f"{ollama_host}/api/tags", timeout=2) as resp:  # noqa: S310  (host validated by _validate_ollama_host, SSRF guard)
+        with urllib.request.urlopen(f"{ollama_host}/api/tags", timeout=2) as resp:  # noqa: S310  (host validated by _validate_ollama_host, SSRF guard)  # nosec B310
             data = json.loads(resp.read())
             available_models = [m["name"] for m in data.get("models", [])]
 

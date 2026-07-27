@@ -48,7 +48,7 @@ def _load_access_token() -> str | None:
 def _raw_get(req: urllib.request.Request, *, decode_json: bool = True):
     """Perform a single HTTP GET, feeding rate limit headers to the limiter."""
     # req is always built from an _ensure_https_url-validated URL below.
-    with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310
+    with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310  # nosec B310
         headers = dict(resp.headers)
         _genius_limiter.update_from_headers(headers)
         body = resp.read()

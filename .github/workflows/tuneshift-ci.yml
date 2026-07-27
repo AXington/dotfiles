@@ -52,3 +52,6 @@ jobs:
 
       - name: Type check (mypy)
         run: mypy tuneshift
+
+      - name: Security scan (bandit)
+        run: bandit -r tuneshift -ll

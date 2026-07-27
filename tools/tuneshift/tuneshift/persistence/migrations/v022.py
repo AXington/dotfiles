@@ -63,7 +63,7 @@ def apply(conn: _Conn) -> None:
         # belt-and-suspenders, but keeps the merge correct generally).
         for col in merge_cols:
             conn.execute(
-                f"UPDATE artists SET {col} = ("  # noqa: S608 - columns from code-controlled allowlist; values parameterized
+                f"UPDATE artists SET {col} = ("  # noqa: S608 - columns from code-controlled allowlist; values parameterized  # nosec B608
                 f"    SELECT d.{col} FROM artists d "
                 f"    WHERE d.norm_name = ? AND d.id != ? "
                 f"      AND d.{col} IS NOT NULL ORDER BY d.id LIMIT 1"
@@ -72,17 +72,17 @@ def apply(conn: _Conn) -> None:
             )
         placeholders = ",".join("?" * len(dupes))
         conn.execute(
-            f"UPDATE tracks SET artist_id = ? "  # noqa: S608 - placeholders are bound '?' params; values parameterized
+            f"UPDATE tracks SET artist_id = ? "  # noqa: S608 - placeholders are bound '?' params; values parameterized  # nosec B608
             f"WHERE artist_id IN ({placeholders})",
             (keeper, *dupes),
         )
         conn.execute(
-            f"UPDATE albums SET artist_id = ? "  # noqa: S608 - placeholders are bound '?' params; values parameterized
+            f"UPDATE albums SET artist_id = ? "  # noqa: S608 - placeholders are bound '?' params; values parameterized  # nosec B608
             f"WHERE artist_id IN ({placeholders})",
             (keeper, *dupes),
         )
         conn.execute(
-            f"DELETE FROM artists WHERE id IN ({placeholders})",  # noqa: S608 - placeholders are bound '?' params; values parameterized
+            f"DELETE FROM artists WHERE id IN ({placeholders})",  # noqa: S608 - placeholders are bound '?' params; values parameterized  # nosec B608
             tuple(dupes),
         )
     conn.execute("DROP INDEX IF EXISTS idx_artists_norm")

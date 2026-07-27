@@ -63,7 +63,7 @@ def _raw_request(url: str) -> dict:
     req = urllib.request.Request(  # noqa: S310
         _ensure_https_url(url), headers={"User-Agent": "tuneshift/1.0"}
     )
-    with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310
+    with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310  # nosec B310
         data = json.loads(resp.read())
 
     # Last.fm signals errors in the body even with HTTP 200
