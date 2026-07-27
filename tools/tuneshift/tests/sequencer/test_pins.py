@@ -15,7 +15,9 @@ from tuneshift.sequencer.optimizer import optimize_sequence
 WEIGHTS = {"energy": 0.5, "themes": 0.5}
 
 
-def _track(track_id: int, energy: float = 0.5, artist: str | None = None) -> TrackMetadata:
+def _track(
+    track_id: int, energy: float = 0.5, artist: str | None = None
+) -> TrackMetadata:
     return TrackMetadata(
         track_id=track_id,
         title=f"Track {track_id}",
@@ -103,6 +105,58 @@ class TestPinConflictRejection:
         pins = [_pin(3, "moment"), _pin(3, "position", group_order=4)]
         result = optimize_sequence(tracks, WEIGHTS, pins=pins)
         assert sorted(t.track_id for t in result) == list(range(1, 9))
+
+    def test_moment_on_anchor_member_does_not_duplicate_track(self):
+        """C6 regression: a moment pin on a track that also belongs to an anchor
+        group must be dropped, not honored as a second placement. Honoring it
+        placed the track both inside its anchor block and at the moment index,
+        producing N+1 outputs (a duplicated track)."""
+        tracks = [_track(i) for i in range(1, 9)]
+        pins = [
+            _pin(3, "anchor", group_id="g", group_order=0),
+            _pin(4, "anchor", group_id="g", group_order=1),
+            _pin(3, "moment"),
+        ]
+        result = optimize_sequence(tracks, WEIGHTS, pins=pins, seed=1)
+        ids = [t.track_id for t in result]
+        assert len(ids) == 8, f"expected 8 tracks, got {len(ids)}: {ids}"
+        assert sorted(ids) == list(range(1, 9)), f"duplicate/drop: {ids}"
+
+    def test_moment_on_second_anchor_member_does_not_duplicate(self):
+        """C6 regression: the moment landing on the non-lead anchor member is
+        also dropped rather than duplicating that member."""
+        tracks = [_track(i) for i in range(1, 9)]
+        pins = [
+            _pin(3, "anchor", group_id="g", group_order=0),
+            _pin(4, "anchor", group_id="g", group_order=1),
+            _pin(4, "moment"),
+        ]
+        result = optimize_sequence(tracks, WEIGHTS, pins=pins, seed=1)
+        ids = [t.track_id for t in result]
+        assert sorted(ids) == list(range(1, 9)), f"duplicate/drop: {ids}"
+
+    def test_moment_on_non_pinned_track_is_still_honored(self):
+        """The drop only applies to hard-placed tracks: a moment on a free
+        track must still be honored so anchor+moment does not over-suppress."""
+        tracks = [_track(i) for i in range(1, 9)]
+        pins = [
+            _pin(3, "anchor", group_id="g", group_order=0),
+            _pin(4, "anchor", group_id="g", group_order=1),
+            _pin(7, "moment"),
+        ]
+        result = optimize_sequence(tracks, WEIGHTS, pins=pins, seed=1)
+        ids = [t.track_id for t in result]
+        assert sorted(ids) == list(range(1, 9)), f"duplicate/drop: {ids}"
+
+    def test_moment_on_opener_or_closer_does_not_duplicate(self):
+        """C6 regression: opener/closer are hard placements too, so a coincident
+        moment must be dropped rather than re-placing the endpoint."""
+        tracks = [_track(i) for i in range(1, 9)]
+        for endpoint in ("opener", "closer"):
+            pins = [_pin(2, endpoint), _pin(2, "moment")]
+            result = optimize_sequence(tracks, WEIGHTS, pins=pins, seed=1)
+            ids = [t.track_id for t in result]
+            assert sorted(ids) == list(range(1, 9)), f"{endpoint}: {ids}"
 
 
 class TestAnchorBlockAtomicity:

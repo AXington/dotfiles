@@ -740,6 +740,7 @@ def _apply_moment_and_index_pins(
     track_count,
     pinned_opener_id,
     pinned_closer_id,
+    adjacency_groups=None,
 ):
     """Merge soft moment targets into position_pins (explicit pins win) and
     promote index-0 / last-index pins to opener / closer overrides. Mutates
@@ -749,10 +750,18 @@ def _apply_moment_and_index_pins(
         moment_track_ids = intent.climax_candidates
 
     moment_positions = _place_moments(tracks, moment_track_ids, track_count)
-    # Explicit position pins win over soft moment targets (SEQ-C6): never let a
+    # Explicit placement pins win over soft moment targets (SEQ-C6): never let a
     # moment overwrite an explicit index, and never place a moment for a track
-    # that is already explicitly positioned elsewhere (which would duplicate it).
+    # that is already hard-placed elsewhere (which would duplicate it). A track
+    # can be hard-placed by a position pin, an opener/closer pin, or membership
+    # in an anchor group; a moment on any of those must be dropped, not honored.
     explicitly_pinned_tracks = set(position_pins.values())
+    if pinned_opener_id is not None:
+        explicitly_pinned_tracks.add(pinned_opener_id)
+    if pinned_closer_id is not None:
+        explicitly_pinned_tracks.add(pinned_closer_id)
+    for group_track_ids in (adjacency_groups or {}).values():
+        explicitly_pinned_tracks.update(group_track_ids)
     for moment_idx, moment_tid in moment_positions.items():
         if moment_idx in position_pins:
             continue
@@ -866,6 +875,7 @@ def optimize_sequence(
         track_count,
         pinned_opener_id,
         pinned_closer_id,
+        adjacency_groups,
     )
 
     # Auto opener/closer must not steal a track that belongs to an anchor group;
