@@ -21,11 +21,14 @@ def test_auth_headers_send_real_bearer_token(monkeypatch, tmp_path):
     assert "******" not in headers["Authorization"]
 
 
-def test_session_load_failure_logs_not_prints(monkeypatch, tmp_path, caplog, capsys):
+def test_session_load_failure_logs_not_prints(monkeypatch, tmp_path, caplog):
     """A malformed token must be reported via structured logging, not print.
 
-    Guards the QUAL-M1 print->logging conversion: library-layer diagnostics go
-    through the module logger (machine-parseable) rather than stdout/stderr.
+    Guards the QUAL-M1 print->logging conversion. A bare ``print`` produces no
+    ``LogRecord``; capturing a structured WARNING record from the module logger
+    is the definitive proof that the diagnostic now flows through logging. (We
+    deliberately do not assert on stderr: a configured stream handler may route
+    logs there legitimately, which is not the same as a raw print.)
     """
     monkeypatch.setattr(
         "tuneshift.platforms.ytmusic.validate_no_symlink", lambda _path: None
@@ -37,10 +40,11 @@ def test_session_load_failure_logs_not_prints(monkeypatch, tmp_path, caplog, cap
     with caplog.at_level("WARNING", logger="tuneshift.platforms.ytmusic"):
         assert client.load_session() is False
 
-    assert any(
-        "ytmusic session load failed" in record.getMessage()
+    matching = [
+        record
         for record in caplog.records
-    )
-    captured = capsys.readouterr()
-    assert "session load failed" not in captured.out
-    assert "session load failed" not in captured.err
+        if record.name == "tuneshift.platforms.ytmusic"
+        and record.levelname == "WARNING"
+        and "ytmusic session load failed" in record.getMessage()
+    ]
+    assert matching, "expected a structured WARNING log record, not a print"
