@@ -362,9 +362,7 @@ def _print_findings_section(title: str, items: list) -> None:
     print()
 
 
-def _apply_review_fixes(
-    db: Database, playlist: Any, tracks: list, hard: list
-) -> None:
+def _apply_review_fixes(db: Database, playlist: Any, tracks: list, hard: list) -> None:
     """Remove tracks that violate hard concept rules."""
     import re as _re
 

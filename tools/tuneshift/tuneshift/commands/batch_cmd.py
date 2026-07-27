@@ -916,9 +916,7 @@ def undo_batch(db: Database, history_id: int | None = None) -> bool:
             max_pos = db.get_max_playlist_position(playlist_id)
             for shift_pos in range(max_pos, insert_pos - 1, -1):
                 db.shift_playlist_position(playlist_id, shift_pos, shift_pos + 1)
-            db.insert_playlist_track_if_absent(
-                playlist_id, op["track_id"], insert_pos
-            )
+            db.insert_playlist_track_if_absent(playlist_id, op["track_id"], insert_pos)
         elif op["action"] == "add" and op.get("track_id"):
             # Remove the track that was added
             db.remove_playlist_track(playlist_id, op["track_id"])
@@ -1150,17 +1148,13 @@ def _batch_ops_from_cli_flags(
     return ops
 
 
-def _collect_batch_ops(
-    args: Any, db: Database, playlist: Any
-) -> list[PlanOperation]:
+def _collect_batch_ops(args: Any, db: Database, playlist: Any) -> list[PlanOperation]:
     """Build the ordered operation list from every plan-generation input.
 
     Raises _BatchInputError(code) for input errors that must exit early.
     """
     if getattr(args, "interactive", False) and getattr(args, "from_stdin", False):
-        print(
-            "--interactive and --from-stdin are mutually exclusive.", file=sys.stderr
-        )
+        print("--interactive and --from-stdin are mutually exclusive.", file=sys.stderr)
         raise _BatchInputError(1)
 
     ops: list[PlanOperation] = []
