@@ -190,3 +190,141 @@ def test_folders_create_not_logged_in_returns_1(tmp_db: Path, capsys, monkeypatc
     db = Database(tmp_db)
     monkeypatch.setattr(folders_cmd, "_get_tidal_client", lambda: None)
     assert handle_folders(SimpleNamespace(action="create", name="Rock"), db) == 1
+
+
+# --- BUG-10: folder ids are TRNs in the DB, bare UUIDs at the tidalapi edge ---
+
+
+def test_bare_folder_id_strips_trn_prefix() -> None:
+    assert folders_cmd._bare_folder_id("trn:folder:abc-123") == "abc-123"
+
+
+def test_bare_folder_id_passes_through_bare_uuid() -> None:
+    """Tolerant of ids already stored bare, so a future storage change is safe."""
+    assert folders_cmd._bare_folder_id("abc-123") == "abc-123"
+
+
+class _RecordingFolder:
+    def __init__(self, log: dict) -> None:
+        self._log = log
+
+    def rename(self, new_name: str) -> None:
+        self._log["renamed_to"] = new_name
+
+    def remove(self) -> None:
+        self._log["removed"] = True
+
+    def add_items(self, trns: list[str]) -> None:
+        self._log.setdefault("added", []).extend(trns)
+
+
+class _RecordingSession:
+    """Stands in for tidalapi.Session, capturing the folder_id it is handed."""
+
+    country_code = "US"
+
+    def __init__(self, log: dict) -> None:
+        self._log = log
+
+    def folder(self, folder_id):
+        self._log["folder_id"] = folder_id
+        return _RecordingFolder(self._log)
+
+
+def _mock_client(monkeypatch, log: dict) -> None:
+    monkeypatch.setattr(
+        folders_cmd,
+        "_get_tidal_client",
+        lambda: SimpleNamespace(_session=_RecordingSession(log)),
+    )
+
+
+def test_rename_resolves_folder_by_bare_uuid(tmp_db: Path, monkeypatch) -> None:
+    """tidalapi matches on the bare ``data.id``; a TRN would raise ObjectNotFound."""
+    db = Database(tmp_db)
+    db.cache_tidal_folder("trn:folder:abc-123", "Rock")
+    log: dict = {}
+    _mock_client(monkeypatch, log)
+
+    assert folders_cmd._folders_rename(db, "Rock", "Metal") == 0
+    assert log["folder_id"] == "abc-123"
+    assert log["renamed_to"] == "Metal"
+
+
+def test_delete_resolves_folder_by_bare_uuid(tmp_db: Path, monkeypatch) -> None:
+    db = Database(tmp_db)
+    db.cache_tidal_folder("trn:folder:abc-123", "Rock")
+    log: dict = {}
+    _mock_client(monkeypatch, log)
+    monkeypatch.setattr("builtins.input", lambda _prompt="": "y")
+
+    assert folders_cmd._folders_delete(db, "Rock") == 0
+    assert log["folder_id"] == "abc-123"
+    assert log["removed"] is True
+
+
+# --- BUG-10 corollary: storage form is an invariant, so guard it --------------
+#
+# Read-side normalisation means tidal_folders.tidal_id and
+# playlists.tidal_folder_id must *stay* in TRN form. Every folder lookup
+# (get_playlists_by_tidal_folder, clear_tidal_folder_assignments,
+# remove_tidal_folder_cache) is an exact-match query, so if a write path ever
+# drifts to bare UUIDs the queries silently match zero rows -- e.g. `folders
+# delete` would report "0 playlists moved to root" while orphaning every
+# assignment. These tests fail loudly if that invariant breaks.
+
+
+def test_import_stores_folder_ids_in_trn_form(tmp_db: Path, monkeypatch) -> None:
+    db = Database(tmp_db)
+    pid = _playlist(db, "Loose")
+
+    folders_page = {
+        "items": [{"trn": "trn:folder:abc-123", "name": "Rock"}]
+    }
+    contents_page = {"items": [{"name": "Loose"}]}
+
+    class _Resp:
+        status_code = 200
+
+        def __init__(self, payload): self._payload = payload
+
+        def json(self): return self._payload
+
+    calls = {"n": 0}
+
+    def _fake_get(_url, **_kwargs):
+        calls["n"] += 1
+        return _Resp(folders_page if calls["n"] == 1 else contents_page)
+
+    monkeypatch.setattr(
+        folders_cmd,
+        "_get_tidal_client",
+        lambda: SimpleNamespace(
+            _session=SimpleNamespace(country_code="US", access_token="t0ken")
+        ),
+    )
+    monkeypatch.setattr("requests.get", _fake_get)
+    monkeypatch.setattr("builtins.input", lambda _prompt="": "n")
+
+    assert folders_cmd._folders_import(db) == 0
+
+    stored = [f["tidal_id"] for f in db.get_cached_tidal_folders()]
+    assert stored == ["trn:folder:abc-123"], "folder cache must stay TRN-form"
+
+    assigned = db.get_playlists_by_tidal_folder("trn:folder:abc-123")
+    assert [p.id for p in assigned] == [pid], "assignment must stay TRN-form"
+
+
+def test_stored_form_keeps_exact_match_lookups_working(tmp_db: Path) -> None:
+    """The exact-match queries only work while both sides share one form."""
+    db = Database(tmp_db)
+    pid = _playlist(db, "Loose")
+    db.cache_tidal_folder("trn:folder:abc-123", "Rock")
+    db.set_playlist_tidal_folder(pid, "trn:folder:abc-123")
+
+    folder = db.get_tidal_folder_by_name("Rock")
+    assert [p.id for p in db.get_playlists_by_tidal_folder(folder["tidal_id"])] == [pid]
+    assert db.clear_tidal_folder_assignments(folder["tidal_id"]) == 1
+
+    db.remove_tidal_folder_cache(folder["tidal_id"])
+    assert db.get_tidal_folder_by_name("Rock") is None

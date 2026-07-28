@@ -10,6 +10,21 @@ from tuneshift.db import Database
 # indefinitely (B113/S113). Matches the timeout used by other platform clients.
 _REQUEST_TIMEOUT = 30
 
+# Tidal's v2 API reports folders as TRNs ("trn:folder:<uuid>") and that is the
+# form cached in tidal_folders.tidal_id. tidalapi's Folder lookup, however,
+# matches against the bare ``data.id`` UUID, so a TRN never matches and raises
+# ObjectNotFound. Normalise at the tidalapi boundary rather than at write time:
+# rewriting stored ids would insert bare-uuid rows beside the existing
+# TRN-keyed ones (tidal_id is UNIQUE), duplicating every cached folder.
+_TRN_FOLDER_PREFIX = "trn:folder:"
+
+
+def _bare_folder_id(folder_id: str) -> str:
+    """Return the bare folder UUID, accepting either a TRN or an already-bare id."""
+    if folder_id.startswith(_TRN_FOLDER_PREFIX):
+        return folder_id[len(_TRN_FOLDER_PREFIX) :]
+    return folder_id
+
 
 def handle_tag(args, db: Database) -> int:
     """Tag a playlist with a collection."""
@@ -161,7 +176,7 @@ def _folders_list(db: Database) -> int:
             sub_resp = requests.get(
                 "https://api.tidal.com/v2/my-collection/playlists/folders",
                 headers=headers,
-                params={**params, "folderId": trn.replace("trn:folder:", "")},
+                params={**params, "folderId": _bare_folder_id(trn)},
                 timeout=_REQUEST_TIMEOUT,
             )
             sub_items = (
@@ -232,7 +247,7 @@ def _folders_import(db: Database) -> int:
         sub_resp = requests.get(
             "https://api.tidal.com/v2/my-collection/playlists/folders",
             headers=headers,
-            params={**params, "folderId": trn.replace("trn:folder:", "")},
+            params={**params, "folderId": _bare_folder_id(trn)},
             timeout=_REQUEST_TIMEOUT,
         )
         if sub_resp.status_code != 200:
@@ -322,7 +337,7 @@ def _folders_rename(db: Database, old_name: str, new_name: str) -> int:
         return 1
 
     try:
-        tidal_folder = client._session.folder(folder["tidal_id"])
+        tidal_folder = client._session.folder(_bare_folder_id(folder["tidal_id"]))
         tidal_folder.rename(new_name)
         db.cache_tidal_folder(
             folder["tidal_id"], new_name, folder.get("parent_tidal_id")
@@ -361,7 +376,7 @@ def _folders_delete(db: Database, name: str) -> int:
         return 1
 
     try:
-        tidal_folder = client._session.folder(folder["tidal_id"])
+        tidal_folder = client._session.folder(_bare_folder_id(folder["tidal_id"]))
         tidal_folder.remove()
         count = db.clear_tidal_folder_assignments(folder["tidal_id"])
         db.remove_tidal_folder_cache(folder["tidal_id"])
@@ -451,7 +466,7 @@ def _folders_sync(db: Database) -> int:
             continue
 
         try:
-            target_folder = session.folder(playlist.tidal_folder_id)
+            target_folder = session.folder(_bare_folder_id(playlist.tidal_folder_id))
             playlist_trn = f"trn:playlist:{platform_id}"
             target_folder.add_items([playlist_trn])
             moved += 1
@@ -520,7 +535,7 @@ def _folders_pull(db: Database) -> int:
         sub_resp = requests.get(
             "https://api.tidal.com/v2/my-collection/playlists/folders",
             headers=headers,
-            params={**params, "folderId": trn.replace("trn:folder:", "")},
+            params={**params, "folderId": _bare_folder_id(trn)},
             timeout=_REQUEST_TIMEOUT,
         )
         if sub_resp.status_code != 200:
