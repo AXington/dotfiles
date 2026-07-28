@@ -10,7 +10,7 @@ import ytmusicapi
 from ytmusicapi import YTMusic
 
 from tuneshift.models import AlbumResult, ArtistResult, PlaylistInfo, TrackResult
-from tuneshift.platforms.auth import validate_no_symlink
+from tuneshift.platforms.auth import secure_write, validate_no_symlink
 from tuneshift.platforms.rate_limiter import RateLimiter
 from tuneshift.platforms.timeout import network_timeout
 
@@ -159,8 +159,7 @@ class YTMusicClient:
             token_data["expires_at"] = int(time.time()) + new_data.get(
                 "expires_in", 3600
             )
-            self._token_path.write_text(json.dumps(token_data))
-            self._fix_token_perms()
+            secure_write(self._token_path, json.dumps(token_data))
 
     def _data_api(
         self,
