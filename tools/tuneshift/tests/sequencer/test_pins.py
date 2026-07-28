@@ -277,3 +277,88 @@ class TestNarrativePinIntegration:
             tracks, WEIGHTS, arc="narrative", narrative=NARRATIVE_5, pins=[], seed=1
         )
         assert [t.track_id for t in baseline] == [t.track_id for t in with_empty]
+
+
+class TestEndpointPinMembership:
+    """A pinned closer must never also be auto-selected as the opener.
+
+    Regression for the corruption found by fuzzing the membership invariant:
+    ``_select_endpoints`` excluded only position/anchor tracks from opener
+    selection, so a lone ``--closer`` pin could pick the same track as opener.
+    ``_greedy_build`` then emitted it twice and dropped another track. The
+    duplicate was masked downstream by a ``set()`` call, so the user saw a
+    plausible-looking playlist with one track duplicated and one missing.
+    """
+
+    @staticmethod
+    def _tracks(count: int) -> list[TrackMetadata]:
+        energies = [0.4, 0.97, 0.64, 0.2, 0.81, 0.55, 0.33, 0.9, 0.11, 0.72]
+        return [
+            _track(i, energy=energies[(i - 1) % len(energies)])
+            for i in range(1, count + 1)
+        ]
+
+    def test_lone_closer_pin_minimal_case(self):
+        """Three tracks, closer pinned to track 1: pre-fix this returned [1, 2, 1]."""
+        result = optimize_sequence(
+            self._tracks(3), WEIGHTS, arc="wave", pins=[_pin(1, "closer")], seed=1
+        )
+        ids = [t.track_id for t in result]
+        assert sorted(ids) == [1, 2, 3], ids
+        assert ids[-1] == 1, ids
+
+    @pytest.mark.parametrize("arc", ["wave", "rise", "fall", "flat", "peak"])
+    @pytest.mark.parametrize("size", [3, 4, 5, 8])
+    @pytest.mark.parametrize("target", [1, 2])
+    def test_lone_closer_pin_preserves_membership(self, arc, size, target):
+        tracks = self._tracks(size)
+        expected = sorted(t.track_id for t in tracks)
+        result = optimize_sequence(
+            tracks, WEIGHTS, arc=arc, pins=[_pin(target, "closer")], seed=7
+        )
+        ids = [t.track_id for t in result]
+        assert sorted(ids) == expected, (arc, size, target, ids)
+        assert len(ids) == len(set(ids)), f"duplicate track in {ids}"
+        assert ids[-1] == target, ids
+
+    @pytest.mark.parametrize("seed", range(12))
+    def test_lone_closer_pin_stable_across_seeds(self, seed):
+        tracks = self._tracks(6)
+        result = optimize_sequence(
+            tracks, WEIGHTS, arc="wave", pins=[_pin(3, "closer")], seed=seed
+        )
+        ids = [t.track_id for t in result]
+        assert sorted(ids) == [1, 2, 3, 4, 5, 6], (seed, ids)
+        assert ids[-1] == 3, (seed, ids)
+
+    def test_lone_opener_pin_preserves_membership(self):
+        """Control: the opener path was already correct and must stay correct."""
+        result = optimize_sequence(
+            self._tracks(6), WEIGHTS, arc="wave", pins=[_pin(4, "opener")], seed=3
+        )
+        ids = [t.track_id for t in result]
+        assert sorted(ids) == [1, 2, 3, 4, 5, 6], ids
+        assert ids[0] == 4, ids
+
+    def test_closer_pin_with_position_pin_exhausting_pool(self):
+        """Exclusions must never be relaxed far enough to re-admit the closer."""
+        tracks = self._tracks(3)
+        pins = [_pin(1, "closer"), _pin(2, "position", group_order=1)]
+        result = optimize_sequence(tracks, WEIGHTS, arc="wave", pins=pins, seed=1)
+        ids = [t.track_id for t in result]
+        assert sorted(ids) == [1, 2, 3], ids
+        assert ids[-1] == 1, ids
+        assert ids[1] == 2, ids
+
+    def test_moment_targets_are_deduplicated(self):
+        """Repeated moment ids must map to one position, not be inserted twice."""
+        from tuneshift.sequencer.optimizer import _place_moments
+
+        placements = _place_moments([], [3, 3, 3], total=10)
+        assert sorted(placements.values()) == [3], placements
+
+    def test_distinct_moment_targets_still_each_placed(self):
+        from tuneshift.sequencer.optimizer import _place_moments
+
+        placements = _place_moments([], [3, 4], total=10)
+        assert sorted(placements.values()) == [3, 4], placements

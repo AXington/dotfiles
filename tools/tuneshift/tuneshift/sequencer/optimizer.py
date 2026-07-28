@@ -266,6 +266,9 @@ def _place_moments(
     """
     if not moments:
         return {}
+    # Order-preserving de-duplication: two targets for the same track would
+    # otherwise map it to two positions and insert it twice (SEQ-C6).
+    moments = list(dict.fromkeys(moments))
     climax_start = int(total * 0.55)
     climax_end = int(total * 0.75)
     available_positions = list(range(climax_start, min(climax_end + 1, total - 1)))
@@ -426,6 +429,41 @@ def _order_small_playlist(
     return list(tracks)
 
 
+def _pick_opener(
+    tracks: list[TrackMetadata],
+    track_map: dict[int, TrackMetadata],
+    pinned_opener_id: int | None,
+    pinned_closer_id: int | None,
+    arc: str,
+    excluded: set[int],
+) -> TrackMetadata:
+    """Resolve the opener, never returning the pinned closer."""
+    if pinned_opener_id is not None and pinned_opener_id in track_map:
+        return track_map[pinned_opener_id]
+    # A pinned closer is hard-placed at the end. Auto-selecting it as the
+    # opener as well emits that track twice and drops another entirely, so
+    # it is never an opener candidate.
+    pool = [t for t in tracks if t.track_id != pinned_closer_id]
+    narrowed = [t for t in pool if t.track_id not in excluded]
+    # Exclusions may empty the pool; relaxing them is safe, but re-admitting
+    # the pinned closer is precisely the duplicating case.
+    return select_opener(narrowed or pool or tracks, arc)
+
+
+def _pick_closer(
+    remaining: list[TrackMetadata],
+    track_map: dict[int, TrackMetadata],
+    pinned_closer_id: int | None,
+    arc: str,
+    excluded: set[int],
+) -> TrackMetadata:
+    """Resolve the closer from the tracks left after the opener."""
+    if pinned_closer_id is not None and pinned_closer_id in track_map:
+        return track_map[pinned_closer_id]
+    candidates = [t for t in remaining if t.track_id not in excluded]
+    return select_closer(candidates or remaining, arc)
+
+
 def _select_endpoints(
     tracks: list[TrackMetadata],
     track_map: dict[int, TrackMetadata],
@@ -438,24 +476,28 @@ def _select_endpoints(
 
     exclude_from_auto: track IDs that should not be auto-selected as
     opener/closer (e.g., position-pinned tracks that belong elsewhere).
+
+    Guarantees ``opener``, ``closer``, and ``remaining`` are disjoint and
+    together cover ``tracks`` exactly once. Violating that duplicated one
+    track and dropped another (see the membership guard in
+    ``optimize_sequence``).
     """
     excluded = exclude_from_auto or set()
+    opener = _pick_opener(
+        tracks, track_map, pinned_opener_id, pinned_closer_id, arc, excluded
+    )
+    after_opener = [t for t in tracks if t.track_id != opener.track_id]
+    closer = _pick_closer(after_opener, track_map, pinned_closer_id, arc, excluded)
 
-    if pinned_opener_id and pinned_opener_id in track_map:
-        opener = track_map[pinned_opener_id]
-    else:
-        candidates = [t for t in tracks if t.track_id not in excluded]
-        opener = select_opener(candidates or tracks, arc)
+    if opener.track_id == closer.track_id:
+        # Contradictory opener/closer pins that slipped past validation. The
+        # closer keeps its slot; re-pick the opener so no track appears twice.
+        alternatives = [t for t in tracks if t.track_id != closer.track_id]
+        if alternatives:
+            opener = select_opener(alternatives, arc)
 
-    remaining = [t for t in tracks if t.track_id != opener.track_id]
-
-    if pinned_closer_id and pinned_closer_id in track_map:
-        closer = track_map[pinned_closer_id]
-    else:
-        candidates = [t for t in remaining if t.track_id not in excluded]
-        closer = select_closer(candidates or remaining, arc)
-
-    remaining = [t for t in remaining if t.track_id != closer.track_id]
+    endpoints = {opener.track_id, closer.track_id}
+    remaining = [t for t in tracks if t.track_id not in endpoints]
     return opener, closer, remaining
 
 
