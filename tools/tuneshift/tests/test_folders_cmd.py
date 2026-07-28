@@ -328,3 +328,48 @@ def test_stored_form_keeps_exact_match_lookups_working(tmp_db: Path) -> None:
 
     db.remove_tidal_folder_cache(folder["tidal_id"])
     assert db.get_tidal_folder_by_name("Rock") is None
+
+
+# --- tidalapi errors must surface as messages, not tracebacks -----------------
+#
+# ObjectNotFound (and every other tidalapi failure) subclasses TidalAPIError,
+# which derives from Exception -- not OSError/RuntimeError/ValueError. Catching
+# only those let a missing or rate-limited folder escape as an unhandled
+# traceback instead of the intended "Failed to ..." diagnostic.
+
+
+def _raising_client(monkeypatch, exc: Exception) -> None:
+    class _Session:
+        country_code = "US"
+        access_token = "t0ken"
+
+        def folder(self, _folder_id):
+            raise exc
+
+    monkeypatch.setattr(
+        folders_cmd, "_get_tidal_client", lambda: SimpleNamespace(_session=_Session())
+    )
+
+
+def test_rename_reports_object_not_found(tmp_db: Path, monkeypatch, capsys) -> None:
+    from tidalapi.exceptions import ObjectNotFound
+
+    db = Database(tmp_db)
+    db.cache_tidal_folder("trn:folder:abc-123", "Rock")
+    _raising_client(monkeypatch, ObjectNotFound("Folder not found"))
+
+    assert folders_cmd._folders_rename(db, "Rock", "Metal") == 1
+    assert "Failed to rename" in capsys.readouterr().err
+
+
+def test_delete_reports_rate_limit(tmp_db: Path, monkeypatch, capsys) -> None:
+    """TooManyRequests shares the TidalAPIError base, so it is covered too."""
+    from tidalapi.exceptions import TooManyRequests
+
+    db = Database(tmp_db)
+    db.cache_tidal_folder("trn:folder:abc-123", "Rock")
+    _raising_client(monkeypatch, TooManyRequests("slow down"))
+    monkeypatch.setattr("builtins.input", lambda _prompt="": "y")
+
+    assert folders_cmd._folders_delete(db, "Rock") == 1
+    assert "Failed to delete" in capsys.readouterr().err

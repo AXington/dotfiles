@@ -336,6 +336,8 @@ def _folders_rename(db: Database, old_name: str, new_name: str) -> int:
     if not client:
         return 1
 
+    from tidalapi.exceptions import TidalAPIError
+
     try:
         tidal_folder = client._session.folder(_bare_folder_id(folder["tidal_id"]))
         tidal_folder.rename(new_name)
@@ -344,7 +346,7 @@ def _folders_rename(db: Database, old_name: str, new_name: str) -> int:
         )
         print(f'Renamed "{old_name}" to "{new_name}" on Tidal')
         return 0
-    except (OSError, RuntimeError) as exc:
+    except (OSError, RuntimeError, TidalAPIError) as exc:
         print(f"Failed to rename: {exc}", file=sys.stderr)
         return 1
 
@@ -375,6 +377,8 @@ def _folders_delete(db: Database, name: str) -> int:
     if not client:
         return 1
 
+    from tidalapi.exceptions import TidalAPIError
+
     try:
         tidal_folder = client._session.folder(_bare_folder_id(folder["tidal_id"]))
         tidal_folder.remove()
@@ -382,7 +386,7 @@ def _folders_delete(db: Database, name: str) -> int:
         db.remove_tidal_folder_cache(folder["tidal_id"])
         print(f'Deleted "{name}" on Tidal. {count} playlists moved to root.')
         return 0
-    except (OSError, RuntimeError) as exc:
+    except (OSError, RuntimeError, TidalAPIError) as exc:
         print(f"Failed to delete: {exc}", file=sys.stderr)
         return 1
 
@@ -428,6 +432,7 @@ def _folders_sync(db: Database) -> int:
         return 1
 
     import requests
+    from tidalapi.exceptions import TidalAPIError
 
     session = client._session
     headers = {"Authorization": f"Bearer {session.access_token}"}
@@ -482,7 +487,7 @@ def _folders_sync(db: Database) -> int:
                 folder_info["name"] if folder_info else playlist.tidal_folder_id
             )
             print(f"  {playlist.name} -> {folder_name}")
-        except (OSError, RuntimeError, ValueError) as exc:
+        except (OSError, RuntimeError, ValueError, TidalAPIError) as exc:
             print(f"  {playlist.name}: failed ({exc})", file=sys.stderr)
             errors += 1
 
