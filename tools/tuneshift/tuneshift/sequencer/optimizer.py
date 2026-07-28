@@ -3,9 +3,11 @@
 import logging
 import math
 import random
+from collections import Counter
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
+from tuneshift import SequenceIntegrityError
 from tuneshift.db import Database
 from tuneshift.sequencer.metadata import TrackMetadata, get_track_metadata_map
 from tuneshift.sequencer.modifiers import SequenceContext, score_candidate
@@ -846,6 +848,27 @@ def _protected_positions(
     return pinned_positions
 
 
+def _verify_membership(before: list[int], after: list[int], context: str) -> None:
+    """Raise if ``after`` is not a permutation of ``before``.
+
+    Sequencing is a reordering. Any divergence means a track was dropped,
+    duplicated, or invented, which is silent data corruption once the result
+    is persisted, so it is raised rather than logged.
+    """
+    counts_before = Counter(before)
+    counts_after = Counter(after)
+    if counts_before == counts_after:
+        return
+    missing = sorted((counts_before - counts_after).elements())
+    added = sorted(tid for tid in counts_after if tid not in counts_before)
+    duplicated = sorted(
+        tid
+        for tid, count in counts_after.items()
+        if tid in counts_before and count > counts_before[tid]
+    )
+    raise SequenceIntegrityError(context, missing, duplicated, added)
+
+
 def optimize_sequence(
     tracks: list[TrackMetadata],
     weights: dict[str, float],
@@ -864,6 +887,48 @@ def optimize_sequence(
     ``seed`` makes the bold-jump exploration reproducible. When ``None`` a
     fixed default (0) is used so output is deterministic by default; callers
     that want per-playlist variation pass a stable playlist-derived seed.
+
+    Raises ``SequenceIntegrityError`` if the chosen sequencing path returns
+    anything other than a permutation of ``tracks``.
+    """
+    result = _optimize_sequence_unchecked(
+        tracks,
+        weights,
+        arc=arc,
+        artist_min_separation=artist_min_separation,
+        bold_jump_chance=bold_jump_chance,
+        narrative_mode=narrative_mode,
+        context_window=context_window,
+        penalty_overrides=penalty_overrides,
+        pins=pins,
+        narrative=narrative,
+        seed=seed,
+    )
+    _verify_membership(
+        [t.track_id for t in tracks],
+        [t.track_id for t in result],
+        f"optimize_sequence(arc={arc!r})",
+    )
+    return result
+
+
+def _optimize_sequence_unchecked(
+    tracks: list[TrackMetadata],
+    weights: dict[str, float],
+    arc: str = "wave",
+    artist_min_separation: int = 4,
+    bold_jump_chance: float = 0.10,
+    narrative_mode: str = "river",
+    context_window: int = 5,
+    penalty_overrides: dict[str, float] | None = None,
+    pins: list | None = None,
+    narrative: str | None = None,
+    seed: int | None = None,
+) -> list[TrackMetadata]:
+    """Sequence tracks without verifying the membership invariant.
+
+    Call ``optimize_sequence`` instead; it wraps this and enforces that the
+    result is a permutation of the input.
     """
     track_count = len(tracks)
     track_map = {track.track_id: track for track in tracks}
@@ -1213,8 +1278,43 @@ def sequence_playlist(
     been reconciled are unaffected (no audits => nothing excluded).
 
     If weights is provided, it overrides the profile's default weights.
+
+    Raises ``SequenceIntegrityError`` if the result is not a permutation of
+    the playlist's current track list. The caller persists this order
+    verbatim, so returning a corrupted list would rewrite the playlist.
     """
     track_ids = db.get_playlist_track_ids(playlist_id)
+    result = _sequence_playlist_unchecked(
+        db,
+        playlist_id,
+        track_ids,
+        arc=arc,
+        profile=profile,
+        weights=weights,
+        availability_platform=availability_platform,
+        seed=seed,
+    )
+    _verify_membership(
+        list(track_ids), result, f"sequence_playlist(playlist_id={playlist_id})"
+    )
+    return result
+
+
+def _sequence_playlist_unchecked(
+    db: Database,
+    playlist_id: int,
+    track_ids: list[int],
+    arc: str = "wave",
+    profile: str = "default",
+    weights: dict[str, float] | None = None,
+    availability_platform: str = "tidal",
+    seed: int | None = None,
+) -> list[int]:
+    """Sequence a playlist without verifying the membership invariant.
+
+    Call ``sequence_playlist`` instead; it wraps this and enforces that the
+    result is a permutation of the playlist's tracks.
+    """
     if len(track_ids) <= 1:
         return list(track_ids)
 
@@ -1233,7 +1333,10 @@ def sequence_playlist(
     ]
 
     # Everything not placed by the optimizer (unavailable + metadata-less)
-    # tails the result in original playlist order, never dropped.
+    # tails the result in original playlist order, never dropped. The set() is
+    # only a membership lookup: optimize_sequence guarantees no duplicates, so
+    # it can no longer collapse one and silently convert a duplicated track
+    # into a "deferred" one, which is how the closer-pin corruption hid.
     def _tail(placed: set[int]) -> list[int]:
         return [tid for tid in track_ids if tid not in placed]
 
