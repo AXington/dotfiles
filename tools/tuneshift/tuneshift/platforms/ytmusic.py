@@ -12,6 +12,7 @@ from ytmusicapi import YTMusic
 from tuneshift.models import AlbumResult, ArtistResult, PlaylistInfo, TrackResult
 from tuneshift.platforms.auth import validate_no_symlink
 from tuneshift.platforms.rate_limiter import RateLimiter
+from tuneshift.platforms.timeout import network_timeout
 
 logger = logging.getLogger(__name__)
 
@@ -176,7 +177,13 @@ class YTMusicClient:
         headers = self._auth_headers()
         if json_body is not None:
             headers["Content-Type"] = "application/json"
-        resp = getattr(req, method)(url, params=params, json=json_body, headers=headers)
+        resp = getattr(req, method)(
+            url,
+            params=params,
+            json=json_body,
+            headers=headers,
+            timeout=network_timeout(),
+        )
         resp.raise_for_status()
         if resp.status_code == 204:
             return {}

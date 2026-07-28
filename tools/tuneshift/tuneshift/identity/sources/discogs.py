@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from tuneshift.identity.models import Evidence, SourceResult
+from tuneshift.platforms.timeout import network_timeout
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,13 @@ class DiscogsSource:
 
         token = self._credentials_path.read_text().strip()
         self._client = discogs_client.Client("TuneShift/0.1", user_token=token)
+        # python3-discogs-client exposes no per-call timeout: Fetcher.request
+        # passes timeout=(connect_timeout, read_timeout) straight to requests,
+        # and both default to None, so a stalled Discogs response would hang a
+        # resolve run forever. Bound them with the shared network budget.
+        budget = network_timeout()
+        self._client._fetcher.connect_timeout = budget
+        self._client._fetcher.read_timeout = budget
         return self._client
 
     def search(self, artist: str, title: str) -> SourceResult:
