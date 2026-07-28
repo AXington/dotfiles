@@ -76,6 +76,12 @@ class VersionProfile:
     is_remaster: bool = False
     is_explicit: bool = False
     is_clean: bool = False
+    # The platform's structured content RATING, kept distinct from ``is_clean``.
+    # ``is_clean`` means "an affirmatively marked censored edit of an explicit
+    # master" (a recording variant). A rating of ``False`` only means "contains
+    # no explicit content", which is true of most music and is NOT a variant.
+    # Conflating the two penalised every non-explicit recording (BUG-13).
+    explicit_rating: bool | None = None
 
 
 def infer_version(
@@ -94,10 +100,14 @@ def infer_version(
     that denotes a continuous DJ mix (M1) but is an ordinary word in a title.
 
     ``explicit`` is the platform's STRUCTURED explicit boolean. When provided
-    (not ``None``) it is authoritative over free-text markers: ``True`` sets
-    ``is_explicit``, ``False`` sets ``is_clean``. When ``None`` the lyric axis
-    falls back to title/album/version text regex, so callers that do not supply
-    the flag score byte-identically to before.
+    (not ``None``) it is authoritative over free-text markers for the RATING,
+    and is recorded as ``explicit_rating``. ``True`` also sets ``is_explicit``.
+    ``False`` does NOT set ``is_clean``: a recording that merely contains no
+    explicit content is not a censored edit, and treating it as one penalised
+    every clean recording by a substitute-grade 40 points (BUG-13).
+    ``is_clean`` is set only by an affirmative text marker. When ``None`` the
+    lyric axis falls back to title/album/version text regex, so callers that do
+    not supply the flag score byte-identically to before.
     """
     combined = f"{title or ''} {album or ''}"
     version_text = version or ""
@@ -118,14 +128,15 @@ def infer_version(
     is_explicit = bool(_EXPLICIT_RE.search(full))
     is_clean = bool(_CLEAN_RE.search(full))
     if explicit is not None:
-        # Structured platform flag wins over free-text markers.
+        # Structured platform flag wins over free-text markers for the rating.
+        # It must NOT manufacture a clean-edit variant from a bare False.
         is_explicit = explicit
-        is_clean = not explicit
     return VersionProfile(
         recording=recording,
         is_remaster=bool(_norm._REMASTER_RE.search(full)),
         is_explicit=is_explicit,
         is_clean=is_clean,
+        explicit_rating=explicit,
     )
 
 
@@ -179,25 +190,26 @@ def compare_version(
         return VersionVerdict.REJECT
     if source.is_clean and candidate.is_explicit and verdict is VersionVerdict.MATCH:
         verdict = VersionVerdict.SUBSTITUTE
-    # Canonical source with no lyric signal (the common case): rank the two lyric
-    # variants by preference so the PREFERRED one wins OUTRIGHT rather than tying.
-    # The non-preferred variant is a modified/non-preferred master and drops to a
-    # substitute (down-ranked but still findable when it is the only option).
-    # Default prefers explicit (clean is in the default avoid set), so a clean
-    # edit is down-ranked; a "prefer clean" instead down-ranks the explicit take,
-    # so the clean release wins outright. When neither candidate carries a lyric
-    # signal (unknown structured flag and no title marker -- the whole gold
-    # corpus) nothing fires and scoring is byte-identical to before.
+    # NOTE: the lyric RATING preference deliberately does NOT live here. A
+    # preference between available alternatives is not a property of the
+    # recording, so it is emitted as a separate ``pref:lyric`` signal (see
+    # :func:`tuneshift.matching.penalties.source_aware_version_signals`).
+    # Expressing it as a SUBSTITUTE verdict charged every non-explicit
+    # recording 40 points and quarantined tracks that had no explicit
+    # alternative to prefer (BUG-13).
+    #
+    # An AFFIRMATIVELY MARKED clean edit ("(Clean)", "Censored", "Radio Safe")
+    # is different: that is a modified master, a genuine recording variant, so
+    # it keeps its substitute-grade down-rank. A bare ``explicit=False`` rating
+    # never reaches here because it no longer sets ``is_clean``.
     if (
         verdict is VersionVerdict.MATCH
+        and candidate.is_clean
         and not source.is_clean
         and not source.is_explicit
+        and "clean" not in prefer
     ):
-        prefers_clean = "clean" in prefer
-        if candidate.is_clean and not prefers_clean:
-            verdict = VersionVerdict.SUBSTITUTE
-        elif candidate.is_explicit and prefers_clean:
-            verdict = VersionVerdict.SUBSTITUTE
+        verdict = VersionVerdict.SUBSTITUTE
 
     # --- Remaster is cosmetic (same recording) ---
     if (

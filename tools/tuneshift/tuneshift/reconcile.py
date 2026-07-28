@@ -38,6 +38,10 @@ from tuneshift.matching.criteria import (
     Verdict,
     load_token_whitelist,
 )
+from tuneshift.matching.penalties import (
+    DEFAULT_WEIGHTS,
+    is_lyric_non_preferred,
+)
 from tuneshift.matching.registry import (
     STRUCTURED_AXIS_FIELDS,
     PreferenceSpec,
@@ -1576,6 +1580,20 @@ def _quick_top_score(
             100,
             s + duration_proximity_bonus(c.duration_seconds, track.duration_seconds),
         )
+        # A candidate carrying the non-preferred lyric rating must never reach
+        # the short-circuit bar, or the search stops before a later strategy can
+        # find the preferred release. Bonuses are applied after the version
+        # signals and would otherwise erase the preference entirely.
+        if is_lyric_non_preferred(
+            track.title,
+            track.album,
+            c.title,
+            c.album,
+            getattr(c, "version", None),
+            cand_explicit=getattr(c, "explicit", None),
+            prefer=prefer,
+        ):
+            s = min(s, 100 - DEFAULT_WEIGHTS.version.lyric_preference)
         if s > best:
             best = s
     return best

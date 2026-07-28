@@ -18,9 +18,13 @@ preferences, later) without touching this code.
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
+from typing import TYPE_CHECKING
 
 from tuneshift.matching.aliases import AliasResolver, default_resolver
 from tuneshift.matching.similarity import ratio
+
+if TYPE_CHECKING:
+    from tuneshift.matching.version import VersionProfile
 
 
 @dataclass(frozen=True)
@@ -37,6 +41,11 @@ class VersionWeights:
     acoustic: int = 10
     remaster: int = 10
     deluxe: int = 5
+    # Preference-grade down-rank for the lyric (explicit/clean) RATING. This is
+    # a preference between available alternatives, not a defect in the
+    # recording, so it must stay small and must never reuse ``substitute``.
+    # Reusing substitute-grade 40 here quarantined every clean track (BUG-13).
+    lyric_preference: int = 10
     # Source-aware recording-verdict magnitudes (Chunk 4). ``reject`` is large
     # enough to floor the 0-100 legacy score; ``substitute`` down-ranks a
     # fallback recording (e.g. studio master for a requested live take) without
@@ -371,6 +380,66 @@ def _residual_version_signals(
     return signals
 
 
+def _lyric_preference_signals(
+    source: VersionProfile,
+    candidate: VersionProfile,
+    weights: Weights,
+    *,
+    prefer: frozenset[str],
+) -> list[SignalPenalty]:
+    """Down-rank the non-preferred lyric RATING between real alternatives.
+
+    A content rating is a descriptor, not a defect in the recording, so this
+    is preference-grade and is named ``pref:`` so the acceptance floor can
+    ignore it. A preference must never quarantine a track that had no
+    preferred alternative to begin with (BUG-13).
+
+    Fires only when the candidate's STRUCTURED rating is known. Sources that
+    carry an affirmative lyric variant marker are governed by the recording
+    verdict instead, so they are skipped here to avoid double-charging.
+    """
+    if candidate.explicit_rating is None:
+        return []
+    if source.is_clean or source.is_explicit:
+        return []
+    # An affirmatively marked clean edit is a recording variant and is already
+    # charged by the version verdict; that axis owns it, so do not double-count
+    # (same ``owned`` discipline as the residual edition buckets).
+    if candidate.is_clean:
+        return []
+    prefers_clean = "clean" in prefer
+    wanted = False if prefers_clean else True
+    if candidate.explicit_rating is wanted:
+        return []
+    cost = weights.version.lyric_preference
+    return [SignalPenalty("pref:lyric", -cost, 0.15, cost)]
+
+
+def is_lyric_non_preferred(
+    source_title: str | None,
+    source_album: str | None,
+    cand_title: str | None,
+    cand_album: str | None,
+    cand_version: str | None = None,
+    *,
+    cand_explicit: bool | None = None,
+    prefer: frozenset[str] = frozenset(),
+    weights: Weights = DEFAULT_WEIGHTS,
+) -> bool:
+    """True when the candidate carries the NON-preferred lyric rating.
+
+    Exposed so callers that gate on a score threshold (e.g. the ISRC
+    short-circuit) can honour the lyric preference without re-implementing it.
+    Duplicating this rule into a second engine is what let the explicit/clean
+    axis drift out of agreement with itself in the first place.
+    """
+    from tuneshift.matching.version import infer_version
+
+    src = infer_version(source_title, source_album)
+    cand = infer_version(cand_title, cand_album, cand_version, explicit=cand_explicit)
+    return bool(_lyric_preference_signals(src, cand, weights, prefer=prefer))
+
+
 def source_aware_version_signals(
     source_title: str,
     source_album: str,
@@ -430,6 +499,7 @@ def source_aware_version_signals(
     else:  # REJECT
         signals.append(SignalPenalty("version:reject", -vw.reject, 1.0, vw.reject))
 
+    signals.extend(_lyric_preference_signals(src, cand, weights, prefer=prefer))
     signals.extend(
         _residual_version_signals(
             source_title,
