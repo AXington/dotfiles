@@ -34,7 +34,11 @@ def _mock_client() -> MagicMock:
     client.find_playlist_by_name.return_value = PlaylistInfo(
         platform_id="tidal-pl-123", name="Test Playlist", num_tracks=3,
     )
-    client.get_playlist_tracks.side_effect = TypeError("no live remote in test")
+    # An absent remote is an EMPTY READABLE playlist, not one whose read
+    # raises. Raising here modelled the read-fails/write-succeeds asymmetry
+    # that SYNC-WIPE needs, so the suite normalised the very state it
+    # should have caught.
+    client.get_playlist_tracks.return_value = []
     client.replace_playlist_tracks.return_value = None
     return client
 

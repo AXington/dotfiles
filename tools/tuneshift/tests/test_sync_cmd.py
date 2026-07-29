@@ -35,7 +35,11 @@ def _mock_client(platform_name: str = "tidal") -> MagicMock:
     )
     # Remote read isn't enumerable in tests -> prior order unknown -> never an
     # idempotent skip, so a genuine push is always planned.
-    client.get_playlist_tracks.side_effect = TypeError("no live remote in test")
+    # An absent remote is an EMPTY READABLE playlist, not one whose read
+    # raises. Raising here modelled the read-fails/write-succeeds asymmetry
+    # that SYNC-WIPE needs, so the suite normalised the very state it
+    # should have caught.
+    client.get_playlist_tracks.return_value = []
     client.replace_playlist_tracks.return_value = None
     return client
 

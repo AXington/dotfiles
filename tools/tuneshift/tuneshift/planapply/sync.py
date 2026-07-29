@@ -16,7 +16,9 @@ with a fake client (no live platform SDK).
 from __future__ import annotations
 
 import json
+import logging
 
+from tuneshift import TuneShiftError
 from tuneshift.db import Database
 from tuneshift.planapply.apply import (
     LOCAL_SIDE_EFFECT_KEY,
@@ -28,6 +30,17 @@ from tuneshift.planapply.models import Plan, PlanChange, row_key_for
 from tuneshift.planapply.plan import new_plan_id
 from tuneshift.platforms.protocol import MusicPlatformClient
 from tuneshift.reconcile import reconcile_track
+
+logger = logging.getLogger(__name__)
+
+
+class RemoteStateUnknownError(TuneShiftError):
+    """Refused a remote push whose prior state could not be read.
+
+    Pushing here would overwrite remote contents and ordering while journaling
+    no way back, so the mutation is unreversible by construction. Failing the
+    change is recoverable; a silent unreversible push is not (SYNC-WIPE).
+    """
 
 
 def _playlist_meta(db: Database, playlist_id: int) -> tuple[str, str]:
@@ -51,9 +64,25 @@ def _reorder_tracks(tracks: list, ordered_track_ids: list[int]) -> list:
 def _remote_ids(
     client: MusicPlatformClient, platform_playlist_id: str
 ) -> list[str] | None:
+    """Read the remote track order, or ``None`` when it could not be read.
+
+    ``None`` means UNKNOWN, never "empty". Callers must preserve that
+    distinction: coercing an unreadable snapshot to ``[]`` turns a rollback
+    into a permanent wipe of the remote playlist (SYNC-WIPE).
+    """
     try:
         return [t.platform_id for t in client.get_playlist_tracks(platform_playlist_id)]
     except Exception:  # noqa: BLE001
+        # Genuine platform SDK boundary: a client can raise anything from
+        # transport, auth, or vendor-specific errors. Swallowing it silently hid
+        # an auth failure and a transient timeout behind the same empty-looking
+        # result. The value is still None so the callers' fail-closed paths
+        # engage, but the cause is now observable.
+        logger.warning(
+            "could not read remote playlist state",
+            extra={"platform_playlist_id": platform_playlist_id},
+            exc_info=True,
+        )
         return None
 
 
@@ -155,6 +184,7 @@ def make_sync_executor(
         platform_playlist_id = proposed.get("platform_playlist_id")
         local_playlist_id = proposed.get("local_playlist_id")
         link_journal: dict | None = None
+        created_now = False
 
         if not platform_playlist_id:
             existing = client.find_playlist_by_name(proposed["playlist_name"])
@@ -165,6 +195,7 @@ def make_sync_executor(
                     proposed["playlist_name"], proposed.get("description", "")
                 )
                 platform_playlist_id = created.platform_id
+                created_now = True
             if local_playlist_id is not None:
                 # Link within the apply transaction (no self-committing helper),
                 # and report it so apply journals it as a reversible local change
@@ -204,7 +235,23 @@ def make_sync_executor(
                     },
                 }
 
-        prior_ids = _remote_ids(client, platform_playlist_id)
+        if created_now:
+            # Created moments ago in this same call, so the prior state is empty
+            # by construction. Reading it would add a network round trip that
+            # can only fail, and a failure here must not block a first sync:
+            # there is nothing in a brand-new playlist to destroy.
+            prior_ids: list[str] | None = []
+        else:
+            prior_ids = _remote_ids(client, platform_playlist_id)
+            if prior_ids is None:
+                # Last point at which the unreversibility is still avoidable.
+                # Once the push lands, the pre-push order is gone and the
+                # journal records nothing to restore from (SYNC-WIPE).
+                raise RemoteStateUnknownError(
+                    f"refusing to push to {platform} playlist "
+                    f"{platform_playlist_id!r}: its current contents could not "
+                    "be read, so the push could not be rolled back"
+                )
         client.replace_playlist_tracks(
             platform_playlist_id, list(proposed.get("track_ids", []))
         )
@@ -233,26 +280,42 @@ def build_compensating_plan(
         prior = entry.prior_value or {}
         row = json.loads(entry.row_key)
         platform = entry.table_name[len(REMOTE_TABLE_PREFIX) :]
-        changes.append(
-            PlanChange(
-                op="remote_push",
-                table=entry.table_name,
-                row_key=entry.row_key,
-                current=None,
-                proposed={
-                    "platform": platform,
-                    "local_playlist_id": row.get("playlist_id"),
-                    "playlist_name": prior.get("playlist_name", ""),
-                    "description": "",
-                    "platform_playlist_id": prior.get("platform_playlist_id"),
-                    "track_ids": prior.get("track_ids") or [],
-                },
-                remote=True,
-                reason=f"compensating re-push to {platform}",
-                provenance="rollback-compensation",
-                change_id=change_id,
-            )
+        prior_ids = prior.get("track_ids")
+        # ``None`` means the pre-push snapshot could not be read, NOT that the
+        # playlist was empty. ``build_sync_plan`` already draws this distinction
+        # ("never wipe a remote playlist just because nothing resolved"); the
+        # compensating path must draw it too. Coercing unknown to [] re-pushes
+        # an empty tracklist and permanently destroys the remote contents and
+        # ordering that the rollback existed to restore (SYNC-WIPE).
+        prior_unknown = prior_ids is None
+        change = PlanChange(
+            op="remote_push",
+            table=entry.table_name,
+            row_key=entry.row_key,
+            current=None,
+            proposed={
+                "platform": platform,
+                "local_playlist_id": row.get("playlist_id"),
+                "playlist_name": prior.get("playlist_name", ""),
+                "description": "",
+                "platform_playlist_id": prior.get("platform_playlist_id"),
+                "track_ids": None if prior_unknown else list(prior_ids),
+            },
+            remote=True,
+            reason=(
+                f"prior remote state unknown; cannot restore {platform} "
+                "playlist without wiping it"
+                if prior_unknown
+                else f"compensating re-push to {platform}"
+            ),
+            provenance="rollback-compensation",
+            change_id=change_id,
         )
+        if prior_unknown:
+            # Recorded rather than dropped, so the unrestorable entry stays
+            # visible in the plan; "skipped" makes it non-actionable on apply.
+            change.status = "skipped"
+        changes.append(change)
     return Plan(
         plan_id=plan_id or new_plan_id(),
         kind="compensating",

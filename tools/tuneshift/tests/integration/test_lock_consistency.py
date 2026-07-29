@@ -39,7 +39,11 @@ def _mock_client() -> MagicMock:
     )
     # A remote read that can't be enumerated (MagicMock isn't iterable) makes the
     # plan treat prior remote order as unknown, so it never idempotently skips.
-    client.get_playlist_tracks.side_effect = TypeError("no live remote in test")
+    # An absent remote is an EMPTY READABLE playlist, not one whose read
+    # raises. Raising here modelled the read-fails/write-succeeds asymmetry
+    # that SYNC-WIPE needs, so the suite normalised the very state it
+    # should have caught.
+    client.get_playlist_tracks.return_value = []
     client.replace_playlist_tracks.return_value = None
     return client
 
