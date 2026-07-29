@@ -11,6 +11,7 @@ want the distance, breakdown and recommendation (not just an integer).
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from tuneshift.matching.base_scoring import (
@@ -33,6 +34,7 @@ from tuneshift.matching.penalties import (
     artist_overlap_absent,
     artist_signal,
     duration_signal,
+    is_preference_signal,
     isrc_signal,
     source_aware_version_signals,
     title_signal,
@@ -162,7 +164,23 @@ def duration_proximity_bonus(
     return 0
 
 
-def score_match_with_version(
+@dataclass(frozen=True)
+class MatchScores:
+    """The two questions a candidate's score is asked, kept apart.
+
+    ``match_score`` is the ranking answer to "which candidate is best?" and
+    legitimately includes preference penalties. ``quality_score`` is the
+    gating answer to "did we find this recording at all?" and excludes them,
+    so a preference can reorder candidates but can never conclude a track was
+    not found (BUG-13). They differ only by the preference-class signals; both
+    are produced from a single pass over one signal list so they cannot drift.
+    """
+
+    match_score: int
+    quality_score: int
+
+
+def score_match_components(
     source_title: str,
     source_artist: str,
     source_album: str | None,
@@ -179,8 +197,8 @@ def score_match_with_version(
     source_explicit: bool | None = None,
     cand_explicit: bool | None = None,
     alias_resolver: AliasResolver | None = None,
-) -> int:
-    """Score a search result with source-aware version + duration penalties.
+) -> MatchScores:
+    """Score a search result in both projections. See :class:`MatchScores`.
 
     The base similarity score (with its 0-100 clamp) is computed first, then the
     source-aware recording verdict and duration penalties are subtracted. A
@@ -189,6 +207,10 @@ def score_match_with_version(
     ``SUBSTITUTE`` (a fallback recording, e.g. the studio master when a live take
     was requested) down-ranks it but keeps it findable. ``prefer``/``avoid`` are
     recording-class sets from the effective per-playlist preferences.
+
+    Both scores come from a single pass over one signal list, differing only in
+    which signals are summed, so ``match_score`` is byte-identical to the
+    historical result by construction.
     """
     # Drop an album-name parenthetical that a source has appended to the title
     # (e.g. "Femininomenon (The Rise and Fall of a Midwest Princess)") before
@@ -241,21 +263,73 @@ def score_match_with_version(
         weights=weights,
     )
     penalty = -sum(s.points for s in vsignals)
+    # The gating projection. Identical arithmetic, minus only the signals that
+    # express a listener preference rather than a fault in the recording.
+    quality_penalty = -sum(
+        s.points for s in vsignals if not is_preference_signal(s.name)
+    )
     dur_pen = duration_penalty(
         result_duration, reference_duration, all_durations, weights
     )
     # BUG-3: a same-title candidate by a clearly different artist (no alias, no
     # containment, no fuzzy overlap) is a hard reject, not a low-confidence
     # accept. Covers/tributes are handled by the version axis above; this only
-    # catches genuinely different songs that merely share a title.
+    # catches genuinely different songs that merely share a title. This is an
+    # identity verdict, never a preference, so it floors BOTH projections.
     if artist_overlap_absent(
         normalize_artist(source_artist),
         normalize_artist(result_artist),
         weights,
         resolver=alias_resolver,
     ):
-        return 0
-    return max(0, min(100, base - penalty - dur_pen))
+        return MatchScores(match_score=0, quality_score=0)
+    return MatchScores(
+        match_score=max(0, min(100, base - penalty - dur_pen)),
+        quality_score=max(0, min(100, base - quality_penalty - dur_pen)),
+    )
+
+
+def score_match_with_version(
+    source_title: str,
+    source_artist: str,
+    source_album: str | None,
+    result_title: str,
+    result_artist: str,
+    result_album: str,
+    result_duration: int | None = None,
+    reference_duration: int | None = None,
+    all_durations: list[int] | None = None,
+    weights: Weights = DEFAULT_WEIGHTS,
+    *,
+    prefer: frozenset[str] = frozenset(),
+    avoid: frozenset[str] = frozenset(),
+    source_explicit: bool | None = None,
+    cand_explicit: bool | None = None,
+    alias_resolver: AliasResolver | None = None,
+) -> int:
+    """The ranking score. See :func:`score_match_components` for both scores.
+
+    Kept as the historical integer surface, and deliberately a thin wrapper so
+    there is exactly one scoring implementation: parity between the two
+    projections is structural rather than something a test has to police.
+    """
+    return score_match_components(
+        source_title,
+        source_artist,
+        source_album,
+        result_title,
+        result_artist,
+        result_album,
+        result_duration,
+        reference_duration,
+        all_durations,
+        weights,
+        prefer=prefer,
+        avoid=avoid,
+        source_explicit=source_explicit,
+        cand_explicit=cand_explicit,
+        alias_resolver=alias_resolver,
+    ).match_score
 
 
 def score_track_match(

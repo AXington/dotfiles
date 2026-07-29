@@ -132,6 +132,24 @@ def _bonus_penalty(points: int, budget: int) -> float:
     return _clamp01(1.0 - points / budget)
 
 
+# Signals in this class express what the LISTENER wanted, not what is wrong with
+# the recording. They belong in ranking (which candidate wins) and must stay out
+# of every absolute accept floor (was anything found at all), because a
+# preference is only meaningful when a preferred alternative actually exists.
+PREFERENCE_SIGNAL_PREFIX = "pref:"
+
+
+def is_preference_signal(name: str) -> bool:
+    """True when a signal is preference-grade rather than quality-grade.
+
+    The single definition of the distinction. The scorer, the resolve
+    quarantine floor and the reconcile not-found floor all consult this rather
+    than testing the prefix themselves: a second copy of this rule is precisely
+    how the explicit/clean axis drifted out of agreement with itself (BUG-13).
+    """
+    return name.startswith(PREFERENCE_SIGNAL_PREFIX)
+
+
 def title_signal(
     source_title: str, result_title: str, weights: Weights = DEFAULT_WEIGHTS
 ) -> SignalPenalty:

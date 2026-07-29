@@ -27,6 +27,7 @@ from tuneshift.matching import (
     resolve_preferences,
     score_album_match,
     score_artist_match,
+    score_match_components,
     score_match_with_version,
     score_track_match,
     scoring_intent,
@@ -55,6 +56,7 @@ from tuneshift.matching.selection import (
     SelectionResult,
     select_version,
 )
+from tuneshift.matching.track import MatchScores
 from tuneshift.models import (
     AlbumResult,
     ArtistResult,
@@ -1219,6 +1221,7 @@ def _reconcile_not_found(
     selection,
     active_prefs,
     _int_score,
+    _quality_score,
 ):
     # No confident *available* winner. Rank ALL candidates with the integer
     # path so an exact-but-unavailable release still surfaces as held
@@ -1233,7 +1236,11 @@ def _reconcile_not_found(
         )
     )
     fallback_conf = (
-        classify_scores([s for s, _, _ in scored_all], min_lead=prefs.min_lead)
+        classify_scores(
+            [s for s, _, _ in scored_all],
+            quality_scores=[_quality_score(r) for _, _, r in scored_all],
+            min_lead=prefs.min_lead,
+        )
         if scored_all
         else "not_found"
     )
@@ -1462,8 +1469,8 @@ def reconcile_track(
     # Score all candidates uniformly
     all_durations = [r.duration_seconds for r in all_candidates if r.duration_seconds]
 
-    def _int_score(r: TrackResult) -> int:
-        s = score_match_with_version(
+    def _components(r: TrackResult) -> MatchScores:
+        return score_match_components(
             track.title,
             track.artist,
             track.album,
@@ -1478,10 +1485,23 @@ def reconcile_track(
             cand_explicit=getattr(r, "explicit", None),
             alias_resolver=resolver,
         )
+
+    def _with_bonus(s: int, r: TrackResult) -> int:
         return min(
             100,
             s + duration_proximity_bonus(r.duration_seconds, track.duration_seconds),
         )
+
+    def _int_score(r: TrackResult) -> int:
+        return _with_bonus(_components(r).match_score, r)
+
+    def _quality_score(r: TrackResult) -> int:
+        """The same score with preference penalties excluded (BUG-13).
+
+        Feeds the not-found floor only. The duration bonus is applied on both
+        projections so the two stay on one scale.
+        """
+        return _with_bonus(_components(r).quality_score, r)
 
     # --- Selection: the single two-phase engine owns the winner pick (AC-C5) ---
     # select_version applies the availability filter, hard-preference filter,
@@ -1512,7 +1532,11 @@ def reconcile_track(
         (_int_score(r), edition_cost(r.album or ""), r) for r in ordered
     ]
     confidence = (
-        classify_scores([s for s, _, _ in scored], min_lead=prefs.min_lead)
+        classify_scores(
+            [s for s, _, _ in scored],
+            quality_scores=[_quality_score(r) for _, _, r in scored],
+            min_lead=prefs.min_lead,
+        )
         if scored
         else "not_found"
     )
@@ -1535,6 +1559,7 @@ def reconcile_track(
             selection,
             active_prefs,
             _int_score,
+            _quality_score,
         )
 
     return _finalize_reconcile_winner(

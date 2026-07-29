@@ -23,6 +23,7 @@ MIN_LEAD = 0  # additionally require (top - second) >= this for high
 def classify_scores(
     scores: list[int],
     *,
+    quality_scores: list[int] | None = None,
     not_found_floor: int = NOT_FOUND_FLOOR,
     high_top_min: int = HIGH_TOP_MIN,
     high_second_max: int = HIGH_SECOND_MAX,
@@ -42,13 +43,22 @@ def classify_scores(
     the historical behaviour. Raising it (e.g. from stricter preferences) demands
     a wider lead before a pick is treated as confident, pushing near-ties into
     ``ambiguous`` for human review instead of a silent guess.
+
+    ``quality_scores`` are the same candidates scored with preference penalties
+    excluded (:class:`~tuneshift.matching.track.MatchScores`). When supplied
+    they are used for the ``not_found_floor`` test ONLY, because that floor asks
+    "was this recording found at all?", a question a listener preference cannot
+    answer (BUG-13). The ``high``/``ambiguous`` bands keep using ``scores``,
+    since choosing between candidates is exactly what a preference is for.
+    ``None`` preserves the historical behaviour.
     """
     if not scores:
         return NOT_FOUND
-    top = max(scores)
-    if top < not_found_floor:
+    floor_scores = quality_scores if quality_scores else scores
+    if max(floor_scores) < not_found_floor:
         return NOT_FOUND
     sorted_desc = sorted(scores, reverse=True)
+    top = sorted_desc[0]
     second = sorted_desc[1] if len(sorted_desc) > 1 else 0
     if top >= high_top_min and second < high_second_max and (top - second) >= min_lead:
         return HIGH

@@ -17,7 +17,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from tuneshift.library.worker import ResolutionRateLimited, ResolvedCandidate
-from tuneshift.matching.track import score_match_with_version
+from tuneshift.matching.track import MatchScores, score_match_components
 from tuneshift.models import capture_candidate_metadata
 from tuneshift.platforms.timeout import PlatformTimeout
 from tuneshift.reconcile import build_alias_resolver, gather_candidates
@@ -81,8 +81,8 @@ class PlatformResolver:
 
         all_durations = [c.duration_seconds for c in candidates if c.duration_seconds]
 
-        def _score(candidate: TrackResult) -> int:
-            return score_match_with_version(
+        def _score(candidate: TrackResult) -> MatchScores:
+            return score_match_components(
                 track.title,
                 track.artist,
                 track.album,
@@ -105,7 +105,11 @@ class PlatformResolver:
         resolved: list[ResolvedCandidate] = []
         for candidate in candidates[: self._max_candidates]:
             metadata = capture_candidate_metadata(candidate)
-            metadata["match_score"] = _score(candidate)
+            scores = _score(candidate)
+            metadata["match_score"] = scores.match_score
+            # The gating projection, persisted alongside so the quarantine floor
+            # never has to re-derive it from stale stored fields (BUG-13).
+            metadata["quality_score"] = scores.quality_score
             resolved.append(
                 ResolvedCandidate(
                     platform=platform,

@@ -83,6 +83,24 @@ def _best_candidate(candidates: Sequence[ResolvedCandidate]) -> ResolvedCandidat
     return max(candidates, key=_score)
 
 
+def _floor_score(candidate: ResolvedCandidate) -> float | None:
+    """The score the acceptance floor judges: quality, else the legacy ranking.
+
+    Candidate rows persisted before BUG-13 carry only ``match_score``, which
+    still has preference penalties baked in. Falling back to it keeps the floor
+    firing on the existing library; treating a missing ``quality_score`` as "no
+    quality concern" would silently disable the quarantine gate for every
+    already-stored candidate, which is worse than the bug being fixed. Those
+    rows recover their headroom when the track is next re-resolved.
+    """
+    metadata = candidate.metadata or {}
+    for key in ("quality_score", "match_score"):
+        value = metadata.get(key)
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return float(value)
+    return None
+
+
 class ResolutionWorker:
     """Drains the resolution queue by resolving tracks to platform candidates."""
 
@@ -218,7 +236,13 @@ class ResolutionWorker:
         # songs by the same artist, or a same-title different-artist hard-reject).
         # Quarantine for review instead of hydrating a misleading low tier. The
         # persisted candidates above remain so the quarantine can be inspected.
-        best_score = (best.metadata or {}).get("match_score")
+        # BUG-13: gate on the QUALITY projection. This floor asks "did the
+        # resolver find the recording at all?", which a listener preference
+        # cannot answer: a song that only ever had a clean release must not be
+        # quarantined for lacking an explicit alternative it could never have
+        # had. Ranking below still uses match_score, so the preference keeps
+        # deciding which candidate wins.
+        best_score = _floor_score(best)
         if (
             not locked
             and isinstance(best_score, (int, float))

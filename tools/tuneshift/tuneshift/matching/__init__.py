@@ -69,10 +69,12 @@ from tuneshift.matching.review import (
     review_kind,
 )
 from tuneshift.matching.track import (
+    MatchScores,
     classify_results,
     duration_penalty,
     duration_proximity_bonus,
     score_match,
+    score_match_components,
     score_match_with_version,
     score_track_match,
     version_penalty,
@@ -92,6 +94,7 @@ __all__ = [
     "Availability",
     "CriterionOutcome",
     "MatchAudit",
+    "MatchScores",
     "Preferences",
     "ReasonCode",
     "RecordingClass",
@@ -132,6 +135,7 @@ __all__ = [
     "score_album_match",
     "score_artist_match",
     "score_match",
+    "score_match_components",
     "score_match_with_version",
     "score_track_match",
     "scoring_intent",
