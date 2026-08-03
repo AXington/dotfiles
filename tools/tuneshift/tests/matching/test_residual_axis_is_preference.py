@@ -180,8 +180,16 @@ class TestIdentityAxisStillGatesTheFloor:
             "candidate below the accept floor. A 1 second clip scores the same "
             "as a 150 second one. Pre-existing and independent of the edition "
             "axis: before this change the same candidate scored 60 and still "
-            "resolved, so no floor verdict changed here. Remove this marker "
-            "when BUG-18 is fixed."
+            "resolved, so no floor verdict changed here. "
+            "COUPLED TEST: tests/matching/test_quality_score_split.py"
+            "::TestQualityScoreForgivesNothingReal"
+            "::test_bug18_coupling_edition_plus_saturated_duration_clears_the_floor "
+            "pins the permissive value that holds only while this is broken. "
+            "Measured: deepening only the ratio<0.5 band XPASSes this test while "
+            "that pin still passes, so seeing this alone go red means the fix is "
+            "partial and the ratio<0.65 band still forgives a 119 second gap. "
+            "When BOTH go red the fix is complete: remove this marker and delete "
+            "that pin. Do not loosen the floor to make either one pass."
         ),
     )
     def test_a_wildly_wrong_duration_still_sinks_a_radio_edit(self):

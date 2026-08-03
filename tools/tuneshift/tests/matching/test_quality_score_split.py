@@ -101,8 +101,8 @@ class TestQualityScoreForgivesNothingReal:
         # The floor does not: both are Vogue.
         assert marked.quality_score == unmarked.quality_score
 
-    def test_edition_mismatch_plus_bad_duration_now_clears_the_floor(self):
-        """Pins the permissiveness 3b adds, so it can never widen silently.
+    def test_bug18_coupling_edition_plus_saturated_duration_clears_the_floor(self):
+        """BUG-18 COUPLING PIN. Read this before "fixing" a failure here.
 
         This candidate is a 200s radio edit on a compilation against a 319s
         album source. Before 3b it scored 45 quality and was quarantined; it
@@ -110,10 +110,35 @@ class TestQualityScoreForgivesNothingReal:
         quality axis and duration is the only real defect remaining.
 
         Duration SHOULD be doing that work and cannot: it saturates at -20
-        (BUG-18), so it can never sink a candidate on its own. That makes
-        BUG-18 load-bearing for this floor rather than a latent weakness. If
-        this assertion starts failing, check whether BUG-18 was fixed before
-        assuming a regression.
+        (BUG-18), so it can never sink a candidate on its own. This test
+        therefore pins a value that is only correct while BUG-18 is unfixed.
+        It is deliberately coupled to its opposite number:
+
+            tests/matching/test_residual_axis_is_preference.py
+              ::TestIdentityAxisStillGatesTheFloor
+              ::test_a_wildly_wrong_duration_still_sinks_a_radio_edit
+
+        which is a strict xfail asserting the behaviour we actually want.
+
+        MEASURED coupling, not assumed. This candidate's ratio is 200/319 =
+        0.627, which lands in the `ratio < 0.65` band (duration_short_high),
+        while the xfail's 40s candidate lands in `ratio < 0.5`
+        (duration_short_max). Both were simulated:
+
+          deepen duration_short_max only   -> xfail XPASSes, THIS TEST STILL
+                                              PASSES. Only one side goes red.
+          deepen the whole short side      -> both go red together.
+
+        So a partial BUG-18 fix can trip the xfail alone. If you are here
+        because only that one failed, this pin is the thing you have not fixed
+        yet: the 0.65 band still forgives a 119 second gap.
+
+        When both go red, BUG-18 is properly fixed and the correct response is:
+        delete this pin and remove that xfail marker. Do NOT lower
+        NOT_FOUND_FLOOR, weaken the assertion, or restore edition penalties to
+        the quality axis to make this pass again. A 119 second gap is a
+        different recording, not an edition preference, and the floor rejecting
+        it is the outcome BUG-18 exists to obtain.
         """
         scores = _score(
             "Vogue (Radio Edit)",
