@@ -42,6 +42,7 @@ from tuneshift.matching.criteria import (
 from tuneshift.matching.penalties import (
     DEFAULT_WEIGHTS,
     is_lyric_non_preferred,
+    is_preference_signal,
 )
 from tuneshift.matching.registry import (
     STRUCTURED_AXIS_FIELDS,
@@ -115,12 +116,21 @@ def _decisive_signal(
     prefer: frozenset[str],
     avoid: frozenset[str],
     resolver: AliasResolver | None = None,
+    *,
+    quality_only: bool = False,
 ) -> str | None:
     """Name the signal that most drove a candidate's distance (worst-first).
 
     Reuses the engine-native scorer so the reason shown to a human matches the
     real scoring, e.g. ``version:reject`` for a wrong recording or ``duration``
     for a suspicious length.
+
+    ``quality_only`` drops preference-grade (``pref:``) signals before picking
+    the worst. Use it whenever the outcome being explained was decided by the
+    accept floor, because the floor scores on ``quality_score`` and therefore
+    never saw those signals. Without it the explanation can name a preference
+    as the cause of a rejection the preference provably did not cause: the
+    scoring would be right and the explanation would be lying (BUG-13).
     """
     distance = score_track_match(
         track,
@@ -130,6 +140,8 @@ def _decisive_signal(
         alias_resolver=resolver,
     )
     rows = distance.breakdown
+    if quality_only:
+        rows = [r for r in rows if not is_preference_signal(r.name)]
     return rows[0].name if rows else None
 
 
@@ -413,7 +425,11 @@ def _build_audit(
             artist=r.artist,
             album=r.album,
             score=s,
-            decisive_signal=_decisive_signal(track, r, prefer, avoid, resolver),
+            # Same rule as the winner below: a candidate rejected by the accept
+            # floor is explained from the signals the floor actually scored.
+            decisive_signal=_decisive_signal(
+                track, r, prefer, avoid, resolver, quality_only=version_lost
+            ),
             rejection="below_threshold" if version_lost else "lost",
         )
         for s, _, r in scored[1:4]
@@ -443,9 +459,16 @@ def _build_audit(
         )
 
     if confidence == "not_found":
-        # Candidates existed but none cleared the bar. Distinguish a
-        # version-class rejection (wrong recording) from a plain low score.
-        version_rejected = best_signal is not None and best_signal.startswith(
+        # Candidates existed but none cleared the bar. That bar is the accept
+        # floor, which scores on quality_score and so never saw the pref:
+        # signals; explain the outcome from the same evidence rather than
+        # blaming a preference for a rejection it did not cause (BUG-13).
+        floor_signal = _decisive_signal(
+            track, best, prefer, avoid, resolver, quality_only=True
+        )
+        # Distinguish a version-class rejection (wrong recording) from a plain
+        # low score.
+        version_rejected = floor_signal is not None and floor_signal.startswith(
             "version:"
         )
         if untrusted:
@@ -464,7 +487,7 @@ def _build_audit(
             availability=availability,
             reason_code=reason,
             chosen_score=best_score,
-            decisive_signal=best_signal,
+            decisive_signal=floor_signal,
             distance=distance,
             rejected=rejected,
             criteria=criteria,

@@ -60,13 +60,60 @@ class TestQualityScoreForgivesNothingReal:
         assert scores.quality_score == 0
 
     def test_compound_defect_plus_preference_still_quarantines(self):
-        """The exact shape BUG-13 describes, minus the preference contribution.
+        """Real defects plus a preference must still land below the floor.
 
-        A radio edit the source does not carry (-20) plus a duration mismatch,
-        on a candidate that also happens to be clean (-10). Removing only the
-        preference must leave it below the floor, because the remaining
-        penalties are real. If this ever passes the floor the split has become
-        an amnesty.
+        Scoped to the IDENTITY axis deliberately. Commit 3b moved the whole
+        edition axis to preference-grade, so an edition mismatch is no longer a
+        defect for floor purposes; using one here would test the opposite of
+        the current rule. A karaoke cut is a wrong recording, and the clean
+        flag (-10) is incidental. Removing only the preference must leave this
+        below the floor. If it ever passes, the split has become an amnesty.
+        """
+        scores = _score(
+            "Vogue (Karaoke Version)",
+            cand_album="Karaoke Hits",
+            duration=200,
+            cand_explicit=False,
+        )
+        assert scores.quality_score < NOT_FOUND_FLOOR
+
+    def test_default_edition_downrank_is_preference_not_quality(self):
+        """Reverses the rule this test asserted in commit 3a. Deliberate.
+
+        3a kept the default (user-silent) edition down-rank in quality_score on
+        the reasoning that "candidate carries a marker the source lacks" is a
+        real mismatch. That left quality_score preference-DEPENDENT: a listener
+        who configured ``avoid`` saw the penalty excluded while a silent
+        listener saw it charged, so the same candidate could clear the floor
+        for one and be quarantined for the other. That is BUG-13's own defect
+        pointing the permissive way, so 3b moved all three regimes to ``pref:``.
+
+        The edition axis is a ranking axis. Identity is the ``version:`` axis
+        (reject/karaoke/instrumental/substitute), which is untouched and still
+        charged in full at the floor.
+        """
+        # Hold the album constant so only the edition marker differs; changing
+        # the album too would mix in a real album-mismatch penalty.
+        marked = _score("Vogue (Radio Edit)")
+        unmarked = _score()
+        # Ranking still separates them: the album cut wins.
+        assert marked.match_score < unmarked.match_score
+        # The floor does not: both are Vogue.
+        assert marked.quality_score == unmarked.quality_score
+
+    def test_edition_mismatch_plus_bad_duration_now_clears_the_floor(self):
+        """Pins the permissiveness 3b adds, so it can never widen silently.
+
+        This candidate is a 200s radio edit on a compilation against a 319s
+        album source. Before 3b it scored 45 quality and was quarantined; it
+        now scores 65 and resolves, because every edition penalty left the
+        quality axis and duration is the only real defect remaining.
+
+        Duration SHOULD be doing that work and cannot: it saturates at -20
+        (BUG-18), so it can never sink a candidate on its own. That makes
+        BUG-18 load-bearing for this floor rather than a latent weakness. If
+        this assertion starts failing, check whether BUG-18 was fixed before
+        assuming a regression.
         """
         scores = _score(
             "Vogue (Radio Edit)",
@@ -75,15 +122,8 @@ class TestQualityScoreForgivesNothingReal:
             cand_explicit=False,
         )
         assert scores.match_score == 35
-        assert scores.quality_score == 45
-        assert scores.quality_score < NOT_FOUND_FLOOR
-
-    def test_default_edition_downrank_is_quality_not_preference(self):
-        # "Candidate carries a marker the source lacks" is a genuine mismatch
-        # against the source, so it must survive into quality_score.
-        marked = _score("Vogue (Radio Edit)", cand_album="Now Thats What I Call Music")
-        clean_source = _score()
-        assert marked.quality_score < clean_source.quality_score
+        assert scores.quality_score == 65
+        assert scores.quality_score >= NOT_FOUND_FLOOR
 
 
 class TestPreferenceNeverSinksACandidate:
@@ -153,8 +193,13 @@ class TestMatchScoreIsUnchanged:
 class TestPreferenceSignalClassification:
     def test_pref_prefix_is_the_single_definition(self):
         assert is_preference_signal("pref:lyric")
+        assert is_preference_signal("pref:radio_edit")
+        # The identity axis is what the accept floor scores on, so none of
+        # these may ever read as preference-grade.
         assert not is_preference_signal("version:reject")
-        assert not is_preference_signal("version:radio_edit")
+        assert not is_preference_signal("version:karaoke")
+        assert not is_preference_signal("version:instrumental")
+        assert not is_preference_signal("version:substitute")
         assert not is_preference_signal("duration")
 
 

@@ -351,9 +351,21 @@ def _residual_version_signals(
 
     These buckets (radio/single edit, compilation, deluxe/expanded/anniversary)
     do not change *which recording* a track is, so they sit on top of the
-    source-aware recording verdict. There are three regimes per bucket, keyed on
-    the effective per-playlist preferences (``prefer``/``avoid`` carry the
-    edition bucket names produced by
+    source-aware recording verdict. Because they are a statement about which
+    copy the listener wants rather than about whether the recording was found,
+    every signal here is emitted as ``pref:`` and is therefore excluded from
+    ``quality_score`` and from the accept floor (BUG-13). Identity remains the
+    job of the ``version:`` axis (reject/karaoke/instrumental/substitute), which
+    is charged in full at the floor.
+
+    Naming all three regimes ``pref:`` is what keeps ``quality_score``
+    preference-independent. Reclassifying only the configured regimes would
+    mean a listener who expresses a preference sees a candidate clear the floor
+    that a silent listener sees quarantined, which is the same defect as
+    BUG-13 pointing the permissive way.
+
+    There are three regimes per bucket, keyed on the effective per-playlist
+    preferences (``prefer``/``avoid`` carry the edition bucket names produced by
     :func:`tuneshift.matching.preferences.scoring_intent`):
 
     * **avoided**, the candidate carries an edition the playlist wants to steer
@@ -386,15 +398,16 @@ def _residual_version_signals(
             continue
         regex = getattr(_norm, regex_name)
         cand_has = bool(regex.search(cand_combined))
+        signal_name = f"{PREFERENCE_SIGNAL_PREFIX}{name}"
         if name in avoid:
             if cand_has:
-                signals.append(SignalPenalty(f"version:{name}", -sub, 0.55, sub))
+                signals.append(SignalPenalty(signal_name, -sub, 0.55, sub))
         elif name in prefer:
             if not cand_has:
-                signals.append(SignalPenalty(f"version:{name}", -sub, 0.55, sub))
+                signals.append(SignalPenalty(signal_name, -sub, 0.55, sub))
         elif cand_has and not regex.search(src_combined):
             cost = getattr(weights.version, attr)
-            signals.append(SignalPenalty(f"version:{name}", -cost, 1.0, cost))
+            signals.append(SignalPenalty(signal_name, -cost, 1.0, cost))
     return signals
 
 

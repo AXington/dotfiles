@@ -322,12 +322,14 @@ def test_source_aware_weight_override():
 # --- edition-axis residual preferences (radio/single, deluxe, compilation) ---
 
 def test_residual_default_penalises_radio_edit_when_source_lacks_it():
-    # No preferences: the historical asymmetric down-rank still fires.
+    # No preferences: the historical asymmetric down-rank still fires. The
+    # signal is preference-grade (`pref:`) because an edition is a ranking
+    # opinion, not evidence the recording was not found (BUG-13).
     signals = pen._residual_version_signals(
         "Oops I Did It Again", "Oops I Did It Again",
         "Oops I Did It Again (Radio Edit)", "Oops I Did It Again",
     )
-    assert any(s.name == "version:radio_edit" for s in signals)
+    assert any(s.name == "pref:radio_edit" for s in signals)
 
 
 def test_residual_default_no_penalty_when_source_also_radio_edit():
