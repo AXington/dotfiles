@@ -4,18 +4,51 @@
 
 ## Communication
 
-These rules govern what you say to Ali in the terminal, including the
-decision ritual and the options rules below. They do not govern files,
-documentation, code, or committed artifacts, which follow the
-conventions of the repository they live in.
+These rules govern everything you emit that renders in Ali's
+terminal, whether a reply, a one-line note, a command, or a tool
+argument. They include the decision ritual and the options rules
+below. They do not govern the stored bytes of files, documentation,
+code, or committed artifacts, which follow the conventions of the
+repository they live in. A terminal preview of such an artifact is
+still terminal output.
 
 Lead with the answer. No preamble, no restatement of the request, no
 narration of what you are about to do.
 
-Wrap prose to 80 columns using hard line breaks. Short paragraphs with a
-blank line between them. Structure over long prose. Code, diffs, tables,
-file paths, command output, and quoted logs are exempt and are never
-broken to fit.
+Wrap to 70 display columns using hard line breaks. Short paragraphs
+with a blank line between them. Prefer structure over long unbroken
+text.
+
+Every line you emit is covered, however short or informal. Without
+limitation: replies, one-line progress notes between tool calls,
+every user-visible field of a question prompt including option labels
+and descriptions, shell commands you write, subagent prompts, todo
+and task text, tool description fields, composed error messages,
+summaries, and commit message previews. If a tool argument renders to
+Ali it is covered, whether or not this list names it.
+
+Exempt by provenance: bytes a process wrote to stdout or stderr, and
+file contents you read from disk. Text you composed is never exempt,
+including text you pass through echo, printf, or a heredoc, and text
+you wrote into a file and then displayed.
+
+Exempt by breakage: tokens that cannot be reflowed. A long URL or
+file path is not broken, but the line it sits on still starts within
+the margin, so put it on its own line. Table columns that cannot wrap
+are exempt; do not convert text into a table to avoid wrapping. Code
+and diffs from a tool are exempt; code you author is wrapped where the
+language allows, and putting text in a code fence does not exempt it.
+
+A long command you wrote is not exempt. Break it with a trailing
+backslash continuation, or split it into separate commands, so it
+still runs.
+
+If you cannot name the provenance or breakage reason a line is exempt,
+wrap it.
+
+Compliance is determined by an external checker over the session
+records. Your own measurement is not evidence, because it can only
+measure the surfaces you already believe are covered.
 
 Restate an earlier decision in one line when you rely on it, rather than
 assuming it is still in mind.
@@ -28,8 +61,10 @@ confidence scores, or counts. Measure it or leave it out.
 
 ## Prose conventions
 
-These apply everywhere: terminal output, files, documentation, commit
-messages, and anything shared or committed.
+These apply everywhere: terminal output, files, documentation,
+commit messages, and anything shared or committed. In the terminal
+they cover every surface defined under Communication, which is every
+string you emit that renders to Ali, not only your replies.
 
 Never use em-dashes. Do not use a spaced hyphen or a double hyphen as a
 prose separator either. Use a colon, a comma, a semicolon, or
@@ -130,7 +165,7 @@ ignores them by default. That output then reaches Ali directly, or
 through a summary that copies its shape.
 
 Every subagent prompt must therefore carry the output rules itself.
-Restate, inside the prompt: the 80 column wrapping rule, the short
+Restate, inside the prompt: the 70 column wrapping rule, the short
 paragraph and structure rules, and the ban on em-dashes and on " - " as
 a prose separator. Verbatim is fine and preferred. Long subagent prompts
 are explicitly permitted, so length is not a reason to skip this.
