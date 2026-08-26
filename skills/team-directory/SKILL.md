@@ -37,8 +37,7 @@ Kafka incidents also page SRE (Kafka Team policy PLQ0GVS uses SRE schedules).
 | wwilliams | Will Williams | Contractor Developer |
 
 **Kafka ownership note:** SRE owns Kafka operationally. Stakeholders for retention/config
-changes: paul (Paul Sjoberg), cheng (Cheng Zhou), drinkevich (Debora Rinkevich). Do not
-change Kafka settings without sign-off from those three.
+changes: paul (Paul Sjoberg), cheng (Cheng Zhou), drinkevich (Debora Rinkevich).
 
 ---
 

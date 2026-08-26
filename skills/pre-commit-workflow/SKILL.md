@@ -102,7 +102,6 @@ fix: OPS-1234: handle 404 on missing template
 
 Rules:
 - Subject line under 72 characters
-- Use the commit body to explain what changed and why (not just what)
 - Include the Co-authored-by trailer for Copilot-assisted commits:
   ```
   Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>

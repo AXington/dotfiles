@@ -340,7 +340,6 @@ Input validation: validate at every external boundary (API, CLI, queue). Whiteli
 - Commit messages follow **Conventional Commits**: `<type>[scope]: <description>`
   - Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `perf`, `ci`, `revert`
   - Description: imperative mood, present tense, 72 characters or fewer
-  - Body explains *why*, not *what* (the diff shows what)
 - **Atomic commits:** one logical change per commit. Every commit must pass tests independently.
 - Never mix refactoring and feature changes in the same commit.
 - Never force-push to `main` or any shared branch.
