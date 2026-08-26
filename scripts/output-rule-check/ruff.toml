@@ -1,0 +1,12 @@
+# Scoped to this script. The repository has no global ruff config, so this
+# records the settings the checker is linted against rather than changing
+# how anything else in the repo is checked.
+line-length = 88
+target-version = "py310"
+
+[lint]
+select = ["E", "W", "F", "I", "N", "B", "C4", "UP", "S"]
+
+[lint.per-file-ignores]
+# Tests build fixtures from literal widths and read fixture files by path.
+"test_output_rule_check.py" = ["S101", "E501"]
