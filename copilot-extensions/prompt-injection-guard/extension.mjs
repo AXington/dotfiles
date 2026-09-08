@@ -174,7 +174,7 @@ const DENY_PATTERNS = [
     { pattern: /find\s+.*-delete/, reason: "Blocked: find -delete" },
     { pattern: /shred\s/, reason: "Blocked: shred command" },
     // Git destruction (catches both -f and --force)
-    { pattern: /git\s+push\s+.*(-f|--force)(?!-with-lease)/, reason: "Blocked: force push (use --force-with-lease)" },
+    { pattern: /git\s+push\s+.*(?<![\w-])(-f|--force)(?![\w-])/, reason: "Blocked: force push (use --force-with-lease)" },
     { pattern: /git\s+push\s+.*--delete/, reason: "Blocked: git push --delete" },
     { pattern: /git\s+reset\s+--hard\s+HEAD~/, reason: "Blocked: destructive history rewrite" },
     { pattern: /git\s+clean\s+-[fdx]+/, reason: "Blocked: git clean (removes untracked files)" },
