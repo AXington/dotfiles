@@ -2,8 +2,8 @@
 """sessionStart hook: emit a short orientation card for a resumed context.
 
 Reads the most recent where-were-we ledger written for this working directory
-and injects Goal, Now, Blocked and Next as additionalContext, so a new session
-starts oriented instead of asking what we were doing.
+and injects Goal, Now, Next, Blocked and open Todos as additionalContext, so a
+new session starts oriented instead of asking what we were doing.
 
 Self-contained by design. It reads a ledger file if one happens to exist and
 stays silent otherwise, so it never depends on the where-were-we skill being
@@ -63,6 +63,37 @@ def sessions_for_cwd(store: Path, cwd: str) -> list[str] | None:
     return [row[0] for row in rows]
 
 
+def main_worktree(cwd: str) -> str | None:
+    """Main clone path when cwd is a linked git worktree, else None.
+
+    A worktree's `.git` is a file reading `gitdir: <main>/.git/worktrees/<name>`,
+    so the main clone can be derived by reading it. Deliberately not `git
+    rev-parse`: this hook must never hang a session start, and a file read
+    cannot.
+
+    Sessions are looked up by exact working directory, so feature work done in
+    a worktree matched nothing and the card went silent precisely when it was
+    most needed.
+    """
+    marker = Path(cwd) / ".git"
+    try:
+        if not marker.is_file():
+            return None
+        line = marker.read_text(encoding="utf-8", errors="replace").strip()
+    except OSError:
+        return None
+    if not line.startswith("gitdir:"):
+        return None
+    gitdir = Path(line[len("gitdir:") :].strip())
+    # .git/worktrees/<name> -> the directory holding .git
+    if len(gitdir.parts) < 4 or gitdir.parent.name != "worktrees":
+        return None
+    root = gitdir.parent.parent
+    if root.name != ".git":
+        return None
+    return str(root.parent)
+
+
 def find_ledger(home: Path, cwd: str, current_id: str) -> Path | None:
     """Newest ledger for this directory.
 
@@ -74,7 +105,16 @@ def find_ledger(home: Path, cwd: str, current_id: str) -> Path | None:
     if not state_dir.is_dir():
         return None
 
-    session_ids = sessions_for_cwd(home / "session-store.db", cwd)
+    store = home / "session-store.db"
+    session_ids = sessions_for_cwd(store, cwd)
+    # A worktree is the same project as its main clone, so its history is the
+    # right history to offer. Checked only when the worktree itself has none,
+    # so a session actually run here still wins.
+    if not session_ids:
+        root = main_worktree(cwd)
+        if root:
+            session_ids = sessions_for_cwd(store, root) or session_ids
+
     if session_ids is None:
         try:
             candidates = sorted(
@@ -95,8 +135,41 @@ def find_ledger(home: Path, cwd: str, current_id: str) -> Path | None:
     return None
 
 
+def section_items(lines: list[str]) -> list[str]:
+    """Read a section as a list whatever shape it was written in.
+
+    `## blockers` is written as bullets and `## next` as a prose block, but
+    both were read as bullets, so Next was empty for every ledger the skill
+    has ever produced and never appeared on the card. Shape is detected rather
+    than assumed, which also keeps a hand-edited section working.
+    """
+    bullets = [ln for ln in lines if ln.lstrip().startswith(("- ", "* "))]
+    if bullets:
+        return [strip_marker(ln) for ln in bullets]
+    prose = " ".join(ln.strip() for ln in lines if ln.strip())
+    return [prose] if prose else []
+
+
+def strip_marker(line: str) -> str:
+    """Drop a list bullet and any checkbox from the front of a line."""
+    text = line.lstrip()[2:].strip()
+    if text[:3] in ("[ ]", "[x]", "[X]"):
+        text = text[3:].strip()
+    return text
+
+
+def open_todos(lines: list[str]) -> list[str]:
+    """Unchecked todo lines only.
+
+    A finished todo is history. Carrying it onto an orientation card would let
+    completed work crowd out the commitments still outstanding, which is the
+    failure the todos section exists to prevent.
+    """
+    return [strip_marker(ln) for ln in lines if ln.lstrip().startswith("- [ ]")]
+
+
 def parse_ledger(text: str) -> dict[str, object]:
-    """Pull goal, state, blockers and next out of a where-were-we ledger."""
+    """Pull goal, state, todos, blockers and next out of a ledger."""
     fields: dict[str, object] = {}
     section: str | None = None
     body: dict[str, list[str]] = {}
@@ -115,9 +188,12 @@ def parse_ledger(text: str) -> dict[str, object]:
             body[section].append(line)
 
     fields["state"] = " ".join(body.get("state", []))
+    fields["todos"] = open_todos(body.get("todos", []))
     for name in ("blockers", "next"):
-        items = [ln.lstrip("- ").strip() for ln in body.get(name, []) if ln.startswith("-")]
-        fields[name] = items[:MAX_LIST_ITEMS]
+        fields[name] = section_items(body.get(name, []))
+    # Truncation happens in build_card so it can say what it left out. Cutting
+    # here made a partial list look like the whole one, which is the same
+    # class of quiet failure as a ledger that claims to be current.
     return fields
 
 
@@ -136,11 +212,25 @@ def build_card(fields: dict[str, object], age_days: int) -> str | None:
         lines.append(f"Goal: {goal}")
     if state:
         lines.append(f"Now: {state}")
-    for label, key in (("Blocked", "blockers"), ("Next", "next")):
+    # Next before Blocked: the card is read to resume work, and what to do
+    # next is the first thing that answers. Todos last because they are the
+    # backlog, not the current move, but present because being out of sight
+    # is exactly how they were being lost.
+    for label, key in (
+        ("Next", "next"),
+        ("Blocked", "blockers"),
+        ("Todo", "todos"),
+    ):
         items = fields.get(key) or []
-        if isinstance(items, list) and items:
-            lines.append(f"{label}:")
-            lines.extend(f"  - {clamp(item)}" for item in items)
+        if not isinstance(items, list) or not items:
+            continue
+        lines.append(f"{label}:")
+        lines.extend(f"  - {clamp(item)}" for item in items[:MAX_LIST_ITEMS])
+        hidden = len(items) - MAX_LIST_ITEMS
+        if hidden > 0:
+            # Say what was cut. A truncated list that looks complete invites
+            # the reader to believe the rest does not exist.
+            lines.append(f"  - ...and {hidden} more, see the ledger")
     if not lines:
         return None
 
@@ -184,6 +274,10 @@ if __name__ == "__main__":
         main()
     except SystemExit:
         raise
-    except BaseException:
+    except BaseException:  # noqa: BLE001
+        # Deliberately total. This runs at session start, so any escaping
+        # exception would stop a session from beginning at all. Failing to
+        # orient is an inconvenience; failing to start is not. SystemExit is
+        # re-raised above so a normal emit() still exits cleanly.
         print("{}")
         sys.exit(0)
