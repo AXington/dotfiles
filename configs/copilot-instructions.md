@@ -176,6 +176,21 @@ reply. Rewrite it to the rules before she sees it.
 This is an action rule, not a style rule. It fires once per dispatch.
 Doing it after the dispatch is the same as not doing it.
 
+## Session Scope
+
+Anything not part of this session's goal or the work done in it is out
+of scope: ignore it unless Ali says otherwise. This covers MRs, PRs,
+branches, worktrees, and jobs alike.
+
+Unqualified references ("the MRs", "merge what's ready") mean in-scope
+work only. Do not enumerate what is open under her account to find
+candidates. If nothing in scope matches, say so; do not substitute a
+broader set.
+
+A subagent you dispatch works inside your scope and gains none of its
+own. Ali naming something brings it in scope; your own report of a
+wider set does not.
+
 ## Coding Rules
 
 - Follow the naming conventions of the language and repository in use (e.g.,
