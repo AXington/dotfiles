@@ -30,28 +30,6 @@ section_copilot() {
     local instructions_src="${SCRIPT_DIR}/configs/copilot-instructions.md"
     install_instructions "$instructions_dir" "$instructions_file" "$instructions_src" "Copilot"
 
-    # Hooks -- sessionStart orientation card and the agentStop ledger
-    # reminder. Symlinked so edits in the repo take effect without re-running
-    # setup. Tests live beside the hooks they cover but are not hooks, so they
-    # are skipped rather than installed into the live hooks directory.
-    local hooks_src="${SCRIPT_DIR}/configs/hooks"
-    local hooks_dest="${instructions_dir}/hooks"
-    if [[ -d "$hooks_src" ]]; then
-        run mkdir -p "$hooks_dest"
-        local hook_path hook_name
-        for hook_path in "$hooks_src"/*; do
-            [[ -f "$hook_path" ]] || continue
-            hook_name="$(basename "$hook_path")"
-            [[ "$hook_name" == test_* ]] && continue
-            if [[ -L "${hooks_dest}/${hook_name}" ]]; then
-                ok "Hook '${hook_name}' already linked."
-            else
-                run ln -sf "$hook_path" "${hooks_dest}/${hook_name}"
-                ok "Hook '${hook_name}' installed."
-            fi
-        done
-    fi
-
     local settings_file="${instructions_dir}/settings.json"
     if [[ -f "$settings_file" ]]; then
         # Deliberately a no-op. This file holds deliberate per-machine choices
@@ -122,7 +100,10 @@ section_copilot() {
 
     log "To authenticate, run: copilot /login"
 
-    # Extensions -- user-level Copilot CLI extensions
+    # Extensions -- user-level Copilot CLI extensions. This is the only
+    # mechanism that loads in every repo: JSON command hooks are read from
+    # <git root>/.github/hooks, which would mean committing personal tooling
+    # into every repository.
     local ext_src="${SCRIPT_DIR}/copilot-extensions"
     local ext_dest="$HOME/.copilot/extensions"
     if [[ -d "$ext_src" ]]; then
@@ -151,12 +132,11 @@ verify_copilot() {
                                         && pass "Copilot instructions written"                 || fail "Copilot instructions missing"
     [[ -f "$HOME/.copilot/settings.json" ]] \
                                         && pass "Copilot settings written"                     || fail "Copilot settings missing"
-    [[ -L "$HOME/.copilot/hooks/session-start-orient.json" && -L "$HOME/.copilot/hooks/orient.py" ]] \
-                                        && pass "Copilot sessionStart hook installed"          || fail "Copilot sessionStart hook missing"
-    [[ -L "$HOME/.copilot/hooks/agent-stop-nudge.json" && -L "$HOME/.copilot/hooks/nudge.py" ]] \
-                                        && pass "Copilot agentStop hook installed"             || fail "Copilot agentStop hook missing"
-    [[ ! -e "$HOME/.copilot/hooks/test_orient.py" && ! -e "$HOME/.copilot/hooks/test_nudge.py" ]] \
-                                        && pass "Hook tests not installed as hooks"            || fail "Hook test files leaked into hooks dir"
+    [[ -L "$HOME/.copilot/extensions/ledger-companion" \
+       || -d "$HOME/.copilot/extensions/ledger-companion" ]] \
+                                        && pass "Ledger companion extension installed"         || fail "Ledger companion extension missing"
+    [[ ! -e "$HOME/.copilot/hooks/session-start-orient.json" ]] \
+                                        && pass "Dead JSON command hooks removed"              || fail "Dead JSON command hook still present"
     # Probe a superpowers-only skill. brainstorming is unusable here: this repo
     # ships its own skills/brainstorming/, and _install_local_skills replaces
     # the superpowers symlink with the repo copy, so the check always failed.
