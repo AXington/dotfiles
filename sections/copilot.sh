@@ -30,8 +30,10 @@ section_copilot() {
     local instructions_src="${SCRIPT_DIR}/configs/copilot-instructions.md"
     install_instructions "$instructions_dir" "$instructions_file" "$instructions_src" "Copilot"
 
-    # Hooks -- sessionStart orientation card. Symlinked so edits in the repo
-    # take effect without re-running setup.
+    # Hooks -- sessionStart orientation card and the agentStop ledger
+    # reminder. Symlinked so edits in the repo take effect without re-running
+    # setup. Tests live beside the hooks they cover but are not hooks, so they
+    # are skipped rather than installed into the live hooks directory.
     local hooks_src="${SCRIPT_DIR}/configs/hooks"
     local hooks_dest="${instructions_dir}/hooks"
     if [[ -d "$hooks_src" ]]; then
@@ -40,6 +42,7 @@ section_copilot() {
         for hook_path in "$hooks_src"/*; do
             [[ -f "$hook_path" ]] || continue
             hook_name="$(basename "$hook_path")"
+            [[ "$hook_name" == test_* ]] && continue
             if [[ -L "${hooks_dest}/${hook_name}" ]]; then
                 ok "Hook '${hook_name}' already linked."
             else
@@ -150,6 +153,10 @@ verify_copilot() {
                                         && pass "Copilot settings written"                     || fail "Copilot settings missing"
     [[ -L "$HOME/.copilot/hooks/session-start-orient.json" && -L "$HOME/.copilot/hooks/orient.py" ]] \
                                         && pass "Copilot sessionStart hook installed"          || fail "Copilot sessionStart hook missing"
+    [[ -L "$HOME/.copilot/hooks/agent-stop-nudge.json" && -L "$HOME/.copilot/hooks/nudge.py" ]] \
+                                        && pass "Copilot agentStop hook installed"             || fail "Copilot agentStop hook missing"
+    [[ ! -e "$HOME/.copilot/hooks/test_orient.py" && ! -e "$HOME/.copilot/hooks/test_nudge.py" ]] \
+                                        && pass "Hook tests not installed as hooks"            || fail "Hook test files leaked into hooks dir"
     # Probe a superpowers-only skill. brainstorming is unusable here: this repo
     # ships its own skills/brainstorming/, and _install_local_skills replaces
     # the superpowers symlink with the repo copy, so the check always failed.
