@@ -130,7 +130,7 @@ def build_parser() -> argparse.ArgumentParser:
     record.add_argument(
         "--kind",
         required=True,
-        choices=["decision", "thread", "blocker", "state", "next", "goal"],
+        choices=["decision", "thread", "todo", "blocker", "state", "next", "goal"],
     )
     record.add_argument("--text", required=True)
     record.add_argument("--why", default="")

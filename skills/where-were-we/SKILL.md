@@ -42,6 +42,7 @@ Show the output verbatim. Do not add commentary above or below it.
 | everything / full | `--level full` |
 | what did we decide | `--section decisions` |
 | what is left / open threads | `--section threads` |
+| what do I still owe / my todos | `--section todos` |
 | what happened / timeline | `--section timeline` |
 | which files | `--section files` |
 | what is blocking | `--section blockers` |
@@ -61,7 +62,22 @@ python3 $S/wwm.py record --kind decision \
   --rejected "pure prompt (drifts), full CLI (too heavy)"
 ```
 
-Kinds: `decision`, `thread`, `blocker`, `state`, `next`, `goal`.
+Kinds: `decision`, `thread`, `todo`, `blocker`, `state`, `next`, `goal`.
+
+Record a `todo` the moment the user defers something, including asides like
+"we should do X later" or "remind me to Y". Do not wait to be asked, and do
+not keep it in your head until the end of the turn.
+
+`thread` and `todo` look identical on disk and differ in meaning. A thread is
+an open question inside the work happening now; it resolves as that work
+proceeds. A todo is a commitment set aside with no natural resolution point,
+so it has to outlive the session that raised it. When unsure, record a todo:
+a thread that should have been a todo disappears when the work moves on.
+
+Recording a `state` or a `next` also marks the session reconciled up to the
+current turn, because both are statements about the whole session. Appending
+a single decision, thread, todo or blocker does not, since one item is no
+evidence about the turns around it.
 
 Record a new `goal` whenever the session's purpose actually shifts. It
 replaces the current goal on purpose, and the one it replaced is filed into

@@ -94,6 +94,12 @@ def _recorded_items(led: wwm_ledger.Ledger) -> list[dict]:
     for thread in led.threads:
         if not thread.done:
             items.append({"label": "Thread", "text": thread.text, "source": "rec"})
+    # Open todos only. A completed one is history; carrying it forward would
+    # let finished work crowd out the commitments still outstanding, which is
+    # the failure this section was added to stop.
+    for todo in led.todos:
+        if not todo.done:
+            items.append({"label": "Todo", "text": todo.text, "source": "rec"})
     for blocker in led.blockers:
         items.append({"label": "Blocked", "text": blocker, "source": "rec"})
     if led.next:
@@ -149,15 +155,16 @@ def collect(session_id: str) -> dict:
     # the fallback off `not newer` meant a 461-turn session answered "where were
     # we" with turns 1-29. Verified against the real store.
     #
-    # Threads and blockers count. Omitting them meant a ledger holding only an
-    # open thread was treated as no ledger at all, which threw away its own
-    # last_synced_turn boundary and replayed history the user had already seen.
+    # Threads, todos and blockers count. Omitting them meant a ledger holding
+    # only an open thread was treated as no ledger at all, which threw away its
+    # own last_synced_turn boundary and replayed history the user had seen.
     has_ledger = bool(
         led.decisions
         or led.state
         or led.goal
         or led.next
         or led.threads
+        or led.todos
         or led.blockers
     )
 

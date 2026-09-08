@@ -19,7 +19,7 @@ TEXT_COL = INDENT + LABEL_W + 1
 TEXT_W = TOTAL - TEXT_COL
 TAG_W = 5
 TIGHT_W = TEXT_W - TAG_W - 1
-MENU = "more? [decisions] [threads] [timeline] [files] [full]"
+MENU = "more? [decisions] [todos] [threads] [timeline] [files] [full]"
 
 
 def display_width(text: str) -> int:
@@ -137,6 +137,7 @@ def row(label: str, text: str, tag: str) -> list[str]:
 LEVELS = ("tldr", "summary", "full")
 SECTIONS = {
     "decisions": ("Decided",),
+    "todos": ("Todo",),
     "threads": ("Thread",),
     "timeline": ("Discussed", "Direction", "Started"),
     "files": ("Files",),
@@ -153,6 +154,10 @@ TLDR_PRIORITY = (
     "State",
     "Next",
     "Blocked",
+    # Above Thread because a todo is something the user committed to and then
+    # set aside, while a thread is a loose end in work still in hand. The
+    # deferred commitment is the one with no other reminder attached to it.
+    "Todo",
     "Thread",
     # Recorded labels win, but history-only labels MUST remain eligible.
     # Omitting them rendered an empty tldr (prose plus menu, zero facts) for

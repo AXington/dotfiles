@@ -20,15 +20,19 @@ from pathlib import Path
 import wwm_session
 
 META_KEYS = ("goal", "started", "updated", "last_synced_turn", "adopted_from")
-KINDS = ("decision", "thread", "blocker", "state", "next", "goal")
+KINDS = ("decision", "thread", "todo", "blocker", "state", "next", "goal")
 KNOWN_SECTIONS = (
     "state",
     "next",
+    "todos",
     "decisions",
     "threads",
     "blockers",
     "goal history",
 )
+# Kinds that describe the session as a whole rather than adding one item to
+# it. Only these can honestly advance last_synced_turn; see record().
+WHOLE_SESSION_KINDS = ("state", "next")
 HEADING = re.compile(r"^##\s+(.+?)\s*$")
 DECISION = re.compile(r"^-\s+(\d{4}-\d{2}-\d{2})\s+(.*)$")
 THREAD = re.compile(r"^-\s+\[( |x)\]\s+(.*)$")
@@ -54,6 +58,22 @@ class Thread:
 
 
 @dataclass(frozen=True)
+class Todo:
+    """A committed action deferred to later.
+
+    Distinct from Thread despite the identical shape. A thread is an open
+    question inside the work happening now, and it resolves as that work
+    proceeds. A todo is something the user said they would do and then set
+    aside, so it has no natural resolution point and must survive the session
+    that raised it. Collapsing the two put deferred commitments in a section
+    people skim for loose ends, which is how they were being lost.
+    """
+
+    done: bool
+    text: str
+
+
+@dataclass(frozen=True)
 class Ledger:
     goal: str | None = None
     # A long session changes what it is about, so replacing the goal is
@@ -72,6 +92,7 @@ class Ledger:
     next: str | None = None
     decisions: list[Decision] = field(default_factory=list)
     threads: list[Thread] = field(default_factory=list)
+    todos: list[Todo] = field(default_factory=list)
     blockers: list[str] = field(default_factory=list)
     # Names of sections that failed to parse. The spec requires that a damaged
     # ledger be used for what survives AND that the loss be stated. Dropping
@@ -187,6 +208,7 @@ def parse(text: str) -> Ledger:
     for name, parser in (
         ("decisions", _decisions),
         ("threads", _threads),
+        ("todos", _todos),
         ("blockers", _blockers),
         # Same `- YYYY-MM-DD text` shape as decisions, so it reuses the same
         # parser and inherits the same preserve-verbatim behaviour for free.
@@ -230,6 +252,7 @@ def parse(text: str) -> Ledger:
         next=_block(sections.get("next")),
         decisions=parsed["decisions"],
         threads=parsed["threads"],
+        todos=parsed["todos"],
         blockers=parsed["blockers"],
         damaged=damaged,
         unparsed=unparsed,
@@ -277,6 +300,26 @@ def _threads(lines: list[str]) -> tuple[list[Thread], list[str]]:
     return out, dropped
 
 
+def _todos(lines: list[str]) -> tuple[list[Todo], list[str]]:
+    """Parse the todos section, which shares the checkbox shape of threads.
+
+    Deliberately the same on-disk form. The distinction between a thread and
+    a todo is which heading the line sits under, so a user who moves a line
+    between the two sections by hand changes its meaning and nothing else.
+    """
+    out: list[Todo] = []
+    dropped: list[str] = []
+    for line in lines:
+        if not line.strip():
+            continue
+        match = THREAD.match(line)
+        if match:
+            out.append(Todo(done=match.group(1) == "x", text=match.group(2).strip()))
+            continue
+        dropped.append(line.rstrip())
+    return out, dropped
+
+
 def _blockers(lines: list[str]) -> tuple[list[str], list[str]]:
     out: list[str] = []
     dropped: list[str] = []
@@ -316,6 +359,19 @@ def serialize(led: Ledger) -> str:
         parts += ["## state", led.state, ""]
     if led.next:
         parts += ["## next", led.next, ""]
+
+    # Sits with state and next because all three look forward, and above the
+    # record of what already happened because a deferred commitment is only
+    # useful if it is read before the history. Emitted only when it holds
+    # something, following goal history: adding an empty heading would rewrite
+    # every existing ledger for no content.
+    if led.todos or led.unparsed.get("todos"):
+        parts.append("## todos")
+        for todo in led.todos:
+            box = "x" if todo.done else " "
+            parts.append(f"- [{box}] {todo.text}")
+        parts += led.unparsed.get("todos", [])
+        parts.append("")
 
     parts.append("## decisions")
     for dec in led.decisions:
@@ -378,7 +434,8 @@ def _max_turn_index(session_id: str) -> int:
     """Return the highest committed turn index, or -1 when none is readable.
 
     Read straight from the store so record() stamps last_synced_turn from
-    reality rather than from any caller-supplied value. The connection is
+    reality rather than from any caller-supplied value. Only whole-session
+    kinds consult it; see WHOLE_SESSION_KINDS. The connection is
     read-only by URI so a bug here cannot corrupt session history, and it is
     wrapped in contextlib.closing because a bare sqlite3.connect context manager
     commits without closing and would leak the handle.
@@ -496,7 +553,7 @@ def record(
 
     Args:
         session_id: The session whose ledger to update.
-        kind: One of decision, thread, blocker, state, next, or goal.
+        kind: One of decision, thread, todo, blocker, state, next, or goal.
         text: The milestone content.
         why: Rationale, recorded only for decisions.
         rejected: Rejected alternatives, recorded only for decisions.
@@ -545,6 +602,8 @@ def record(
             )
         elif kind == "thread":
             led = replace(led, threads=[*led.threads, Thread(False, text)])
+        elif kind == "todo":
+            led = replace(led, todos=[*led.todos, Todo(False, text)])
         elif kind == "blocker":
             led = replace(led, blockers=[*led.blockers, text])
         elif kind == "state":
@@ -563,11 +622,29 @@ def record(
                 history = [*history, Decision(today, led.goal)]
             led = replace(led, goal=text, goal_history=history)
 
+        # Appending one item is evidence about that item and nothing else.
+        # Only state and next are claims about the session as a whole, so only
+        # they can honestly say the turns behind them have been folded in.
+        #
+        # Stamping this on every kind assumed recording was continuous, which
+        # is the exact habit this skill exists because nobody keeps. Observed
+        # live: one throwaway `--kind thread` write moved the pointer from 9 to
+        # 34 while state and next still held three-week-old content. Because
+        # reconciliation only ever selects turn_index > this value, those 25
+        # turns could not resurface. A stale ledger says so; that one claimed
+        # to be current and was not, which is worse.
+        synced = led.last_synced_turn
+        if kind in WHOLE_SESSION_KINDS:
+            # Never backwards. _max_turn_index returns -1 when the store is
+            # missing or unreadable, and that transient failure must not erase
+            # a pointer that was true when it was written.
+            synced = max(synced, _max_turn_index(session_id))
+
         led = replace(
             led,
             started=led.started or today,
             updated=today,
-            last_synced_turn=_max_turn_index(session_id),
+            last_synced_turn=synced,
         )
         _atomic_write(wwm_session.ledger_path(session_id), serialize(led))
     return led
@@ -633,6 +710,7 @@ def _has_content(led: Ledger) -> bool:
         or led.next
         or led.decisions
         or led.threads
+        or led.todos
         or led.blockers
         or led.unparsed
         or led.unknown_sections
