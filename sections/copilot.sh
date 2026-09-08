@@ -126,12 +126,28 @@ section_copilot() {
         run mkdir -p "$ext_dest"
         for ext_path in "$ext_src"/*/; do
             [[ -d "$ext_path" ]] || continue
-            local ext_name
+            local ext_name ext_link ext_target ext_backup
             ext_name="$(basename "$ext_path")"
-            if [[ -L "${ext_dest}/${ext_name}" || -d "${ext_dest}/${ext_name}" ]]; then
-                ok "Extension '${ext_name}' already installed."
+            ext_link="${ext_dest}/${ext_name}"
+            if [[ -L "$ext_link" ]]; then
+                ext_target="$(readlink "$ext_link")"
+                if [[ "${ext_target%/}" == "${ext_path%/}" ]]; then
+                    ok "Extension '${ext_name}' already linked to repo."
+                else
+                    warn "Extension '${ext_name}' links to ${ext_target}; relinking to repo."
+                    run ln -sfn "$ext_path" "$ext_link"
+                fi
+            elif [[ -d "$ext_link" ]]; then
+                # A real directory shadows the repo copy, so edits made to the
+                # installed extension never appear in git status and the two
+                # drift apart unnoticed. Preserve the local copy, then link.
+                ext_backup="${ext_link}.local-$(date +%Y%m%d%H%M%S)"
+                warn "Extension '${ext_name}' is a real directory, not a link."
+                warn "Preserving it at ${ext_backup}, then linking to the repo."
+                run mv "$ext_link" "$ext_backup"
+                run ln -sfn "$ext_path" "$ext_link"
             else
-                run ln -sf "$ext_path" "${ext_dest}/${ext_name}"
+                run ln -sfn "$ext_path" "$ext_link"
                 ok "Extension '${ext_name}' installed."
             fi
         done
@@ -159,8 +175,10 @@ verify_copilot() {
                                         && pass "bun installed (gstack dependency)"             || fail "bun not installed (required by gstack)"
     [[ -d "$HOME/.copilot/skills/gstack" ]] \
                                         && pass "gstack installed for Copilot"                  || fail "gstack not installed for Copilot"
-    [[ -e "$HOME/.copilot/extensions/prompt-injection-guard/extension.mjs" ]] \
-                                        && pass "prompt-injection-guard extension installed"    || fail "prompt-injection-guard extension missing"
+    local guard_link="$HOME/.copilot/extensions/prompt-injection-guard"
+    local guard_src="${SCRIPT_DIR}/copilot-extensions/prompt-injection-guard"
+    [[ -L "$guard_link" && "$(readlink "$guard_link")" == "${guard_src}"* && -e "${guard_link}/extension.mjs" ]] \
+                                        && pass "prompt-injection-guard linked to repo"         || fail "prompt-injection-guard not linked to repo (local edits invisible to git)"
 
     # Check local skills installed. Mirrors verify_claude: assert every skill
     # this repo ships, rather than probing one name as a proxy.
