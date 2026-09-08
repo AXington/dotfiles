@@ -39,7 +39,8 @@ def mock_discogs():
 
 class TestResolverCacheCheck:
     def test_skips_fresh_confirmed_track(self, mock_store, mock_mb):
-        mock_store.get_resolution_state.return_value = ("CONFIRMED", 0.85, "2026-06-01T00:00:00")
+        fresh_time = datetime.now(timezone.utc).isoformat()
+        mock_store.get_resolution_state.return_value = ("CONFIRMED", 0.85, fresh_time)
         resolver = TrackResolver(store=mock_store, musicbrainz=mock_mb)
         track = TrackInput(title="Heroes", artist="David Bowie")
         result = resolver.resolve(track_id=1, track=track)
@@ -47,7 +48,8 @@ class TestResolverCacheCheck:
         mock_mb.lookup_isrc.assert_not_called()
 
     def test_resolves_stale_track(self, mock_store, mock_mb):
-        mock_store.get_resolution_state.return_value = ("CONFIRMED", 0.85, "2025-01-01T00:00:00")
+        stale_time = (datetime.now(timezone.utc) - timedelta(days=91)).isoformat()
+        mock_store.get_resolution_state.return_value = ("CONFIRMED", 0.85, stale_time)
         mock_mb.lookup_isrc.return_value = None
         mock_mb.search.return_value = SourceResult(recordings=[])
         resolver = TrackResolver(store=mock_store, musicbrainz=mock_mb, config=ResolverConfig(upgrade_mode=True))
